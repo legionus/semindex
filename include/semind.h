@@ -20,6 +20,12 @@ typedef enum {
 	SEMIND_SYMBOL_TYPEDEF,
 } semind_symbol_kind_t;
 
+typedef enum {
+	SEMIND_USE_READ,
+	SEMIND_USE_WRITE,
+	SEMIND_USE_ADDR
+} semind_use_kind_t;
+
 /* symbol record */
 typedef struct {
 	semind_symbol_kind_t kind;
@@ -33,6 +39,7 @@ typedef struct {
 
 /* usage record */
 typedef struct {
+	semind_use_kind_t kind;
 	const char* usr; /* target symbol */
 	const char* file;
 	unsigned line;
@@ -52,8 +59,6 @@ const semind_symbol_t* semind_get_symbol(const semind_t* s, size_t idx);
 
 size_t semind_use_count(const semind_t* s);
 const semind_use_t* semind_get_use(const semind_t* s, size_t idx);
-
-const char* kind_to_string(semind_symbol_kind_t kind);
 
 #ifdef __cplusplus
 }

@@ -3,6 +3,7 @@
 
 /* ==== LLVM / Clang ==== */
 #include <clang/AST/AST.h>
+#include <clang/AST/ParentMapContext.h>
 #include <clang/AST/RecursiveASTVisitor.h>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Frontend/FrontendActions.h>
@@ -25,8 +26,7 @@ using namespace clang::tooling;
  * Helpers
  * ============================================================ */
 
-static std::string locToFile(
-    const ASTContext& ctx, SourceLocation loc, unsigned& line, unsigned& col)
+static std::string locToFile(const ASTContext& ctx, SourceLocation loc, unsigned& line, unsigned& col)
 {
 	const SourceManager& sm = ctx.getSourceManager();
 	PresumedLoc ploc = sm.getPresumedLoc(loc);
@@ -56,6 +56,45 @@ static std::string getUSR(const Decl* D, const ASTContext& ctx)
 	return std::string(buf.begin(), buf.end());
 }
 
+static semind_use_kind_t classifyUse(const Expr* E, ASTContext& ctx)
+{
+	E = E->IgnoreParenImpCasts();
+
+	const Stmt* parent = nullptr;
+
+	auto parents = ctx.getParents(*E);
+	if (!parents.empty()) {
+		if (const Stmt* S = parents.begin()->get<Stmt>())
+			parent = S;
+	}
+
+	/* &x */
+	if (parent) {
+		if (const auto* U = dyn_cast<UnaryOperator>(parent)) {
+			if (U->getOpcode() == UO_AddrOf)
+				return SEMIND_USE_ADDR;
+		}
+	}
+
+	/* x = ... */
+	if (parent) {
+		if (const auto* B = dyn_cast<BinaryOperator>(parent)) {
+			if (B->isAssignmentOp() && B->getLHS() == E)
+				return SEMIND_USE_WRITE;
+		}
+	}
+
+	/* ++x, x++ */
+	if (parent) {
+		if (const auto* U = dyn_cast<UnaryOperator>(parent)) {
+			if (U->isIncrementDecrementOp())
+				return SEMIND_USE_WRITE;
+		}
+	}
+
+	return SEMIND_USE_READ;
+}
+
 /* ============================================================
  * Internal C++ model
  * ============================================================ */
@@ -71,6 +110,7 @@ struct SemindSymbol {
 };
 
 struct SemindUse {
+	semind_use_kind_t kind;
 	std::string usr;
 	std::string file;
 	unsigned line;
@@ -127,6 +167,7 @@ class SemindVisitor : public RecursiveASTVisitor<SemindVisitor> {
 			return true;
 
 		SemindUse u;
+		u.kind = classifyUse(E, ctx);
 		u.usr = getUSR(D, ctx);
 		u.file = locToFile(ctx, E->getExprLoc(), u.line, u.column);
 
@@ -141,6 +182,7 @@ class SemindVisitor : public RecursiveASTVisitor<SemindVisitor> {
 			return true;
 
 		SemindUse u;
+		u.kind = classifyUse(E, ctx);
 		u.usr = getUSR(D, ctx);
 		u.file = locToFile(ctx, E->getExprLoc(), u.line, u.column);
 
@@ -235,8 +277,7 @@ semind_t* semind_create(void) { return new semind {}; }
 
 void semind_destroy(semind_t* s) { delete s; }
 
-int semind_index_file(
-    semind_t* s, const char* compile_commands_json, const char* source_file)
+int semind_index_file(semind_t* s, const char* compile_commands_json, const char* source_file)
 {
 	if (!s || !source_file)
 		return -1;
@@ -295,24 +336,13 @@ const semind_use_t* semind_get_use(const semind_t* s, size_t idx)
 	static semind_use_t out;
 	const auto& u = s->uses[idx];
 
+	out.kind = u.kind;
 	out.usr = u.usr.c_str();
 	out.file = u.file.c_str();
 	out.line = u.line;
 	out.column = u.column;
 
 	return &out;
-}
-
-const char* kind_to_string(semind_symbol_kind_t kind)
-{
-	static const char* kinds[] = {
-		[SEMIND_SYMBOL_VAR]     = "var",
-		[SEMIND_SYMBOL_FIELD]   = "field",
-		[SEMIND_SYMBOL_STRUCT]  = "struct",
-		[SEMIND_SYMBOL_UNION]   = "union",
-		[SEMIND_SYMBOL_TYPEDEF] = "typedef",
-	};
-	return kinds[kind];
 }
 
 } /* extern "C" */
