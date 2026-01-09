@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
-project(semind LANGUAGES CXX)
+project(semind C CXX)
 
 # LLVM paths from llvm-config
 execute_process(
@@ -32,22 +32,25 @@ execute_process(
 	OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
-add_executable(semind semind.cpp)
+# libsemind_parser (C++)
+add_library(semind_parser SHARED
+	src/semind.cpp
+)
 
-# Includes
-target_include_directories(semind PRIVATE ${LLVM_INCLUDEDIR})
+target_include_directories(semind_parser PUBLIC
+	${CMAKE_CURRENT_SOURCE_DIR}/include
+	${LLVM_INCLUDEDIR}
+)
 
 # Compile flags
 separate_arguments(LLVM_CXXFLAGS)
-target_compile_options(semind PRIVATE ${LLVM_CXXFLAGS})
+target_compile_options(semind_parser PRIVATE ${LLVM_CXXFLAGS})
+target_link_directories(semind_parser PRIVATE ${LLVM_LIBDIR})
+target_link_libraries(semind_parser PRIVATE clang-cpp ${LLVM_LIBS})
 
-# Linker flags
-separate_arguments(LLVM_LDFLAGS)
-target_link_options(semind PRIVATE ${LLVM_LDFLAGS})
-
-target_link_directories(semind PRIVATE ${LLVM_LIBDIR})
-
-target_link_libraries(semind PRIVATE
-	clang-cpp
-	${LLVM_LIBS}
+add_executable(semind
+	utils/semind.c
 )
+
+target_include_directories(semind PRIVATE include)
+target_link_libraries(semind PRIVATE semind_parser)
