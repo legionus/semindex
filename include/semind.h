@@ -18,12 +18,14 @@ typedef enum {
 	SEMIND_SYMBOL_STRUCT,
 	SEMIND_SYMBOL_UNION,
 	SEMIND_SYMBOL_TYPEDEF,
+	SEMIND_SYMBOL_FUNCTION,
 } semind_symbol_kind_t;
 
 typedef enum {
 	SEMIND_USE_READ,
 	SEMIND_USE_WRITE,
-	SEMIND_USE_ADDR
+	SEMIND_USE_ADDR,
+	SEMIND_USE_CALL,
 } semind_use_kind_t;
 
 /* symbol record */

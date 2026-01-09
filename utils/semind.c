@@ -6,11 +6,12 @@
 static const char* kind_to_string(semind_symbol_kind_t kind)
 {
 	switch (kind) {
-		case SEMIND_SYMBOL_VAR:     return "var";
-		case SEMIND_SYMBOL_FIELD:   return "field";
-		case SEMIND_SYMBOL_STRUCT:  return "struct";
-		case SEMIND_SYMBOL_UNION:   return "union";
-		case SEMIND_SYMBOL_TYPEDEF: return "typedef";
+		case SEMIND_SYMBOL_VAR:      return "var";
+		case SEMIND_SYMBOL_FIELD:    return "field";
+		case SEMIND_SYMBOL_STRUCT:   return "struct";
+		case SEMIND_SYMBOL_UNION:    return "union";
+		case SEMIND_SYMBOL_TYPEDEF:  return "typedef";
+		case SEMIND_SYMBOL_FUNCTION: return "function";
 		default:
 			return "?";
 	};
@@ -22,6 +23,7 @@ static const char* use_kind_to_string(semind_use_kind_t k)
 		case SEMIND_USE_READ:  return "READ";
 		case SEMIND_USE_WRITE: return "WRITE";
 		case SEMIND_USE_ADDR:  return "ADDR";
+	       case SEMIND_USE_CALL:   return "CALL";
 		default:
 			return "?";
 	}

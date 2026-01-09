@@ -208,6 +208,37 @@ class SemindVisitor : public RecursiveASTVisitor<SemindVisitor> {
 		return true;
 	}
 
+	bool VisitFunctionDecl(FunctionDecl* D)
+	{
+		if (!D->isThisDeclarationADefinition())
+			return true;
+
+		SemindSymbol s;
+		s.kind = SEMIND_SYMBOL_FUNCTION;
+		s.name = getName(D);
+		s.type = D->getType().getAsString();
+		s.usr = getUSR(D, ctx);
+		s.file = locToFile(ctx, D->getLocation(), s.line, s.column);
+
+		out->symbols.push_back(std::move(s));
+		return true;
+	}
+
+	bool VisitCallExpr(CallExpr* E)
+	{
+		const FunctionDecl* FD = E->getDirectCallee();
+		if (!FD)
+			return true; /* indirect call: fp() */
+
+		SemindUse u;
+		u.kind = SEMIND_USE_CALL;
+		u.usr = getUSR(FD, ctx);
+		u.file = locToFile(ctx, E->getExprLoc(), u.line, u.column);
+
+		out->uses.push_back(std::move(u));
+		return true;
+	}
+
     private:
 	ASTContext& ctx;
 	semind* out;
