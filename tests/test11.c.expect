@@ -1,0 +1,17 @@
+SYMBOLS:
+tests/test11.c:2:8 defined  struct   Inner
+tests/test11.c:3:6 defined  field    x          int
+tests/test11.c:6:8 defined  struct   Outer
+tests/test11.c:7:15 defined  field    inner      struct Inner
+tests/test11.c:8:6 defined  field    y          int
+tests/test11.c:9:6 defined  field    z          int[2]
+tests/test11.c:12:14 defined  var      o          struct Outer
+
+USES:
+tests/test11.c:7:9 READ  c:@S@Inner
+tests/test11.c:12:14 WRITE c:@o
+tests/test11.c:12:8 READ  c:@S@Outer
+tests/test11.c:13:3 WRITE c:@S@Outer@FI@inner
+tests/test11.c:13:9 WRITE c:@S@Inner@FI@x
+tests/test11.c:14:3 WRITE c:@S@Outer@FI@y
+tests/test11.c:15:3 WRITE c:@S@Outer@FI@z

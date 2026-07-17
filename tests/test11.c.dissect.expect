@@ -1,0 +1,17 @@
+
+FILE: tests/test11.c
+
+   2:8                    def   s Inner
+   3:6                    def   m Inner.x                          int
+   6:8                    def   s Outer
+   7:9                    -r-   s Inner
+   7:15                   def   m Outer.inner                      struct Inner
+   8:6                    def   m Outer.y                          int
+   9:6                    def   m Outer.z                          int[2]
+  12:8                    -r-   s Outer
+  12:14                   def   v o                                struct Outer
+  12:14                   -w-   v o                                struct Outer
+  13:3                    -w-   m Outer.inner                      struct Inner
+  13:9                    -w-   m Inner.x                          int
+  14:3                    -w-   m Outer.y                          int
+  15:3                    -w-   m Outer.z                          int[2]

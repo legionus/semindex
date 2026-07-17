@@ -694,19 +694,26 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		if (!D)
 			return true;
 
-		SemindexUse u;
-		u.kind = classifyUse(E, ctx);
-		u.symbol_kind = symbolKindForDecl(D);
-		u.mode = accessModeForUse(u.kind, E, ctx);
-		u.name = getName(D);
-		u.owner = getOwnerName(D);
-		u.type = D->getType().getAsString();
-		u.usr = getUSR(D, ctx);
-		u.context = currentFunction;
-		u.file = locToFile(ctx, E->getExprLoc(), u.line, u.column);
-		u.local = false;
+		semindex_use_kind_t kind = classifyUse(E, ctx);
+		addValueUse(D, kind, accessModeForUse(kind, E, ctx),
+		    currentFunction, E->getExprLoc(), false);
+		return true;
+	}
 
-		out->uses.push_back(std::move(u));
+	bool VisitDesignatedInitExpr(DesignatedInitExpr* E)
+	{
+		for (const auto& designator : E->designators()) {
+			if (!designator.isFieldDesignator())
+				continue;
+
+			const FieldDecl* D = designator.getFieldDecl();
+			if (!D)
+				continue;
+
+			addValueUse(D, SEMINDEX_USE_WRITE, SEMINDEX_MODE_W_VAL,
+			    currentFunction, designator.getFieldLoc(), false);
+		}
+
 		return true;
 	}
 
@@ -856,6 +863,25 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		    + "|" + u.context;
 		if (!typeUses.insert(key).second)
 			return;
+
+		out->uses.push_back(std::move(u));
+	}
+
+	void addValueUse(const ValueDecl* D, semindex_use_kind_t kind,
+	    unsigned mode, const std::string& context, SourceLocation loc,
+	    bool local)
+	{
+		SemindexUse u;
+		u.kind = kind;
+		u.symbol_kind = symbolKindForDecl(D);
+		u.mode = mode;
+		u.name = getName(D);
+		u.owner = getOwnerName(D);
+		u.type = D->getType().getAsString();
+		u.usr = getUSR(D, ctx);
+		u.context = context;
+		u.file = locToFile(ctx, loc, u.line, u.column);
+		u.local = local;
 
 		out->uses.push_back(std::move(u));
 	}
