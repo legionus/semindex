@@ -5,6 +5,7 @@ tests/test3.c:6:6 defined  var      x          int
 tests/test3.c:7:7 defined  var      p          int *
 
 USES:
+tests/test3.c:6:6 WRITE c:test3.c@68@F@f@x
 tests/test3.c:9:2 WRITE c:test3.c@80@F@f@p
 tests/test3.c:9:7 ADDR  c:@g
 tests/test3.c:10:2 WRITE c:test3.c@68@F@f@x

@@ -560,7 +560,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 
 		out->symbols.push_back(std::move(s));
 
-		if (D->hasInit() && currentFunction.empty()) {
+		if (D->hasInit()) {
 			SemindexUse u;
 			u.kind = SEMINDEX_USE_WRITE;
 			u.symbol_kind = SEMINDEX_SYMBOL_VAR;
@@ -569,9 +569,9 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 			u.owner = "";
 			u.type = typeName;
 			u.usr = getUSR(D, ctx);
-			u.context = "";
+			u.context = currentFunction;
 			u.file = locToFile(ctx, D->getLocation(), u.line, u.column);
-			u.local = false;
+			u.local = !currentFunction.empty();
 
 			out->uses.push_back(std::move(u));
 		}

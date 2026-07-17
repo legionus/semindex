@@ -4,6 +4,7 @@ FILE: tests/test3.c
    2:5                    def   v g                                int
    4:5                    def   f f                                int (void)
    6:6   f                def . v x                                int
+   6:6   f                -w- . v x                                int
    7:7   f                def . v p                                int *
    9:2   f                -w- . v p                                int *
    9:7   f                m--   v g                                int

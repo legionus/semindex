@@ -6,5 +6,6 @@ tests/test2.c:10:6 defined  var      y          int
 
 USES:
 tests/test2.c:5:9 READ  c:test2.c@54@F@foo@x
+tests/test2.c:10:6 WRITE c:test2.c@99@F@main@y
 tests/test2.c:10:10 CALL  c:@F@foo
 tests/test2.c:11:9 READ  c:test2.c@99@F@main@y
