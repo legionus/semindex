@@ -1,0 +1,7 @@
+
+FILE: tests/test6.c
+
+   2:8                    def   s :var                             
+   4:21                   def   m :var.x                           int
+   6:3                    def   v var                              struct :var
+   6:3                    -w-   v var                              struct :var

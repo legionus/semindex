@@ -42,6 +42,41 @@ static std::string locToFile(const ASTContext& ctx, SourceLocation loc, unsigned
 	return std::string(ploc.getFilename());
 }
 
+static unsigned displayColumnForLoc(const ASTContext& ctx, SourceLocation loc)
+{
+	const SourceManager& sm = ctx.getSourceManager();
+	bool invalid = false;
+	SourceLocation spelling = sm.getSpellingLoc(loc);
+	const char* ptr = sm.getCharacterData(spelling, &invalid);
+	unsigned col = 1;
+
+	if (invalid || !ptr)
+		return sm.getPresumedLoc(loc).getColumn();
+
+	while (ptr > sm.getBufferData(sm.getFileID(spelling), &invalid).begin()
+	    && ptr[-1] != '\n')
+		ptr--;
+
+	const char* end = sm.getCharacterData(spelling, &invalid);
+	while (!invalid && ptr < end) {
+		if (*ptr == '\t')
+			col = ((col - 1) / 8 + 1) * 8 + 1;
+		else
+			col++;
+		ptr++;
+	}
+
+	return col;
+}
+
+static std::string locToFileDisplayColumn(
+    const ASTContext& ctx, SourceLocation loc, unsigned& line, unsigned& col)
+{
+	std::string file = locToFile(ctx, loc, line, col);
+	col = displayColumnForLoc(ctx, loc);
+	return file;
+}
+
 static std::string getName(const Decl* D)
 {
 	if (const auto* ND = llvm::dyn_cast<NamedDecl>(D))
@@ -243,6 +278,31 @@ static std::string getOwnerName(const Decl* D)
 	return getName(RD);
 }
 
+static const RecordDecl* recordDeclForType(QualType type)
+{
+	type = type.getCanonicalType();
+
+	if (const auto* RT = type->getAs<RecordType>())
+		return RT->getDecl();
+
+	return nullptr;
+}
+
+static bool isAnonymousRecord(const RecordDecl* D)
+{
+	return D && getName(D).empty();
+}
+
+static std::string anonymousRecordNameForVar(const VarDecl* D)
+{
+	return ":" + getName(D);
+}
+
+static std::string typeNameForRecord(const RecordDecl* D, const std::string& name)
+{
+	return std::string(D->isUnion() ? "union " : "struct ") + name;
+}
+
 /* ============================================================
  * Internal C++ model
  * ============================================================ */
@@ -353,22 +413,54 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 
 	bool VisitVarDecl(VarDecl* D)
 	{
+		const RecordDecl* anonymousRecord = recordDeclForType(D->getType());
+		std::string anonymousName;
+		std::string typeName;
+
+		if (isAnonymousRecord(anonymousRecord)) {
+			anonymousName = anonymousRecordNameForVar(D);
+			typeName = typeNameForRecord(anonymousRecord, anonymousName);
+			addAnonymousRecordSymbols(anonymousRecord, anonymousName);
+		} else {
+			typeName = D->getType().getAsString();
+		}
+
 		SemindexSymbol s;
 		s.kind = SEMINDEX_SYMBOL_VAR;
 		s.name = getName(D);
 		s.owner = "";
-		s.type = D->getType().getAsString();
+		s.type = typeName;
 		s.usr = getUSR(D, ctx);
 		s.context = currentFunction;
 		s.file = locToFile(ctx, D->getLocation(), s.line, s.column);
 		s.local = !currentFunction.empty();
 
 		out->symbols.push_back(std::move(s));
+
+		if (D->hasInit() && currentFunction.empty()) {
+			SemindexUse u;
+			u.kind = SEMINDEX_USE_WRITE;
+			u.symbol_kind = SEMINDEX_SYMBOL_VAR;
+			u.mode = SEMINDEX_MODE_W_VAL;
+			u.name = getName(D);
+			u.owner = "";
+			u.type = typeName;
+			u.usr = getUSR(D, ctx);
+			u.context = "";
+			u.file = locToFile(ctx, D->getLocation(), u.line, u.column);
+			u.local = false;
+
+			out->uses.push_back(std::move(u));
+		}
+
 		return true;
 	}
 
 	bool VisitFieldDecl(FieldDecl* D)
 	{
+		if (isAnonymousRecord(D->getParent()))
+			return true;
+
 		SemindexSymbol s;
 		s.kind = SEMINDEX_SYMBOL_FIELD;
 		s.name = getName(D);
@@ -434,6 +526,8 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 	{
 		if (!D->isThisDeclarationADefinition())
 			return true;
+		if (isAnonymousRecord(D))
+			return true;
 
 		SemindexSymbol s;
 		s.kind
@@ -493,6 +587,54 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 	}
 
     private:
+	void addAnonymousRecordSymbols(const RecordDecl* D, const std::string& name)
+	{
+		SemindexSymbol s;
+		s.kind = D->isUnion() ? SEMINDEX_SYMBOL_UNION : SEMINDEX_SYMBOL_STRUCT;
+		s.name = name;
+		s.owner = "";
+		s.type = "";
+		s.usr = getUSR(D, ctx);
+		s.context = "";
+		s.file = locToFileDisplayColumn(ctx,
+		    D->getBraceRange().getBegin().isValid()
+		        ? D->getBraceRange().getBegin()
+		        : D->getLocation(),
+		    s.line, s.column);
+		s.local = false;
+
+		out->symbols.push_back(std::move(s));
+		addAnonymousRecordFields(D, name);
+	}
+
+	void addAnonymousRecordFields(const RecordDecl* D, const std::string& owner)
+	{
+		for (const FieldDecl* field : D->fields()) {
+			const RecordDecl* nested = recordDeclForType(field->getType());
+
+			if (isAnonymousRecord(nested) && getName(field).empty()) {
+				addAnonymousRecordFields(nested, owner);
+				continue;
+			}
+
+			if (getName(field).empty())
+				continue;
+
+			SemindexSymbol s;
+			s.kind = SEMINDEX_SYMBOL_FIELD;
+			s.name = getName(field);
+			s.owner = owner;
+			s.type = field->getType().getAsString();
+			s.usr = getUSR(field, ctx);
+			s.context = "";
+			s.file = locToFileDisplayColumn(ctx, field->getLocation(),
+			    s.line, s.column);
+			s.local = false;
+
+			out->symbols.push_back(std::move(s));
+		}
+	}
+
 	ASTContext& ctx;
 	semindex* out;
 	std::string currentFunction;
