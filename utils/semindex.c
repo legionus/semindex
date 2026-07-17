@@ -31,8 +31,8 @@ static const char* use_kind_to_string(semind_use_kind_t k)
 
 int main(int argc, char** argv)
 {
-	if (argc == 1) {
-		printf("Usage: semindex <source> [compile_commands]\n");
+	if (argc < 2 || argc > 3) {
+		fprintf(stderr, "Usage: semindex <source> [compile_commands]\n");
 		return 1;
 	}
 
@@ -40,6 +40,8 @@ int main(int argc, char** argv)
 	semind_t* s = semind_create();
 
 	if (semind_index_file(s, compile_commands, argv[1]) != 0) {
+		fprintf(stderr, "semindex: failed to index '%s' using '%s'\n",
+		    argv[1], compile_commands);
 		semind_destroy(s);
 		return 1;
 	}
