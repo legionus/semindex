@@ -1,0 +1,13 @@
+SYMBOLS:
+tests/test9.c:2:6 enum     Color      
+tests/test9.c:3:2 enumerator RED        int
+tests/test9.c:4:2 enumerator GREEN      int
+tests/test9.c:7:12 var      color      enum Color
+tests/test9.c:8:5 var      x          int
+
+USES:
+tests/test9.c:7:12 WRITE c:@color
+tests/test9.c:7:6 READ  c:@E@Color
+tests/test9.c:7:20 READ  c:@E@Color@RED
+tests/test9.c:8:5 WRITE c:@x
+tests/test9.c:8:9 READ  c:@E@Color@GREEN

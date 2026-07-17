@@ -279,6 +279,8 @@ static semindex_symbol_kind_t symbolKindForDecl(const ValueDecl* D)
 {
 	if (isa<FieldDecl>(D))
 		return SEMINDEX_SYMBOL_FIELD;
+	if (isa<EnumConstantDecl>(D))
+		return SEMINDEX_SYMBOL_ENUM_CONSTANT;
 	if (isa<FunctionDecl>(D))
 		return SEMINDEX_SYMBOL_FUNCTION;
 	return SEMINDEX_SYMBOL_VAR;
@@ -639,6 +641,19 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		return true;
 	}
 
+	bool VisitEnumTypeLoc(EnumTypeLoc TL)
+	{
+		if (TL.isDefinition())
+			return true;
+
+		const EnumDecl* D = TL.getDecl();
+		if (!D || getName(D).empty())
+			return true;
+
+		addTypeUse(D, SEMINDEX_SYMBOL_ENUM, TL.getNameLoc(), "");
+		return true;
+	}
+
 	bool VisitDeclRefExpr(DeclRefExpr* E)
 	{
 		const ValueDecl* D = E->getDecl();
@@ -700,6 +715,43 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.name = getName(D);
 		s.owner = "";
 		s.type = ""; // TODO: fill it later
+		s.usr = getUSR(D, ctx);
+		s.context = "";
+		s.file = locToFile(ctx, D->getLocation(), s.line, s.column);
+		s.local = false;
+
+		out->symbols.push_back(std::move(s));
+		return true;
+	}
+
+	bool VisitEnumDecl(EnumDecl* D)
+	{
+		if (!D->isThisDeclarationADefinition())
+			return true;
+		if (getName(D).empty())
+			return true;
+
+		SemindexSymbol s;
+		s.kind = SEMINDEX_SYMBOL_ENUM;
+		s.name = getName(D);
+		s.owner = "";
+		s.type = "";
+		s.usr = getUSR(D, ctx);
+		s.context = "";
+		s.file = locToFile(ctx, D->getLocation(), s.line, s.column);
+		s.local = false;
+
+		out->symbols.push_back(std::move(s));
+		return true;
+	}
+
+	bool VisitEnumConstantDecl(EnumConstantDecl* D)
+	{
+		SemindexSymbol s;
+		s.kind = SEMINDEX_SYMBOL_ENUM_CONSTANT;
+		s.name = getName(D);
+		s.owner = "";
+		s.type = D->getType().getAsString();
 		s.usr = getUSR(D, ctx);
 		s.context = "";
 		s.file = locToFile(ctx, D->getLocation(), s.line, s.column);

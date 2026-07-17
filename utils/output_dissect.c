@@ -18,6 +18,9 @@ static char kind_to_dissect_char(semindex_symbol_kind_t kind)
 		case SEMINDEX_SYMBOL_FIELD:    return 'm';
 		case SEMINDEX_SYMBOL_STRUCT:
 		case SEMINDEX_SYMBOL_UNION:    return 's';
+		case SEMINDEX_SYMBOL_ENUM:     return 'e';
+		case SEMINDEX_SYMBOL_ENUM_CONSTANT:
+			return 'v';
 		case SEMINDEX_SYMBOL_TYPEDEF:  return 't';
 		case SEMINDEX_SYMBOL_FUNCTION: return 'f';
 		case SEMINDEX_SYMBOL_MACRO:    return 'd';
