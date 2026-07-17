@@ -1,0 +1,10 @@
+SYMBOLS:
+tests/test1.c:2:5 var      g          int
+tests/test1.c:4:5 function main       int (void)
+tests/test1.c:6:6 var      x          int
+
+USES:
+tests/test1.c:7:2 WRITE c:@g
+tests/test1.c:8:2 WRITE c:test1.c@71@F@main@x
+tests/test1.c:8:6 READ  c:@g
+tests/test1.c:9:3 ADDR  c:test1.c@71@F@main@x

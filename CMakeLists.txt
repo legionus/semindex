@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.13)
 project(semindex C CXX)
 
+include(CTest)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # LLVM paths from llvm-config
 execute_process(
 	COMMAND llvm-config --includedir
@@ -54,3 +57,24 @@ add_executable(semindex
 
 target_include_directories(semindex PRIVATE include)
 target_link_libraries(semindex PRIVATE semindex_parser)
+
+if(BUILD_TESTING)
+	foreach(test_source IN ITEMS
+		tests/test.c
+		tests/test1.c
+		tests/test2.c
+	)
+		get_filename_component(test_name ${test_source} NAME)
+		add_test(
+			NAME semindex-${test_name}
+			COMMAND
+				${CMAKE_COMMAND} -E env
+				SEMINDEX=$<TARGET_FILE:semindex>
+				COMPILE_COMMANDS=${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
+				SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+				sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-output-tests.sh
+					${test_source}
+					${test_source}.expect
+		)
+	endforeach()
+endif()
