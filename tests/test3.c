@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 int g;
 
-int main(void)
+int f(void)
 {
-	int x;
+	int x = 0;
 	int *p;
-	g = 1;
-	x = g;
-	p = &x;
-	return *p;
+
+	p = &g;
+	x = *p;
+	return x;
 }

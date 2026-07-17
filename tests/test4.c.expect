@@ -1,0 +1,12 @@
+SYMBOLS:
+tests/test4.c:2:8 struct   P          
+tests/test4.c:3:6 field    x          int
+tests/test4.c:4:6 field    y          int
+tests/test4.c:7:5 function f          int (struct P *)
+tests/test4.c:7:17 var      p          struct P *
+
+USES:
+tests/test4.c:9:12 READ  c:@S@P@FI@x
+tests/test4.c:9:9 READ  c:test4.c@82@F@f@p
+tests/test4.c:9:19 READ  c:@S@P@FI@y
+tests/test4.c:9:16 READ  c:test4.c@82@F@f@p

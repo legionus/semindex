@@ -1,0 +1,12 @@
+SYMBOLS:
+tests/test3.c:2:5 var      g          int
+tests/test3.c:4:5 function f          int (void)
+tests/test3.c:6:6 var      x          int
+tests/test3.c:7:7 var      p          int *
+
+USES:
+tests/test3.c:9:2 WRITE c:test3.c@80@F@f@p
+tests/test3.c:9:7 ADDR  c:@g
+tests/test3.c:10:2 WRITE c:test3.c@68@F@f@x
+tests/test3.c:10:7 READ  c:test3.c@80@F@f@p
+tests/test3.c:11:9 READ  c:test3.c@68@F@f@x

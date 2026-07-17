@@ -64,6 +64,9 @@ if(BUILD_TESTING)
 		tests/test.c
 		tests/test1.c
 		tests/test2.c
+		tests/test3.c
+		tests/test4.c
+		tests/test5.c
 	)
 		get_filename_component(test_name ${test_source} NAME)
 		add_test(
