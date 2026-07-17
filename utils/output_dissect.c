@@ -1,16 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-#include <stdlib.h>
 #include <string.h>
 
 #include "output.h"
-
-struct output_row {
-	const char* file;
-	unsigned line;
-	unsigned column;
-	int is_definition;
-	size_t index;
-};
 
 static char kind_to_dissect_char(semindex_symbol_kind_t kind)
 {
@@ -63,23 +54,6 @@ static const char* mode_to_string(unsigned mode)
 		str[2] = str[2] == 'r' ? 'm' : 'w';
 
 	return str;
-}
-
-static int compare_rows(const void* a, const void* b)
-{
-	const struct output_row* ra = a;
-	const struct output_row* rb = b;
-	int cmp = strcmp(ra->file, rb->file);
-
-	if (cmp)
-		return cmp;
-	if (ra->line != rb->line)
-		return ra->line < rb->line ? -1 : 1;
-	if (ra->column != rb->column)
-		return ra->column < rb->column ? -1 : 1;
-	if (ra->is_definition != rb->is_definition)
-		return ra->is_definition ? -1 : 1;
-	return 0;
 }
 
 static int same_string(const char* a, const char* b)
@@ -151,66 +125,54 @@ int output_dissect(FILE* out, semindex_t* s)
 {
 	size_t symbol_count = semindex_symbol_count(s);
 	size_t use_count = semindex_use_count(s);
-	size_t row_count = symbol_count + use_count;
-	struct output_row* rows = calloc(row_count, sizeof(*rows));
+	size_t symbol_index = 0;
+	size_t use_index = 0;
 	const char* current_file = NULL;
+	const semindex_use_t* prev_use = NULL;
+	int prev_was_use = 0;
 
-	if (!rows)
-		return -1;
+	while (symbol_index < symbol_count || use_index < use_count) {
+		const semindex_symbol_t* sym = NULL;
+		const semindex_use_t* use = NULL;
+		int is_symbol;
 
-	for (size_t i = 0; i < symbol_count; i++) {
-		const semindex_symbol_t* sym = semindex_get_symbol(s, i);
+		if (symbol_index < symbol_count)
+			sym = semindex_get_symbol(s, symbol_index);
+		if (use_index < use_count)
+			use = semindex_get_use(s, use_index);
 
-		rows[i].file = sym->file;
-		rows[i].line = sym->line;
-		rows[i].column = sym->column;
-		rows[i].is_definition = 1;
-		rows[i].index = i;
-	}
+		is_symbol = use_index >= use_count ||
+		    (sym && sym->order <= use->order);
 
-	for (size_t i = 0; i < use_count; i++) {
-		const semindex_use_t* use = semindex_get_use(s, i);
-		size_t row = symbol_count + i;
+		if (is_symbol) {
+			if (!current_file || strcmp(current_file, sym->file)) {
+				current_file = sym->file;
+				fprintf(out, "\nFILE: %s\n\n", current_file);
+			}
 
-		rows[row].file = use->file;
-		rows[row].line = use->line;
-		rows[row].column = use->column;
-		rows[row].is_definition = 0;
-		rows[row].index = i;
-	}
-
-	qsort(rows, row_count, sizeof(*rows), compare_rows);
-
-	for (size_t i = 0; i < row_count; i++) {
-		int skip = 0;
-
-		if (!rows[i].is_definition && i > 0 &&
-		    !rows[i - 1].is_definition &&
-		    !strcmp(rows[i].file, rows[i - 1].file)) {
-			const semindex_use_t* use =
-			    semindex_get_use(s, rows[i].index);
-			const semindex_use_t* prev =
-			    semindex_get_use(s, rows[i - 1].index);
-
-			skip = same_dissect_use(use, prev);
+			print_dissect_symbol(out, sym);
+			symbol_index++;
+			prev_was_use = 0;
+			continue;
 		}
 
-		if (skip)
+		if (prev_was_use && prev_use &&
+		    same_string(current_file, use->file) &&
+		    same_dissect_use(use, prev_use)) {
+			use_index++;
 			continue;
+		}
 
-		if (!current_file || strcmp(current_file, rows[i].file)) {
-			current_file = rows[i].file;
+		if (!current_file || strcmp(current_file, use->file)) {
+			current_file = use->file;
 			fprintf(out, "\nFILE: %s\n\n", current_file);
 		}
 
-		if (rows[i].is_definition)
-			print_dissect_symbol(out,
-			    semindex_get_symbol(s, rows[i].index));
-		else
-			print_dissect_use(out,
-			    semindex_get_use(s, rows[i].index));
+		print_dissect_use(out, use);
+		prev_use = use;
+		prev_was_use = 1;
+		use_index++;
 	}
 
-	free(rows);
 	return ferror(out) ? -1 : 0;
 }

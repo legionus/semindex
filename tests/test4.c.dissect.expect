@@ -5,9 +5,9 @@ FILE: tests/test4.c
    3:6                    def   m P.x                              int
    4:6                    def   m P.y                              int
    7:5                    def   f f                                int (struct P *)
-   7:14  f                -r- . s P
    7:17  f                def . v p                                struct P *
-   9:9   f                --r . v p                                struct P *
+   7:14  f                -r- . s P
    9:12  f                -r-   m P.x                              int
-   9:16  f                --r . v p                                struct P *
+   9:9   f                --r . v p                                struct P *
    9:19  f                -r-   m P.y                              int
+   9:16  f                --r . v p                                struct P *

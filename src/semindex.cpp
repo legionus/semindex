@@ -369,6 +369,7 @@ struct SemindexSymbol {
 	unsigned column;
 	bool local;
 	bool definition;
+	unsigned long long order;
 };
 
 struct SemindexUse {
@@ -384,10 +385,12 @@ struct SemindexUse {
 	unsigned line;
 	unsigned column;
 	bool local;
+	unsigned long long order;
 };
 
 struct semindex {
 	semindex_scope_t scope = SEMINDEX_SCOPE_PROJECT;
+	unsigned long long next_order = 0;
 	std::vector<SemindexSymbol> symbols;
 	std::vector<SemindexUse> uses;
 	std::vector<semindex_symbol_t> symbol_records;
@@ -441,6 +444,7 @@ public:
 		s.local = false;
 		s.definition = true;
 
+		s.order = out->next_order++;
 		out->symbols.push_back(std::move(s));
 	}
 
@@ -523,6 +527,7 @@ private:
 		u.file = locToFile(sm, spelling, u.line, u.column);
 		u.local = false;
 
+		u.order = out->next_order++;
 		out->uses.push_back(std::move(u));
 	}
 
@@ -548,6 +553,7 @@ private:
 		u.file = locToFile(sm, spelling, u.line, u.column);
 		u.local = false;
 
+		u.order = out->next_order++;
 		out->uses.push_back(std::move(u));
 	}
 
@@ -574,6 +580,7 @@ static void rebuildRecords(semindex* s)
 		rec.column = sym.column;
 		rec.local = sym.local;
 		rec.definition = sym.definition;
+		rec.order = sym.order;
 
 		s->symbol_records.push_back(rec);
 	}
@@ -596,6 +603,7 @@ static void rebuildRecords(semindex* s)
 		rec.line = use.line;
 		rec.column = use.column;
 		rec.local = use.local;
+		rec.order = use.order;
 
 		s->use_records.push_back(rec);
 	}
@@ -933,6 +941,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		if (!locInScope(ctx.getSourceManager(), out->scope, loc))
 			return;
 
+		s.order = out->next_order++;
 		out->symbols.push_back(std::move(s));
 	}
 
@@ -941,6 +950,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		if (!locInScope(ctx.getSourceManager(), out->scope, loc))
 			return;
 
+		u.order = out->next_order++;
 		out->uses.push_back(std::move(u));
 	}
 
@@ -1140,6 +1150,12 @@ int semindex_index_file(semindex_t* s, const char* compile_commands_json, const 
 {
 	if (!s || !source_file)
 		return -1;
+
+	s->next_order = 0;
+	s->symbols.clear();
+	s->uses.clear();
+	s->symbol_records.clear();
+	s->use_records.clear();
 
 	std::string error;
 	std::unique_ptr<CompilationDatabase> db

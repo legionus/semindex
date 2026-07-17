@@ -4,10 +4,10 @@ FILE: tests/test13.c
    2:9                    def   d FOO
    3:9                    def   d BAZ
    5:8                    -r-   d FOO
-   6:5                    def   v a                                int
    9:9                    -r-   d BAR
-  10:5                    def   v b                                int
   13:13                   -r-   d BAZ
-  14:5                    def   v c                                int
   17:13                   -r-   d __GNUC__
+   6:5                    def   v a                                int
+  10:5                    def   v b                                int
+  14:5                    def   v c                                int
   18:5                    def   v d                                int

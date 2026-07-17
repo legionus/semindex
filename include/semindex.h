@@ -60,6 +60,7 @@ typedef struct {
 	unsigned column;
 	int local;
 	int definition;
+	unsigned long long order;
 } semindex_symbol_t;
 
 /* usage record */
@@ -76,6 +77,7 @@ typedef struct {
 	unsigned line;
 	unsigned column;
 	int local;
+	unsigned long long order;
 } semindex_use_t;
 
 /* lifecycle */
