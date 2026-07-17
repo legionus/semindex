@@ -16,8 +16,8 @@ run_scope()
 	out=$3
 	err=$4
 
-	if ! "$SEMINDEX" --scope="$scope" "$SOURCE_DIR/tests/scope/use.c" \
-	     "$COMPILE_COMMANDS" >"$out" 2>"$err"; then
+	if ! "$SEMINDEX" --compile-commands "$COMPILE_COMMANDS" \
+	     --scope "$scope" "$SOURCE_DIR/tests/scope/use.c" >"$out" 2>"$err"; then
 		cat "$err" >&2
 		cat "$out" >&2
 		fail "scope=$scope did not index successfully"

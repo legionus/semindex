@@ -83,7 +83,7 @@ The CLI can print either the default prototype output or a Sparse
 `test-dissect`-style view:
 
 ```sh
-semindex --format=dissect path/to/file.c build/compile_commands.json
+semindex --format=dissect --compile-commands build/compile_commands.json path/to/file.c
 ```
 
 ## Current limitations

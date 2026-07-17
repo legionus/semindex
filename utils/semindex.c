@@ -1,59 +1,117 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include <getopt.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "output.h"
 
+static void usage(FILE* f)
+{
+	fprintf(f,
+	    "Usage: semindex [OPTION]... SOURCE\n");
+}
+
+static void help(void)
+{
+	usage(stdout);
+	printf("\n"
+	       "Index C source files using clang semantic information.\n"
+	       "\n"
+	       "Arguments:\n"
+	       "  SOURCE                     C source file to index\n"
+	       "\n"
+	       "Options:\n"
+	       "  -f, --format=FORMAT        select output format: default, dissect\n"
+	       "                             (default: default)\n"
+	       "  -s, --scope=SCOPE          select indexed source scope: file, project, all\n"
+	       "                             (default: project)\n"
+	       "  -c, --compile-commands=PATH\n"
+	       "                             path to compile_commands.json or its directory\n"
+	       "                             (default: .)\n"
+	       "  -h, --help                 display this help and exit\n"
+	       "\n"
+	       "Report bugs to authors.\n"
+	       "\n"
+	);
+}
+
+static int parse_format(const char* value, enum output_format* format)
+{
+	if (!strcmp(value, "default"))
+		*format = FORMAT_DEFAULT;
+	else if (!strcmp(value, "dissect"))
+		*format = FORMAT_DISSECT;
+	else
+		return -1;
+
+	return 0;
+}
+
+static int parse_scope(const char* value, semindex_scope_t* scope)
+{
+	if (!strcmp(value, "file"))
+		*scope = SEMINDEX_SCOPE_FILE;
+	else if (!strcmp(value, "project"))
+		*scope = SEMINDEX_SCOPE_PROJECT;
+	else if (!strcmp(value, "all"))
+		*scope = SEMINDEX_SCOPE_ALL;
+	else
+		return -1;
+
+	return 0;
+}
+
 int main(int argc, char** argv)
 {
+	static const struct option long_options[] = {
+		{ "format", required_argument, NULL, 'f' },
+		{ "scope", required_argument, NULL, 's' },
+		{ "compile-commands", required_argument, NULL, 'c' },
+		{ "help", no_argument, NULL, 'h' },
+		{ NULL, 0, NULL, 0 },
+	};
 	enum output_format format = FORMAT_DEFAULT;
 	semindex_scope_t scope = SEMINDEX_SCOPE_PROJECT;
 	const char* source_file = NULL;
 	const char* compile_commands = ".";
+	int opt;
 
-	for (int i = 1; i < argc; i++) {
-		if (!strncmp(argv[i], "--format=", 9)) {
-			const char* value = argv[i] + 9;
-
-			if (!strcmp(value, "default"))
-				format = FORMAT_DEFAULT;
-			else if (!strcmp(value, "dissect"))
-				format = FORMAT_DISSECT;
-			else {
-				fprintf(stderr, "semindex: unknown format: %s\n", value);
+	while ((opt = getopt_long(argc, argv, "f:s:c:h", long_options, NULL)) != -1) {
+		switch (opt) {
+		case 'f':
+			if (parse_format(optarg, &format) < 0) {
+				fprintf(stderr, "semindex: unknown format: %s\n", optarg);
 				return 1;
 			}
-			continue;
-		}
-
-		if (!strncmp(argv[i], "--scope=", 8)) {
-			const char* value = argv[i] + 8;
-
-			if (!strcmp(value, "file"))
-				scope = SEMINDEX_SCOPE_FILE;
-			else if (!strcmp(value, "project"))
-				scope = SEMINDEX_SCOPE_PROJECT;
-			else if (!strcmp(value, "all"))
-				scope = SEMINDEX_SCOPE_ALL;
-			else {
-				fprintf(stderr, "semindex: unknown scope: %s\n", value);
+			break;
+		case 's':
+			if (parse_scope(optarg, &scope) < 0) {
+				fprintf(stderr, "semindex: unknown scope: %s\n", optarg);
 				return 1;
 			}
-			continue;
-		}
-
-		if (!source_file)
-			source_file = argv[i];
-		else if (compile_commands[0] == '.' && compile_commands[1] == '\0')
-			compile_commands = argv[i];
-		else {
-			fprintf(stderr, "Usage: semindex [--format=default|dissect] [--scope=file|project|all] <source> [compile_commands]\n");
+			break;
+		case 'c':
+			compile_commands = optarg;
+			break;
+		case 'h':
+			help();
+			return 0;
+		default:
+			usage(stderr);
 			return 1;
 		}
 	}
 
+	if (optind < argc)
+		source_file = argv[optind++];
+
+	if (optind < argc) {
+		usage(stderr);
+		return 1;
+	}
+
 	if (!source_file) {
-		fprintf(stderr, "Usage: semindex [--format=default|dissect] [--scope=file|project|all] <source> [compile_commands]\n");
+		usage(stderr);
 		return 1;
 	}
 

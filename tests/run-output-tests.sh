@@ -16,13 +16,13 @@ run_case()
 	out=$3
 	err=$4
 	format=$5
-	format_arg=
 
+	set -- --compile-commands "$COMPILE_COMMANDS"
 	if [ "$format" != "default" ]; then
-		format_arg=--format=$format
+		set -- "$@" --format "$format"
 	fi
 
-	if ! "$SEMINDEX" $format_arg "$SOURCE_DIR/$src" "$COMPILE_COMMANDS" >"$out" 2>"$err"; then
+	if ! "$SEMINDEX" "$@" "$SOURCE_DIR/$src" >"$out" 2>"$err"; then
 		cat "$err" >&2
 		cat "$out" >&2
 		fail "$src did not index successfully"
