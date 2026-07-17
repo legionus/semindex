@@ -6,6 +6,7 @@ tests/test4.c:7:5 function f          int (struct P *)
 tests/test4.c:7:17 var      p          struct P *
 
 USES:
+tests/test4.c:7:14 READ  c:@S@P
 tests/test4.c:9:12 READ  c:@S@P@FI@x
 tests/test4.c:9:9 READ  c:test4.c@82@F@f@p
 tests/test4.c:9:19 READ  c:@S@P@FI@y

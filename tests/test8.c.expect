@@ -11,3 +11,7 @@ tests/test8.c:14:8 var      p          pair_t
 tests/test8.c:15:8 var      a          anon_t
 
 USES:
+tests/test8.c:7:16 READ  c:@S@Pair
+tests/test8.c:13:1 READ  c:test8.c@T@counter_t
+tests/test8.c:14:1 READ  c:test8.c@T@pair_t
+tests/test8.c:15:1 READ  c:@T@anon_t

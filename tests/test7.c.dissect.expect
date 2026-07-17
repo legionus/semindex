@@ -1,9 +1,9 @@
 
 FILE: tests/test7.c
 
-   2:9                    def   d FOO                              
-   3:9                    def   d BAR                              
-   3:23                   -r-   d FOO                              
+   2:9                    def   d FOO
+   3:9                    def   d BAR
+   3:23                   -r-   d FOO
    5:5                    def   v v                                int
    5:5                    -w-   v v                                int
-   5:9                    -r-   d BAR                              
+   5:9                    -r-   d BAR

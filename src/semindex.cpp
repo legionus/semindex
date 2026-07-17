@@ -21,6 +21,7 @@
 
 /* ==== STL ==== */
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -339,6 +340,17 @@ static std::string typeNameForRecord(const RecordDecl* D, const std::string& nam
 	return std::string(D->isUnion() ? "union " : "struct ") + name;
 }
 
+static std::string typeNameForTypedef(const TypedefNameDecl* D)
+{
+	const RecordDecl* anonymousRecord = recordDeclForType(D->getUnderlyingType());
+
+	if (isAnonymousRecord(anonymousRecord))
+		return typeNameForRecord(anonymousRecord,
+		    anonymousRecordNameForTypedef(D));
+
+	return D->getUnderlyingType().getAsString();
+}
+
 /* ============================================================
  * Internal C++ model
  * ============================================================ */
@@ -581,14 +593,11 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 	{
 		const RecordDecl* anonymousRecord = recordDeclForType(D->getUnderlyingType());
 		std::string anonymousName;
-		std::string typeName;
+		std::string typeName = typeNameForTypedef(D);
 
 		if (isAnonymousRecord(anonymousRecord)) {
 			anonymousName = anonymousRecordNameForTypedef(D);
-			typeName = typeNameForRecord(anonymousRecord, anonymousName);
 			addAnonymousRecordSymbols(anonymousRecord, anonymousName);
-		} else {
-			typeName = D->getUnderlyingType().getAsString();
 		}
 
 		SemindexSymbol s;
@@ -602,6 +611,31 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.local = !currentFunction.empty();
 
 		out->symbols.push_back(std::move(s));
+		return true;
+	}
+
+	bool VisitTypedefTypeLoc(TypedefTypeLoc TL)
+	{
+		const TypedefNameDecl* D = TL.getTypedefNameDecl();
+
+		addTypeUse(D, SEMINDEX_SYMBOL_TYPEDEF, TL.getNameLoc(),
+		    typeNameForTypedef(D));
+		return true;
+	}
+
+	bool VisitRecordTypeLoc(RecordTypeLoc TL)
+	{
+		if (TL.isDefinition())
+			return true;
+
+		const RecordDecl* D = TL.getDecl();
+		if (isAnonymousRecord(D))
+			return true;
+
+		addTypeUse(D,
+		    D->isUnion() ? SEMINDEX_SYMBOL_UNION
+		                 : SEMINDEX_SYMBOL_STRUCT,
+		    TL.getNameLoc(), "");
 		return true;
 	}
 
@@ -717,6 +751,38 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 	}
 
     private:
+	void addTypeUse(const TypeDecl* D, semindex_symbol_kind_t kind,
+	    SourceLocation loc, const std::string& type)
+	{
+		if (!D || loc.isInvalid())
+			return;
+
+		const SourceManager& sm = ctx.getSourceManager();
+		SourceLocation spelling = sm.getSpellingLoc(loc);
+		if (!sm.isWrittenInMainFile(spelling))
+			return;
+
+		SemindexUse u;
+		u.kind = SEMINDEX_USE_READ;
+		u.symbol_kind = kind;
+		u.mode = SEMINDEX_MODE_R_VAL;
+		u.name = getName(D);
+		u.owner = "";
+		u.type = type;
+		u.usr = getUSR(D, ctx);
+		u.context = currentFunction;
+		u.file = locToFile(ctx, spelling, u.line, u.column);
+		u.local = !currentFunction.empty();
+
+		std::string key = u.usr + "|" + u.file + "|"
+		    + std::to_string(u.line) + "|" + std::to_string(u.column)
+		    + "|" + u.context;
+		if (!typeUses.insert(key).second)
+			return;
+
+		out->uses.push_back(std::move(u));
+	}
+
 	void addAnonymousRecordSymbols(const RecordDecl* D, const std::string& name)
 	{
 		SemindexSymbol s;
@@ -768,6 +834,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 	ASTContext& ctx;
 	semindex* out;
 	std::string currentFunction;
+	std::set<std::string> typeUses;
 };
 
 /* ============================================================

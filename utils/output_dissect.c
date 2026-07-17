@@ -81,26 +81,42 @@ static int compare_rows(const void* a, const void* b)
 static void print_dissect_symbol(FILE* out, const semindex_symbol_t* sym)
 {
 	char name[256];
+	const char* symbol_name;
 
-	fprintf(out, "%4u:%-3u %-16s def %c %c %-32s %s\n",
-	    sym->line, sym->column, sym->context,
-	    sym->local ? '.' : ' ',
-	    kind_to_dissect_char(sym->kind),
-	    symbol_name_for_dissect(sym->owner, sym->name, name, sizeof(name)),
-	    sym->type);
+	symbol_name = symbol_name_for_dissect(sym->owner, sym->name, name,
+	    sizeof(name));
+	if (sym->type && sym->type[0])
+		fprintf(out, "%4u:%-3u %-16s def %c %c %-32s %s\n",
+		    sym->line, sym->column, sym->context,
+		    sym->local ? '.' : ' ',
+		    kind_to_dissect_char(sym->kind), symbol_name, sym->type);
+	else
+		fprintf(out, "%4u:%-3u %-16s def %c %c %s\n",
+		    sym->line, sym->column, sym->context,
+		    sym->local ? '.' : ' ',
+		    kind_to_dissect_char(sym->kind), symbol_name);
 }
 
 static void print_dissect_use(FILE* out, const semindex_use_t* use)
 {
 	char name[256];
+	const char* symbol_name;
 
-	fprintf(out, "%4u:%-3u %-16s %s %c %c %-32s %s\n",
-	    use->line, use->column, use->context,
-	    mode_to_string(use->mode),
-	    use->local ? '.' : ' ',
-	    kind_to_dissect_char(use->symbol_kind),
-	    symbol_name_for_dissect(use->owner, use->name, name, sizeof(name)),
-	    use->type);
+	symbol_name = symbol_name_for_dissect(use->owner, use->name, name,
+	    sizeof(name));
+	if (use->type && use->type[0])
+		fprintf(out, "%4u:%-3u %-16s %s %c %c %-32s %s\n",
+		    use->line, use->column, use->context,
+		    mode_to_string(use->mode),
+		    use->local ? '.' : ' ',
+		    kind_to_dissect_char(use->symbol_kind), symbol_name,
+		    use->type);
+	else
+		fprintf(out, "%4u:%-3u %-16s %s %c %c %s\n",
+		    use->line, use->column, use->context,
+		    mode_to_string(use->mode),
+		    use->local ? '.' : ' ',
+		    kind_to_dissect_char(use->symbol_kind), symbol_name);
 }
 
 int output_dissect(FILE* out, semindex_t* s)
