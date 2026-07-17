@@ -12,6 +12,7 @@
 #include <clang/Tooling/Tooling.h>
 
 #include <llvm/ADT/SmallVector.h>
+#include <llvm/Support/Path.h>
 #include <llvm/Support/raw_ostream.h>
 
 /* ==== STL ==== */
@@ -54,6 +55,28 @@ static std::string getUSR(const Decl* D, const ASTContext& ctx)
 	if (index::generateUSRForDecl(D, buf, ctx.getLangOpts()))
 		return "";
 	return std::string(buf.begin(), buf.end());
+}
+
+static std::unique_ptr<CompilationDatabase> loadCompileCommands(
+    const char* compile_commands_json, std::string& error)
+{
+	if (!compile_commands_json || !compile_commands_json[0]) {
+		error = "missing compile_commands.json path";
+		return nullptr;
+	}
+
+	llvm::StringRef path(compile_commands_json);
+	std::string directory;
+
+	if (llvm::sys::path::filename(path) == "compile_commands.json")
+		directory = llvm::sys::path::parent_path(path).str();
+	else
+		directory = path.str();
+
+	if (directory.empty())
+		directory = ".";
+
+	return CompilationDatabase::loadFromDirectory(directory, error);
 }
 
 static semind_use_kind_t classifyUse(const Expr* E, ASTContext& ctx)
@@ -314,17 +337,17 @@ int semind_index_file(semind_t* s, const char* compile_commands_json, const char
 		return -1;
 
 	std::string error;
-	std::unique_ptr<CompilationDatabase> db;
-
-	if (compile_commands_json) {
-		db = CompilationDatabase::loadFromDirectory(
-		    compile_commands_json, error);
-	}
+	std::unique_ptr<CompilationDatabase> db
+	    = loadCompileCommands(compile_commands_json, error);
 
 	if (!db) {
-		/* fallback: empty database */
-		db = std::make_unique<FixedCompilationDatabase>(
-		    ".", std::vector<std::string> {});
+		llvm::errs() << "semindex: failed to load compilation database";
+		if (compile_commands_json)
+			llvm::errs() << " from '" << compile_commands_json << "'";
+		if (!error.empty())
+			llvm::errs() << ": " << error;
+		llvm::errs() << "\n";
+		return -1;
 	}
 
 	ClangTool tool(*db, { source_file });

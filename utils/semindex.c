@@ -32,13 +32,17 @@ static const char* use_kind_to_string(semind_use_kind_t k)
 int main(int argc, char** argv)
 {
 	if (argc == 1) {
-		printf("Usage: semindex <source>\n");
+		printf("Usage: semindex <source> [compile_commands]\n");
 		return 1;
 	}
 
+	const char* compile_commands = argc > 2 ? argv[2] : ".";
 	semind_t* s = semind_create();
 
-	semind_index_file(s, "compile_commands.json", argv[1]);
+	if (semind_index_file(s, compile_commands, argv[1]) != 0) {
+		semind_destroy(s);
+		return 1;
+	}
 
 	printf("SYMBOLS:\n");
 
