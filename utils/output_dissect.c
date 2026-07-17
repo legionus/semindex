@@ -82,6 +82,29 @@ static int compare_rows(const void* a, const void* b)
 	return 0;
 }
 
+static int same_string(const char* a, const char* b)
+{
+	if (!a)
+		a = "";
+	if (!b)
+		b = "";
+
+	return !strcmp(a, b);
+}
+
+static int same_dissect_use(const semindex_use_t* a, const semindex_use_t* b)
+{
+	return a->line == b->line &&
+	    a->column == b->column &&
+	    a->local == b->local &&
+	    a->mode == b->mode &&
+	    a->symbol_kind == b->symbol_kind &&
+	    same_string(a->context, b->context) &&
+	    same_string(a->owner, b->owner) &&
+	    same_string(a->name, b->name) &&
+	    same_string(a->type, b->type);
+}
+
 static void print_dissect_symbol(FILE* out, const semindex_symbol_t* sym)
 {
 	char name[256];
@@ -159,6 +182,22 @@ int output_dissect(FILE* out, semindex_t* s)
 	qsort(rows, row_count, sizeof(*rows), compare_rows);
 
 	for (size_t i = 0; i < row_count; i++) {
+		int skip = 0;
+
+		if (!rows[i].is_definition && i > 0 &&
+		    !rows[i - 1].is_definition &&
+		    !strcmp(rows[i].file, rows[i - 1].file)) {
+			const semindex_use_t* use =
+			    semindex_get_use(s, rows[i].index);
+			const semindex_use_t* prev =
+			    semindex_get_use(s, rows[i - 1].index);
+
+			skip = same_dissect_use(use, prev);
+		}
+
+		if (skip)
+			continue;
+
 		if (!current_file || strcmp(current_file, rows[i].file)) {
 			current_file = rows[i].file;
 			fprintf(out, "\nFILE: %s\n\n", current_file);

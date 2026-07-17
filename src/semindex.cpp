@@ -220,9 +220,9 @@ static bool isCallCallee(const Expr* E, ASTContext& ctx)
 
 static semindex_use_kind_t classifyUse(const Expr* E, ASTContext& ctx)
 {
-	E = E->IgnoreParenImpCasts();
-
 	const Stmt* parent = nullptr;
+
+	E = E->IgnoreParenImpCasts();
 
 	auto parents = ctx.getParents(*E);
 	if (!parents.empty()) {
@@ -782,6 +782,12 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		u.local = !currentFunction.empty() && !D->hasExternalFormalLinkage();
 
 		addUse(std::move(u), E->getExprLoc());
+
+		if (!isa<FunctionDecl>(D) && isCallCallee(E, ctx))
+			addValueUse(D, SEMINDEX_USE_CALL, SEMINDEX_MODE_R_PTR,
+			    currentFunction, E->getExprLoc(),
+			    !currentFunction.empty() && !D->hasExternalFormalLinkage());
+
 		return true;
 	}
 
