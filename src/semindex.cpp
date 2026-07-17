@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-#include "semind.h"
+#include "semindex.h"
 
 /* ==== LLVM / Clang ==== */
 #include <clang/AST/AST.h>

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <stdio.h>
 
-#include "semind.h"
+#include "semindex.h"
 
 static const char* kind_to_string(semind_symbol_kind_t kind)
 {
@@ -32,7 +32,7 @@ static const char* use_kind_to_string(semind_use_kind_t k)
 int main(int argc, char** argv)
 {
 	if (argc == 1) {
-		printf("Usage: semind <source>\n");
+		printf("Usage: semindex <source>\n");
 		return 1;
 	}
 
