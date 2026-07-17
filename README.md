@@ -1,6 +1,6 @@
-# semind
+# semindex
 
-**semind** (Semantic Indexer for C) is an experimental semantic indexer for the C programming language built on top of the Clang frontend.
+**semindex** (Semantic Indexer for C) is an experimental semantic indexer for the C programming language built on top of the Clang frontend.
 
 The long-term goal of the project is to provide functionality similar to the original **semind** from the Sparse project while using an actively maintained parser and semantic analysis framework.
 
@@ -36,10 +36,10 @@ The project is split into two layers.
           |  CLI / database / UI |
           +----------+-----------+
                      |
-                 semind.h
+                 semindex.h
                      |
           +----------v-----------+
-          |    libsemind.so      |
+          |    libsemindex.so    |
           |                      |
           |  Clang LibTooling    |
           |  AST traversal       |

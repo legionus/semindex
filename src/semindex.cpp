@@ -103,7 +103,7 @@ static bool isDirectCallCallee(const Expr* E, ASTContext& ctx)
 	}
 }
 
-static semind_use_kind_t classifyUse(const Expr* E, ASTContext& ctx)
+static semindex_use_kind_t classifyUse(const Expr* E, ASTContext& ctx)
 {
 	E = E->IgnoreParenImpCasts();
 
@@ -119,7 +119,7 @@ static semind_use_kind_t classifyUse(const Expr* E, ASTContext& ctx)
 	if (parent) {
 		if (const auto* U = dyn_cast<UnaryOperator>(parent)) {
 			if (U->getOpcode() == UO_AddrOf)
-				return SEMIND_USE_ADDR;
+				return SEMINDEX_USE_ADDR;
 		}
 	}
 
@@ -127,7 +127,7 @@ static semind_use_kind_t classifyUse(const Expr* E, ASTContext& ctx)
 	if (parent) {
 		if (const auto* B = dyn_cast<BinaryOperator>(parent)) {
 			if (B->isAssignmentOp() && B->getLHS() == E)
-				return SEMIND_USE_WRITE;
+				return SEMINDEX_USE_WRITE;
 		}
 	}
 
@@ -135,19 +135,19 @@ static semind_use_kind_t classifyUse(const Expr* E, ASTContext& ctx)
 	if (parent) {
 		if (const auto* U = dyn_cast<UnaryOperator>(parent)) {
 			if (U->isIncrementDecrementOp())
-				return SEMIND_USE_WRITE;
+				return SEMINDEX_USE_WRITE;
 		}
 	}
 
-	return SEMIND_USE_READ;
+	return SEMINDEX_USE_READ;
 }
 
 /* ============================================================
  * Internal C++ model
  * ============================================================ */
 
-struct SemindSymbol {
-	semind_symbol_kind_t kind;
+struct SemindexSymbol {
+	semindex_symbol_kind_t kind;
 	std::string name;
 	std::string type;
 	std::string usr;
@@ -156,28 +156,28 @@ struct SemindSymbol {
 	unsigned column;
 };
 
-struct SemindUse {
-	semind_use_kind_t kind;
+struct SemindexUse {
+	semindex_use_kind_t kind;
 	std::string usr;
 	std::string file;
 	unsigned line;
 	unsigned column;
 };
 
-struct semind {
-	std::vector<SemindSymbol> symbols;
-	std::vector<SemindUse> uses;
-	std::vector<semind_symbol_t> symbol_records;
-	std::vector<semind_use_t> use_records;
+struct semindex {
+	std::vector<SemindexSymbol> symbols;
+	std::vector<SemindexUse> uses;
+	std::vector<semindex_symbol_t> symbol_records;
+	std::vector<semindex_use_t> use_records;
 };
 
-static void rebuildRecords(semind* s)
+static void rebuildRecords(semindex* s)
 {
 	s->symbol_records.clear();
 	s->symbol_records.reserve(s->symbols.size());
 
 	for (const auto& sym : s->symbols) {
-		semind_symbol_t rec;
+		semindex_symbol_t rec;
 
 		rec.kind = sym.kind;
 		rec.name = sym.name.c_str();
@@ -194,7 +194,7 @@ static void rebuildRecords(semind* s)
 	s->use_records.reserve(s->uses.size());
 
 	for (const auto& use : s->uses) {
-		semind_use_t rec;
+		semindex_use_t rec;
 
 		rec.kind = use.kind;
 		rec.usr = use.usr.c_str();
@@ -210,9 +210,9 @@ static void rebuildRecords(semind* s)
  * AST Visitor
  * ============================================================ */
 
-class SemindVisitor : public RecursiveASTVisitor<SemindVisitor> {
+class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
     public:
-	SemindVisitor(ASTContext& ctx, semind* out)
+	SemindexVisitor(ASTContext& ctx, semindex* out)
 	    : ctx(ctx)
 	    , out(out)
 	{
@@ -220,8 +220,8 @@ class SemindVisitor : public RecursiveASTVisitor<SemindVisitor> {
 
 	bool VisitVarDecl(VarDecl* D)
 	{
-		SemindSymbol s;
-		s.kind = SEMIND_SYMBOL_VAR;
+		SemindexSymbol s;
+		s.kind = SEMINDEX_SYMBOL_VAR;
 		s.name = getName(D);
 		s.type = D->getType().getAsString();
 		s.usr = getUSR(D, ctx);
@@ -233,8 +233,8 @@ class SemindVisitor : public RecursiveASTVisitor<SemindVisitor> {
 
 	bool VisitFieldDecl(FieldDecl* D)
 	{
-		SemindSymbol s;
-		s.kind = SEMIND_SYMBOL_FIELD;
+		SemindexSymbol s;
+		s.kind = SEMINDEX_SYMBOL_FIELD;
 		s.name = getName(D);
 		s.type = D->getType().getAsString();
 		s.usr = getUSR(D, ctx);
@@ -253,7 +253,7 @@ class SemindVisitor : public RecursiveASTVisitor<SemindVisitor> {
 		if (isa<FunctionDecl>(D) && isDirectCallCallee(E, ctx))
 			return true;
 
-		SemindUse u;
+		SemindexUse u;
 		u.kind = classifyUse(E, ctx);
 		u.usr = getUSR(D, ctx);
 		u.file = locToFile(ctx, E->getExprLoc(), u.line, u.column);
@@ -268,7 +268,7 @@ class SemindVisitor : public RecursiveASTVisitor<SemindVisitor> {
 		if (!D)
 			return true;
 
-		SemindUse u;
+		SemindexUse u;
 		u.kind = classifyUse(E, ctx);
 		u.usr = getUSR(D, ctx);
 		u.file = locToFile(ctx, E->getExprLoc(), u.line, u.column);
@@ -282,9 +282,9 @@ class SemindVisitor : public RecursiveASTVisitor<SemindVisitor> {
 		if (!D->isThisDeclarationADefinition())
 			return true;
 
-		SemindSymbol s;
+		SemindexSymbol s;
 		s.kind
-		    = D->isUnion() ? SEMIND_SYMBOL_UNION : SEMIND_SYMBOL_STRUCT;
+		    = D->isUnion() ? SEMINDEX_SYMBOL_UNION : SEMINDEX_SYMBOL_STRUCT;
 
 		s.name = getName(D);
 		s.type = ""; // TODO: fill it later
@@ -300,8 +300,8 @@ class SemindVisitor : public RecursiveASTVisitor<SemindVisitor> {
 		if (!D->isThisDeclarationADefinition())
 			return true;
 
-		SemindSymbol s;
-		s.kind = SEMIND_SYMBOL_FUNCTION;
+		SemindexSymbol s;
+		s.kind = SEMINDEX_SYMBOL_FUNCTION;
 		s.name = getName(D);
 		s.type = D->getType().getAsString();
 		s.usr = getUSR(D, ctx);
@@ -317,8 +317,8 @@ class SemindVisitor : public RecursiveASTVisitor<SemindVisitor> {
 		if (!FD)
 			return true; /* indirect call: fp() */
 
-		SemindUse u;
-		u.kind = SEMIND_USE_CALL;
+		SemindexUse u;
+		u.kind = SEMINDEX_USE_CALL;
 		u.usr = getUSR(FD, ctx);
 		u.file = locToFile(ctx, E->getExprLoc(), u.line, u.column);
 
@@ -328,16 +328,16 @@ class SemindVisitor : public RecursiveASTVisitor<SemindVisitor> {
 
     private:
 	ASTContext& ctx;
-	semind* out;
+	semindex* out;
 };
 
 /* ============================================================
  * AST Consumer / FrontendAction
  * ============================================================ */
 
-class SemindASTConsumer : public ASTConsumer {
+class SemindexASTConsumer : public ASTConsumer {
     public:
-	SemindASTConsumer(ASTContext& ctx, semind* out)
+	SemindexASTConsumer(ASTContext& ctx, semindex* out)
 	    : visitor(ctx, out)
 	{
 	}
@@ -348,12 +348,12 @@ class SemindASTConsumer : public ASTConsumer {
 	}
 
     private:
-	SemindVisitor visitor;
+	SemindexVisitor visitor;
 };
 
-class SemindFrontendAction : public ASTFrontendAction {
+class SemindexFrontendAction : public ASTFrontendAction {
     public:
-	explicit SemindFrontendAction(semind* out)
+	explicit SemindexFrontendAction(semindex* out)
 	    : out(out)
 	{
 	}
@@ -361,28 +361,28 @@ class SemindFrontendAction : public ASTFrontendAction {
 	std::unique_ptr<ASTConsumer> CreateASTConsumer(
 	    CompilerInstance& CI, StringRef) override
 	{
-		return std::make_unique<SemindASTConsumer>(
+		return std::make_unique<SemindexASTConsumer>(
 		    CI.getASTContext(), out);
 	}
 
     private:
-	semind* out;
+	semindex* out;
 };
 
-class SemindActionFactory : public FrontendActionFactory {
+class SemindexActionFactory : public FrontendActionFactory {
     public:
-	explicit SemindActionFactory(semind* out)
+	explicit SemindexActionFactory(semindex* out)
 	    : out(out)
 	{
 	}
 
 	std::unique_ptr<FrontendAction> create() override
 	{
-		return std::make_unique<SemindFrontendAction>(out);
+		return std::make_unique<SemindexFrontendAction>(out);
 	}
 
     private:
-	semind* out;
+	semindex* out;
 };
 
 /* ============================================================
@@ -391,11 +391,11 @@ class SemindActionFactory : public FrontendActionFactory {
 
 extern "C" {
 
-semind_t* semind_create(void) { return new semind {}; }
+semindex_t* semindex_create(void) { return new semindex {}; }
 
-void semind_destroy(semind_t* s) { delete s; }
+void semindex_destroy(semindex_t* s) { delete s; }
 
-int semind_index_file(semind_t* s, const char* compile_commands_json, const char* source_file)
+int semindex_index_file(semindex_t* s, const char* compile_commands_json, const char* source_file)
 {
 	if (!s || !source_file)
 		return -1;
@@ -416,7 +416,7 @@ int semind_index_file(semind_t* s, const char* compile_commands_json, const char
 
 	ClangTool tool(*db, { source_file });
 
-	SemindActionFactory factory(s);
+	SemindexActionFactory factory(s);
 	int ret = tool.run(&factory);
 	if (ret == 0)
 		rebuildRecords(s);
@@ -424,12 +424,12 @@ int semind_index_file(semind_t* s, const char* compile_commands_json, const char
 	return ret;
 }
 
-size_t semind_symbol_count(const semind_t* s)
+size_t semindex_symbol_count(const semindex_t* s)
 {
 	return s ? s->symbols.size() : 0;
 }
 
-const semind_symbol_t* semind_get_symbol(const semind_t* s, size_t idx)
+const semindex_symbol_t* semindex_get_symbol(const semindex_t* s, size_t idx)
 {
 	if (!s || idx >= s->symbol_records.size())
 		return nullptr;
@@ -437,9 +437,9 @@ const semind_symbol_t* semind_get_symbol(const semind_t* s, size_t idx)
 	return &s->symbol_records[idx];
 }
 
-size_t semind_use_count(const semind_t* s) { return s ? s->uses.size() : 0; }
+size_t semindex_use_count(const semindex_t* s) { return s ? s->uses.size() : 0; }
 
-const semind_use_t* semind_get_use(const semind_t* s, size_t idx)
+const semindex_use_t* semindex_get_use(const semindex_t* s, size_t idx)
 {
 	if (!s || idx >= s->use_records.size())
 		return nullptr;

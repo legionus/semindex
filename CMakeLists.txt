@@ -35,10 +35,11 @@ execute_process(
 	OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
-# libsemind_parser (C++)
+# libsemindex (C++)
 add_library(semindex_parser SHARED
 	src/semindex.cpp
 )
+set_target_properties(semindex_parser PROPERTIES OUTPUT_NAME semindex)
 
 target_include_directories(semindex_parser PUBLIC
 	${CMAKE_CURRENT_SOURCE_DIR}/include
