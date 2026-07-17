@@ -5,6 +5,7 @@
 #include <clang/AST/AST.h>
 #include <clang/AST/ParentMapContext.h>
 #include <clang/AST/RecursiveASTVisitor.h>
+#include <clang/AST/TypeLoc.h>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Frontend/FrontendActions.h>
 #include <clang/Index/USRGeneration.h>
@@ -305,12 +306,30 @@ static const RecordDecl* recordDeclForType(QualType type)
 	return nullptr;
 }
 
+static bool isTypedefType(QualType type)
+{
+	return type->getAs<TypedefType>() != nullptr;
+}
+
+static bool isWrittenAsTypedef(TypeSourceInfo* typeSourceInfo)
+{
+	return typeSourceInfo
+	    && !typeSourceInfo->getTypeLoc()
+	            .getAsAdjusted<TypedefTypeLoc>()
+	            .isNull();
+}
+
 static bool isAnonymousRecord(const RecordDecl* D)
 {
 	return D && getName(D).empty();
 }
 
 static std::string anonymousRecordNameForVar(const VarDecl* D)
+{
+	return ":" + getName(D);
+}
+
+static std::string anonymousRecordNameForTypedef(const TypedefNameDecl* D)
 {
 	return ":" + getName(D);
 }
@@ -498,7 +517,9 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		std::string anonymousName;
 		std::string typeName;
 
-		if (isAnonymousRecord(anonymousRecord)) {
+		if (!isTypedefType(D->getType())
+		    && !isWrittenAsTypedef(D->getTypeSourceInfo())
+		    && isAnonymousRecord(anonymousRecord)) {
 			anonymousName = anonymousRecordNameForVar(D);
 			typeName = typeNameForRecord(anonymousRecord, anonymousName);
 			addAnonymousRecordSymbols(anonymousRecord, anonymousName);
@@ -551,6 +572,34 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.context = "";
 		s.file = locToFile(ctx, D->getLocation(), s.line, s.column);
 		s.local = false;
+
+		out->symbols.push_back(std::move(s));
+		return true;
+	}
+
+	bool VisitTypedefNameDecl(TypedefNameDecl* D)
+	{
+		const RecordDecl* anonymousRecord = recordDeclForType(D->getUnderlyingType());
+		std::string anonymousName;
+		std::string typeName;
+
+		if (isAnonymousRecord(anonymousRecord)) {
+			anonymousName = anonymousRecordNameForTypedef(D);
+			typeName = typeNameForRecord(anonymousRecord, anonymousName);
+			addAnonymousRecordSymbols(anonymousRecord, anonymousName);
+		} else {
+			typeName = D->getUnderlyingType().getAsString();
+		}
+
+		SemindexSymbol s;
+		s.kind = SEMINDEX_SYMBOL_TYPEDEF;
+		s.name = getName(D);
+		s.owner = "";
+		s.type = typeName;
+		s.usr = getUSR(D, ctx);
+		s.context = currentFunction;
+		s.file = locToFile(ctx, D->getLocation(), s.line, s.column);
+		s.local = !currentFunction.empty();
 
 		out->symbols.push_back(std::move(s));
 		return true;

@@ -1,0 +1,13 @@
+
+FILE: tests/test8.c
+
+   2:13                   def   t counter_t                        int
+   4:8                    def   s Pair                             
+   5:6                    def   m Pair.x                           int
+   7:21                   def   t pair_t                           struct Pair
+   9:16                   def   s :anon_t                          
+  10:13                   def   m :anon_t.y                        int
+  11:3                    def   t anon_t                           struct :anon_t
+  13:11                   def   v c                                counter_t
+  14:8                    def   v p                                pair_t
+  15:8                    def   v a                                anon_t

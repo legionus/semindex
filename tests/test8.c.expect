@@ -1,0 +1,13 @@
+SYMBOLS:
+tests/test8.c:2:13 typedef  counter_t  int
+tests/test8.c:4:8 struct   Pair       
+tests/test8.c:5:6 field    x          int
+tests/test8.c:7:21 typedef  pair_t     struct Pair
+tests/test8.c:9:16 struct   :anon_t    
+tests/test8.c:10:13 field    y          int
+tests/test8.c:11:3 typedef  anon_t     struct :anon_t
+tests/test8.c:13:11 var      c          counter_t
+tests/test8.c:14:8 var      p          pair_t
+tests/test8.c:15:8 var      a          anon_t
+
+USES:
