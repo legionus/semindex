@@ -79,6 +79,30 @@ static std::unique_ptr<CompilationDatabase> loadCompileCommands(
 	return CompilationDatabase::loadFromDirectory(directory, error);
 }
 
+static bool isDirectCallCallee(const Expr* E, ASTContext& ctx)
+{
+	const Expr* current = E;
+	const Expr* target = E->IgnoreParenImpCasts();
+
+	for (;;) {
+		auto parents = ctx.getParents(*current);
+		if (parents.empty())
+			return false;
+
+		const Stmt* parent = parents.begin()->get<Stmt>();
+		if (!parent)
+			return false;
+
+		if (const auto* call = dyn_cast<CallExpr>(parent))
+			return call->getCallee()->IgnoreParenImpCasts() == target;
+
+		if (!isa<ParenExpr>(parent) && !isa<ImplicitCastExpr>(parent))
+			return false;
+
+		current = cast<Expr>(parent);
+	}
+}
+
 static semind_use_kind_t classifyUse(const Expr* E, ASTContext& ctx)
 {
 	E = E->IgnoreParenImpCasts();
@@ -187,6 +211,9 @@ class SemindVisitor : public RecursiveASTVisitor<SemindVisitor> {
 	{
 		const ValueDecl* D = E->getDecl();
 		if (!D)
+			return true;
+
+		if (isa<FunctionDecl>(D) && isDirectCallCallee(E, ctx))
 			return true;
 
 		SemindUse u;
