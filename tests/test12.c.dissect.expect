@@ -1,0 +1,35 @@
+
+FILE: tests/test12.c
+
+   2:8                    def   s S
+   3:6                    def   m S.x                              int
+   6:13                   def   t T                                int
+   7:5                    def   v g                                int
+   9:5                    def   f f                                int (int)
+   9:11  f                def . v x                                int
+  11:6   f                def . v a                                int
+  11:6   f                -w- . v a                                int
+  11:17  f                -r- . v x                                int
+  12:6   f                def . v b                                int
+  12:6   f                -w- . v b                                int
+  12:24  f                -r- . s S
+  13:6   f                def . v c                                int
+  13:6   f                -w- . v c                                int
+  13:17  f                -r- . t T                                int
+  14:6   f                def . v d                                int
+  14:6   f                -w- . v d                                int
+  14:19  f                -r- . t T                                int
+  15:6   f                def . v e                                int
+  15:6   f                -w- . v e                                int
+  15:19  f                -r- . v x                                int
+  15:27  f                -r-   v g                                int
+  16:13  f                -r- . v x                                int
+  16:16  f                def . v y                                typeof (x)
+  16:16  f                -w- . v y                                typeof (x)
+  16:20  f                -r-   v g                                int
+  18:9   f                -r- . v a                                int
+  18:13  f                -r- . v b                                int
+  18:17  f                -r- . v c                                int
+  18:21  f                -r- . v d                                int
+  18:25  f                -r- . v e                                int
+  18:29  f                -r- . v y                                typeof (x)
