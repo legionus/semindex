@@ -15,8 +15,14 @@ run_case()
 	expect=$2
 	out=$3
 	err=$4
+	format=$5
+	format_arg=
 
-	if ! "$SEMINDEX" "$SOURCE_DIR/$src" "$COMPILE_COMMANDS" >"$out" 2>"$err"; then
+	if [ "$format" != "default" ]; then
+		format_arg=--format=$format
+	fi
+
+	if ! "$SEMINDEX" $format_arg "$SOURCE_DIR/$src" "$COMPILE_COMMANDS" >"$out" 2>"$err"; then
 		cat "$err" >&2
 		cat "$out" >&2
 		fail "$src did not index successfully"
@@ -33,11 +39,11 @@ if [ -z "${SEMINDEX:-}" ] || [ -z "${COMPILE_COMMANDS:-}" ] ||
 	fail "SEMINDEX, COMPILE_COMMANDS, and SOURCE_DIR must be set"
 fi
 
-if [ "$#" -ne 2 ]; then
-	fail "usage: run-output-tests.sh <source> <expect>"
+if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
+	fail "usage: run-output-tests.sh <source> <expect> [format]"
 fi
 
 tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT
 
-run_case "$1" "$2" "$tmpdir/test.out" "$tmpdir/test.err"
+run_case "$1" "$2" "$tmpdir/test.out" "$tmpdir/test.err" "${3:-default}"

@@ -1,0 +1,7 @@
+
+FILE: tests/test5.c
+
+   2:5                    def   f foo                              int (void)
+   7:5                    def   f call                             int (int (*)(void))
+   7:16  call             def . v fn                               int (*)(void)
+   9:9   call             --r . v fn                               int (*)(void)

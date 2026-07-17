@@ -1,0 +1,11 @@
+
+FILE: tests/test.c
+
+   1:8                    def   s S                                
+   2:9                    def   m S.x                              int
+   5:5                    def   v g                                int
+   7:5                    def   f main                             int ()
+   8:14  main             def . v s                                struct S
+   9:5   main             -r- . v s                                struct S
+   9:7   main             -w-   m S.x                              int
+   9:11  main             -r-   v g                                int

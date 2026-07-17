@@ -79,6 +79,13 @@ cmake ..
 make
 ```
 
+The CLI can print either the default prototype output or a Sparse
+`test-dissect`-style view:
+
+```sh
+semindex --format=dissect path/to/file.c build/compile_commands.json
+```
+
 ## Current limitations
 
 This is still a prototype.

@@ -28,24 +28,43 @@ typedef enum {
 	SEMINDEX_USE_CALL,
 } semindex_use_kind_t;
 
+typedef enum {
+	SEMINDEX_MODE_R_AOF = 1U << 0,
+	SEMINDEX_MODE_W_AOF = 1U << 1,
+	SEMINDEX_MODE_R_VAL = 1U << 2,
+	SEMINDEX_MODE_W_VAL = 1U << 3,
+	SEMINDEX_MODE_R_PTR = 1U << 4,
+	SEMINDEX_MODE_W_PTR = 1U << 5,
+} semindex_use_mode_t;
+
 /* symbol record */
 typedef struct {
 	semindex_symbol_kind_t kind;
 	const char* name; /* may be NULL or "" for anonymous */
+	const char* owner; /* containing record for fields */
 	const char* type; /* textual type */
 	const char* usr;  /* stable unique id */
+	const char* context; /* containing function for local symbols */
 	const char* file;
 	unsigned line;
 	unsigned column;
+	int local;
 } semindex_symbol_t;
 
 /* usage record */
 typedef struct {
 	semindex_use_kind_t kind;
+	semindex_symbol_kind_t symbol_kind;
+	unsigned mode; /* semindex_use_mode_t bitmask */
+	const char* name; /* target symbol */
+	const char* owner; /* containing record for fields */
+	const char* type; /* textual type */
 	const char* usr; /* target symbol */
+	const char* context; /* containing function */
 	const char* file;
 	unsigned line;
 	unsigned column;
+	int local;
 } semindex_use_t;
 
 /* lifecycle */

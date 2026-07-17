@@ -53,6 +53,8 @@ target_link_directories(semindex_parser PRIVATE ${LLVM_LIBDIR})
 target_link_libraries(semindex_parser PRIVATE clang-cpp ${LLVM_LIBS})
 
 add_executable(semindex
+	utils/output_default.c
+	utils/output_dissect.c
 	utils/semindex.c
 )
 
@@ -79,6 +81,18 @@ if(BUILD_TESTING)
 				sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-output-tests.sh
 					${test_source}
 					${test_source}.expect
+		)
+		add_test(
+			NAME semindex-dissect-${test_name}
+			COMMAND
+				${CMAKE_COMMAND} -E env
+				SEMINDEX=$<TARGET_FILE:semindex>
+				COMPILE_COMMANDS=${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
+				SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+				sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-output-tests.sh
+					${test_source}
+					${test_source}.dissect.expect
+					dissect
 		)
 	endforeach()
 endif()

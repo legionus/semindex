@@ -103,6 +103,67 @@ static bool isDirectCallCallee(const Expr* E, ASTContext& ctx)
 	}
 }
 
+static const Stmt* getParentStmt(const Expr* E, ASTContext& ctx)
+{
+	auto parents = ctx.getParents(*E);
+	if (parents.empty())
+		return nullptr;
+
+	return parents.begin()->get<Stmt>();
+}
+
+static const Expr* ignoreParenImpCasts(const Expr* E)
+{
+	return E ? E->IgnoreParenImpCasts() : nullptr;
+}
+
+static bool isPointerReadOperand(const Expr* E, ASTContext& ctx)
+{
+	const Expr* current = E;
+
+	for (;;) {
+		const Stmt* parent = getParentStmt(current, ctx);
+		if (!parent)
+			return false;
+
+		if (const auto* U = dyn_cast<UnaryOperator>(parent)) {
+			if (U->getOpcode() == UO_Deref)
+				return true;
+		}
+
+		if (const auto* M = dyn_cast<MemberExpr>(parent)) {
+			if (M->isArrow()
+			    && ignoreParenImpCasts(M->getBase()) == ignoreParenImpCasts(E))
+				return true;
+		}
+
+		if (!isa<ParenExpr>(parent) && !isa<ImplicitCastExpr>(parent))
+			return false;
+
+		current = cast<Expr>(parent);
+	}
+}
+
+static bool isCallCallee(const Expr* E, ASTContext& ctx)
+{
+	const Expr* current = E;
+	const Expr* target = E->IgnoreParenImpCasts();
+
+	for (;;) {
+		const Stmt* parent = getParentStmt(current, ctx);
+		if (!parent)
+			return false;
+
+		if (const auto* call = dyn_cast<CallExpr>(parent))
+			return ignoreParenImpCasts(call->getCallee()) == target;
+
+		if (!isa<ParenExpr>(parent) && !isa<ImplicitCastExpr>(parent))
+			return false;
+
+		current = cast<Expr>(parent);
+	}
+}
+
 static semindex_use_kind_t classifyUse(const Expr* E, ASTContext& ctx)
 {
 	E = E->IgnoreParenImpCasts();
@@ -142,6 +203,46 @@ static semindex_use_kind_t classifyUse(const Expr* E, ASTContext& ctx)
 	return SEMINDEX_USE_READ;
 }
 
+static unsigned accessModeForUse(semindex_use_kind_t kind, const Expr* E, ASTContext& ctx)
+{
+	switch (kind) {
+	case SEMINDEX_USE_ADDR:
+		return SEMINDEX_MODE_R_AOF | SEMINDEX_MODE_W_AOF;
+	case SEMINDEX_USE_WRITE:
+		return SEMINDEX_MODE_W_VAL;
+	case SEMINDEX_USE_CALL:
+		return SEMINDEX_MODE_R_PTR;
+	case SEMINDEX_USE_READ:
+		if (isCallCallee(E, ctx) || isPointerReadOperand(E, ctx))
+			return SEMINDEX_MODE_R_PTR;
+		return SEMINDEX_MODE_R_VAL;
+	}
+
+	return 0;
+}
+
+static semindex_symbol_kind_t symbolKindForDecl(const ValueDecl* D)
+{
+	if (isa<FieldDecl>(D))
+		return SEMINDEX_SYMBOL_FIELD;
+	if (isa<FunctionDecl>(D))
+		return SEMINDEX_SYMBOL_FUNCTION;
+	return SEMINDEX_SYMBOL_VAR;
+}
+
+static std::string getOwnerName(const Decl* D)
+{
+	const auto* FD = dyn_cast<FieldDecl>(D);
+	if (!FD)
+		return "";
+
+	const auto* RD = FD->getParent();
+	if (!RD)
+		return "";
+
+	return getName(RD);
+}
+
 /* ============================================================
  * Internal C++ model
  * ============================================================ */
@@ -149,19 +250,29 @@ static semindex_use_kind_t classifyUse(const Expr* E, ASTContext& ctx)
 struct SemindexSymbol {
 	semindex_symbol_kind_t kind;
 	std::string name;
+	std::string owner;
 	std::string type;
 	std::string usr;
+	std::string context;
 	std::string file;
 	unsigned line;
 	unsigned column;
+	bool local;
 };
 
 struct SemindexUse {
 	semindex_use_kind_t kind;
+	semindex_symbol_kind_t symbol_kind;
+	unsigned mode;
+	std::string name;
+	std::string owner;
+	std::string type;
 	std::string usr;
+	std::string context;
 	std::string file;
 	unsigned line;
 	unsigned column;
+	bool local;
 };
 
 struct semindex {
@@ -181,11 +292,14 @@ static void rebuildRecords(semindex* s)
 
 		rec.kind = sym.kind;
 		rec.name = sym.name.c_str();
+		rec.owner = sym.owner.c_str();
 		rec.type = sym.type.c_str();
 		rec.usr = sym.usr.c_str();
+		rec.context = sym.context.c_str();
 		rec.file = sym.file.c_str();
 		rec.line = sym.line;
 		rec.column = sym.column;
+		rec.local = sym.local;
 
 		s->symbol_records.push_back(rec);
 	}
@@ -197,10 +311,17 @@ static void rebuildRecords(semindex* s)
 		semindex_use_t rec;
 
 		rec.kind = use.kind;
+		rec.symbol_kind = use.symbol_kind;
+		rec.mode = use.mode;
+		rec.name = use.name.c_str();
+		rec.owner = use.owner.c_str();
+		rec.type = use.type.c_str();
 		rec.usr = use.usr.c_str();
+		rec.context = use.context.c_str();
 		rec.file = use.file.c_str();
 		rec.line = use.line;
 		rec.column = use.column;
+		rec.local = use.local;
 
 		s->use_records.push_back(rec);
 	}
@@ -218,14 +339,29 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 	{
 	}
 
+	bool TraverseFunctionDecl(FunctionDecl* D)
+	{
+		if (!D)
+			return true;
+
+		std::string oldFunction = currentFunction;
+		currentFunction = getName(D);
+		bool ret = RecursiveASTVisitor<SemindexVisitor>::TraverseFunctionDecl(D);
+		currentFunction = oldFunction;
+		return ret;
+	}
+
 	bool VisitVarDecl(VarDecl* D)
 	{
 		SemindexSymbol s;
 		s.kind = SEMINDEX_SYMBOL_VAR;
 		s.name = getName(D);
+		s.owner = "";
 		s.type = D->getType().getAsString();
 		s.usr = getUSR(D, ctx);
+		s.context = currentFunction;
 		s.file = locToFile(ctx, D->getLocation(), s.line, s.column);
+		s.local = !currentFunction.empty();
 
 		out->symbols.push_back(std::move(s));
 		return true;
@@ -236,9 +372,12 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		SemindexSymbol s;
 		s.kind = SEMINDEX_SYMBOL_FIELD;
 		s.name = getName(D);
+		s.owner = getOwnerName(D);
 		s.type = D->getType().getAsString();
 		s.usr = getUSR(D, ctx);
+		s.context = "";
 		s.file = locToFile(ctx, D->getLocation(), s.line, s.column);
+		s.local = false;
 
 		out->symbols.push_back(std::move(s));
 		return true;
@@ -255,8 +394,15 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 
 		SemindexUse u;
 		u.kind = classifyUse(E, ctx);
+		u.symbol_kind = symbolKindForDecl(D);
+		u.mode = accessModeForUse(u.kind, E, ctx);
+		u.name = getName(D);
+		u.owner = getOwnerName(D);
+		u.type = D->getType().getAsString();
 		u.usr = getUSR(D, ctx);
+		u.context = currentFunction;
 		u.file = locToFile(ctx, E->getExprLoc(), u.line, u.column);
+		u.local = !currentFunction.empty() && !D->hasExternalFormalLinkage();
 
 		out->uses.push_back(std::move(u));
 		return true;
@@ -270,8 +416,15 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 
 		SemindexUse u;
 		u.kind = classifyUse(E, ctx);
+		u.symbol_kind = symbolKindForDecl(D);
+		u.mode = accessModeForUse(u.kind, E, ctx);
+		u.name = getName(D);
+		u.owner = getOwnerName(D);
+		u.type = D->getType().getAsString();
 		u.usr = getUSR(D, ctx);
+		u.context = currentFunction;
 		u.file = locToFile(ctx, E->getExprLoc(), u.line, u.column);
+		u.local = false;
 
 		out->uses.push_back(std::move(u));
 		return true;
@@ -287,9 +440,12 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		    = D->isUnion() ? SEMINDEX_SYMBOL_UNION : SEMINDEX_SYMBOL_STRUCT;
 
 		s.name = getName(D);
+		s.owner = "";
 		s.type = ""; // TODO: fill it later
 		s.usr = getUSR(D, ctx);
+		s.context = "";
 		s.file = locToFile(ctx, D->getLocation(), s.line, s.column);
+		s.local = false;
 
 		out->symbols.push_back(std::move(s));
 		return true;
@@ -303,9 +459,12 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		SemindexSymbol s;
 		s.kind = SEMINDEX_SYMBOL_FUNCTION;
 		s.name = getName(D);
+		s.owner = "";
 		s.type = D->getType().getAsString();
 		s.usr = getUSR(D, ctx);
+		s.context = "";
 		s.file = locToFile(ctx, D->getLocation(), s.line, s.column);
+		s.local = false;
 
 		out->symbols.push_back(std::move(s));
 		return true;
@@ -319,8 +478,15 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 
 		SemindexUse u;
 		u.kind = SEMINDEX_USE_CALL;
+		u.symbol_kind = SEMINDEX_SYMBOL_FUNCTION;
+		u.mode = SEMINDEX_MODE_R_PTR;
+		u.name = getName(FD);
+		u.owner = "";
+		u.type = FD->getType().getAsString();
 		u.usr = getUSR(FD, ctx);
+		u.context = currentFunction;
 		u.file = locToFile(ctx, E->getExprLoc(), u.line, u.column);
+		u.local = false;
 
 		out->uses.push_back(std::move(u));
 		return true;
@@ -329,6 +495,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
     private:
 	ASTContext& ctx;
 	semindex* out;
+	std::string currentFunction;
 };
 
 /* ============================================================

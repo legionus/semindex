@@ -1,0 +1,12 @@
+
+FILE: tests/test3.c
+
+   2:5                    def   v g                                int
+   4:5                    def   f f                                int (void)
+   6:6   f                def . v x                                int
+   7:7   f                def . v p                                int *
+   9:2   f                -w- . v p                                int *
+   9:7   f                m--   v g                                int
+  10:2   f                -w- . v x                                int
+  10:7   f                --r . v p                                int *
+  11:9   f                -r- . v x                                int

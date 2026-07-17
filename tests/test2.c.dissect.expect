@@ -1,0 +1,10 @@
+
+FILE: tests/test2.c
+
+   3:5                    def   f foo                              int (int)
+   3:13  foo              def . v x                                int
+   5:9   foo              -r- . v x                                int
+   8:5                    def   f main                             int (void)
+  10:6   main             def . v y                                int
+  10:10  main             --r   f foo                              int (int)
+  11:9   main             -r- . v y                                int

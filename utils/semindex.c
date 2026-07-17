@@ -1,71 +1,58 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <stdio.h>
+#include <string.h>
 
-#include "semindex.h"
-
-static const char* kind_to_string(semindex_symbol_kind_t kind)
-{
-	switch (kind) {
-		case SEMINDEX_SYMBOL_VAR:      return "var";
-		case SEMINDEX_SYMBOL_FIELD:    return "field";
-		case SEMINDEX_SYMBOL_STRUCT:   return "struct";
-		case SEMINDEX_SYMBOL_UNION:    return "union";
-		case SEMINDEX_SYMBOL_TYPEDEF:  return "typedef";
-		case SEMINDEX_SYMBOL_FUNCTION: return "function";
-		default:
-			return "?";
-	};
-}
-
-static const char* use_kind_to_string(semindex_use_kind_t k)
-{
-	switch (k) {
-		case SEMINDEX_USE_READ:  return "READ";
-		case SEMINDEX_USE_WRITE: return "WRITE";
-		case SEMINDEX_USE_ADDR:  return "ADDR";
-	       case SEMINDEX_USE_CALL:   return "CALL";
-		default:
-			return "?";
-	}
-}
+#include "output.h"
 
 int main(int argc, char** argv)
 {
-	if (argc < 2 || argc > 3) {
-		fprintf(stderr, "Usage: semindex <source> [compile_commands]\n");
+	enum output_format format = FORMAT_DEFAULT;
+	const char* source_file = NULL;
+	const char* compile_commands = ".";
+
+	for (int i = 1; i < argc; i++) {
+		if (!strncmp(argv[i], "--format=", 9)) {
+			const char* value = argv[i] + 9;
+
+			if (!strcmp(value, "default"))
+				format = FORMAT_DEFAULT;
+			else if (!strcmp(value, "dissect"))
+				format = FORMAT_DISSECT;
+			else {
+				fprintf(stderr, "semindex: unknown format: %s\n", value);
+				return 1;
+			}
+			continue;
+		}
+
+		if (!source_file)
+			source_file = argv[i];
+		else if (compile_commands[0] == '.' && compile_commands[1] == '\0')
+			compile_commands = argv[i];
+		else {
+			fprintf(stderr, "Usage: semindex [--format=default|dissect] <source> [compile_commands]\n");
+			return 1;
+		}
+	}
+
+	if (!source_file) {
+		fprintf(stderr, "Usage: semindex [--format=default|dissect] <source> [compile_commands]\n");
 		return 1;
 	}
 
-	const char* compile_commands = argc > 2 ? argv[2] : ".";
 	semindex_t* s = semindex_create();
 
-	if (semindex_index_file(s, compile_commands, argv[1]) != 0) {
+	if (semindex_index_file(s, compile_commands, source_file) != 0) {
 		fprintf(stderr, "semindex: failed to index '%s' using '%s'\n",
-		    argv[1], compile_commands);
+		    source_file, compile_commands);
 		semindex_destroy(s);
 		return 1;
 	}
 
-	printf("SYMBOLS:\n");
-
-	for (size_t i = 0; i < semindex_symbol_count(s); i++) {
-		const semindex_symbol_t* sym = semindex_get_symbol(s, i);
-
-		//printf("%s %s %s\n", sym->usr, sym->name, sym->type);
-
-		printf("%s:%u:%u %-8s %-10s %s\n", sym->file, sym->line,
-		    sym->column, kind_to_string(sym->kind), sym->name,
-		    sym->type);
-	}
-
-	printf("\nUSES:\n");
-
-	for (size_t i = 0; i < semindex_use_count(s); i++) {
-		const semindex_use_t* u = semindex_get_use(s, i);
-
-		printf("%s:%u:%u %-5s %s\n", u->file, u->line, u->column,
-		    use_kind_to_string(u->kind), u->usr);
-	}
+	if (format == FORMAT_DISSECT)
+		output_dissect(stdout, s);
+	else
+		output_default(stdout, s);
 
 	semindex_destroy(s);
 

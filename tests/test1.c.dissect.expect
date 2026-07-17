@@ -1,0 +1,13 @@
+
+FILE: tests/test1.c
+
+   2:5                    def   v g                                int
+   4:5                    def   f main                             int (void)
+   6:6   main             def . v x                                int
+   7:7   main             def . v p                                int *
+   8:2   main             -w-   v g                                int
+   9:2   main             -w- . v x                                int
+   9:6   main             -r-   v g                                int
+  10:2   main             -w- . v p                                int *
+  10:7   main             m-- . v x                                int
+  11:10  main             --r . v p                                int *
