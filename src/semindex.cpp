@@ -387,11 +387,29 @@ struct SemindexUse {
 };
 
 struct semindex {
+	semindex_scope_t scope = SEMINDEX_SCOPE_PROJECT;
 	std::vector<SemindexSymbol> symbols;
 	std::vector<SemindexUse> uses;
 	std::vector<semindex_symbol_t> symbol_records;
 	std::vector<semindex_use_t> use_records;
 };
+
+static bool locInScope(const SourceManager& sm, semindex_scope_t scope,
+    SourceLocation loc)
+{
+	SourceLocation spelling;
+
+	if (scope == SEMINDEX_SCOPE_ALL)
+		return true;
+	if (loc.isInvalid())
+		return false;
+
+	spelling = sm.getSpellingLoc(loc);
+	if (scope == SEMINDEX_SCOPE_FILE)
+		return sm.isWrittenInMainFile(spelling);
+
+	return !sm.isInPredefinedFile(spelling) && !sm.isInSystemHeader(spelling);
+}
 
 class SemindexPPCallbacks : public PPCallbacks {
 public:
@@ -409,8 +427,7 @@ public:
 			return;
 
 		SourceLocation loc = macroNameTok.getLocation();
-		SourceLocation spelling = sm.getSpellingLoc(loc);
-		if (!sm.isWrittenInMainFile(spelling))
+		if (!locInScope(sm, out->scope, loc))
 			return;
 
 		SemindexSymbol s;
@@ -435,7 +452,7 @@ public:
 			return;
 
 		SourceLocation spelling = sm.getSpellingLoc(macroNameTok.getLocation());
-		if (!sm.isWrittenInMainFile(spelling))
+		if (!locInScope(sm, out->scope, spelling))
 			return;
 
 		SemindexUse u;
@@ -558,7 +575,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.local = !currentFunction.empty();
 		s.definition = true;
 
-		out->symbols.push_back(std::move(s));
+		addSymbol(std::move(s), D->getLocation());
 
 		if (D->hasInit()) {
 			SemindexUse u;
@@ -573,7 +590,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 			u.file = locToFile(ctx, D->getLocation(), u.line, u.column);
 			u.local = !currentFunction.empty();
 
-			out->uses.push_back(std::move(u));
+			addUse(std::move(u), D->getLocation());
 		}
 
 		return true;
@@ -595,7 +612,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.local = false;
 		s.definition = true;
 
-		out->symbols.push_back(std::move(s));
+		addSymbol(std::move(s), D->getLocation());
 		return true;
 	}
 
@@ -621,7 +638,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.local = !currentFunction.empty();
 		s.definition = true;
 
-		out->symbols.push_back(std::move(s));
+		addSymbol(std::move(s), D->getLocation());
 		return true;
 	}
 
@@ -684,7 +701,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		u.file = locToFile(ctx, E->getExprLoc(), u.line, u.column);
 		u.local = !currentFunction.empty() && !D->hasExternalFormalLinkage();
 
-		out->uses.push_back(std::move(u));
+		addUse(std::move(u), E->getExprLoc());
 		return true;
 	}
 
@@ -737,7 +754,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.local = false;
 		s.definition = true;
 
-		out->symbols.push_back(std::move(s));
+		addSymbol(std::move(s), D->getLocation());
 		return true;
 	}
 
@@ -759,7 +776,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.local = false;
 		s.definition = true;
 
-		out->symbols.push_back(std::move(s));
+		addSymbol(std::move(s), D->getLocation());
 		return true;
 	}
 
@@ -776,7 +793,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.local = false;
 		s.definition = true;
 
-		out->symbols.push_back(std::move(s));
+		addSymbol(std::move(s), D->getLocation());
 		return true;
 	}
 
@@ -798,7 +815,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.local = false;
 		s.definition = D->isThisDeclarationADefinition();
 
-		out->symbols.push_back(std::move(s));
+		addSymbol(std::move(s), D->getLocation());
 		return true;
 	}
 
@@ -820,11 +837,27 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		u.file = locToFile(ctx, E->getExprLoc(), u.line, u.column);
 		u.local = false;
 
-		out->uses.push_back(std::move(u));
+		addUse(std::move(u), E->getExprLoc());
 		return true;
 	}
 
     private:
+	void addSymbol(SemindexSymbol&& s, SourceLocation loc)
+	{
+		if (!locInScope(ctx.getSourceManager(), out->scope, loc))
+			return;
+
+		out->symbols.push_back(std::move(s));
+	}
+
+	void addUse(SemindexUse&& u, SourceLocation loc)
+	{
+		if (!locInScope(ctx.getSourceManager(), out->scope, loc))
+			return;
+
+		out->uses.push_back(std::move(u));
+	}
+
 	static bool isPrototypeParameter(const VarDecl* D)
 	{
 		const auto* P = dyn_cast<ParmVarDecl>(D);
@@ -843,7 +876,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 
 		const SourceManager& sm = ctx.getSourceManager();
 		SourceLocation spelling = sm.getSpellingLoc(loc);
-		if (!sm.isWrittenInMainFile(spelling))
+		if (!locInScope(sm, out->scope, spelling))
 			return;
 
 		SemindexUse u;
@@ -864,7 +897,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		if (!typeUses.insert(key).second)
 			return;
 
-		out->uses.push_back(std::move(u));
+		addUse(std::move(u), spelling);
 	}
 
 	void addValueUse(const ValueDecl* D, semindex_use_kind_t kind,
@@ -883,7 +916,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		u.file = locToFile(ctx, loc, u.line, u.column);
 		u.local = local;
 
-		out->uses.push_back(std::move(u));
+		addUse(std::move(u), loc);
 	}
 
 	void addAnonymousRecordSymbols(const RecordDecl* D, const std::string& name)
@@ -903,7 +936,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.local = false;
 		s.definition = true;
 
-		out->symbols.push_back(std::move(s));
+		addSymbol(std::move(s), D->getLocation());
 		addAnonymousRecordFields(D, name);
 	}
 
@@ -932,7 +965,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 			s.local = false;
 			s.definition = true;
 
-			out->symbols.push_back(std::move(s));
+			addSymbol(std::move(s), field->getLocation());
 		}
 	}
 
@@ -1010,6 +1043,12 @@ extern "C" {
 semindex_t* semindex_create(void) { return new semindex {}; }
 
 void semindex_destroy(semindex_t* s) { delete s; }
+
+void semindex_set_scope(semindex_t* s, semindex_scope_t scope)
+{
+	if (s)
+		s->scope = scope;
+}
 
 int semindex_index_file(semindex_t* s, const char* compile_commands_json, const char* source_file)
 {

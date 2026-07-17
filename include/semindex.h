@@ -40,6 +40,12 @@ typedef enum {
 	SEMINDEX_MODE_W_PTR = 1U << 5,
 } semindex_use_mode_t;
 
+typedef enum {
+	SEMINDEX_SCOPE_FILE,
+	SEMINDEX_SCOPE_PROJECT,
+	SEMINDEX_SCOPE_ALL,
+} semindex_scope_t;
+
 /* symbol record */
 typedef struct {
 	semindex_symbol_kind_t kind;
@@ -74,6 +80,7 @@ typedef struct {
 /* lifecycle */
 semindex_t* semindex_create(void);
 void semindex_destroy(semindex_t* s);
+void semindex_set_scope(semindex_t* s, semindex_scope_t scope);
 
 /* indexing */
 int semindex_index_file(semindex_t* s, const char* compile_commands_json, const char* source_file);
