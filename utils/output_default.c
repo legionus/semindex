@@ -10,6 +10,7 @@ static const char* kind_to_string(semindex_symbol_kind_t kind)
 		case SEMINDEX_SYMBOL_UNION:    return "union";
 		case SEMINDEX_SYMBOL_TYPEDEF:  return "typedef";
 		case SEMINDEX_SYMBOL_FUNCTION: return "function";
+		case SEMINDEX_SYMBOL_MACRO:    return "macro";
 		default:
 			return "?";
 	};

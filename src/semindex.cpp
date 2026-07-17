@@ -8,6 +8,9 @@
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Frontend/FrontendActions.h>
 #include <clang/Index/USRGeneration.h>
+#include <clang/Lex/MacroInfo.h>
+#include <clang/Lex/PPCallbacks.h>
+#include <clang/Lex/Preprocessor.h>
 #include <clang/Tooling/CompilationDatabase.h>
 #include <clang/Tooling/Tooling.h>
 
@@ -75,6 +78,20 @@ static std::string locToFileDisplayColumn(
 	std::string file = locToFile(ctx, loc, line, col);
 	col = displayColumnForLoc(ctx, loc);
 	return file;
+}
+
+static std::string locToFile(const SourceManager& sm, SourceLocation loc, unsigned& line, unsigned& col)
+{
+	PresumedLoc ploc = sm.getPresumedLoc(loc);
+
+	if (!ploc.isValid()) {
+		line = col = 0;
+		return "<invalid>";
+	}
+
+	line = ploc.getLine();
+	col = ploc.getColumn();
+	return std::string(ploc.getFilename());
 }
 
 static std::string getName(const Decl* D)
@@ -340,6 +357,70 @@ struct semindex {
 	std::vector<SemindexUse> uses;
 	std::vector<semindex_symbol_t> symbol_records;
 	std::vector<semindex_use_t> use_records;
+};
+
+class SemindexPPCallbacks : public PPCallbacks {
+public:
+	SemindexPPCallbacks(SourceManager& sm, semindex* out)
+	    : sm(sm)
+	    , out(out)
+	{
+	}
+
+	void MacroDefined(const Token& macroNameTok,
+	    const MacroDirective*) override
+	{
+		IdentifierInfo* ident = macroNameTok.getIdentifierInfo();
+		if (!ident)
+			return;
+
+		SourceLocation loc = macroNameTok.getLocation();
+		SourceLocation spelling = sm.getSpellingLoc(loc);
+		if (!sm.isWrittenInMainFile(spelling))
+			return;
+
+		SemindexSymbol s;
+		s.kind = SEMINDEX_SYMBOL_MACRO;
+		s.name = ident->getName().str();
+		s.owner = "";
+		s.type = "";
+		s.usr = "macro:" + s.name;
+		s.context = "";
+		s.file = locToFile(sm, loc, s.line, s.column);
+		s.local = false;
+
+		out->symbols.push_back(std::move(s));
+	}
+
+	void MacroExpands(const Token& macroNameTok, const MacroDefinition&,
+	    SourceRange, const MacroArgs*) override
+	{
+		IdentifierInfo* ident = macroNameTok.getIdentifierInfo();
+		if (!ident)
+			return;
+
+		SourceLocation spelling = sm.getSpellingLoc(macroNameTok.getLocation());
+		if (!sm.isWrittenInMainFile(spelling))
+			return;
+
+		SemindexUse u;
+		u.kind = SEMINDEX_USE_READ;
+		u.symbol_kind = SEMINDEX_SYMBOL_MACRO;
+		u.mode = SEMINDEX_MODE_R_VAL;
+		u.name = ident->getName().str();
+		u.owner = "";
+		u.type = "";
+		u.usr = "macro:" + u.name;
+		u.context = "";
+		u.file = locToFile(sm, spelling, u.line, u.column);
+		u.local = false;
+
+		out->uses.push_back(std::move(u));
+	}
+
+private:
+	SourceManager& sm;
+	semindex* out;
 };
 
 static void rebuildRecords(semindex* s)
@@ -670,6 +751,10 @@ class SemindexFrontendAction : public ASTFrontendAction {
 	std::unique_ptr<ASTConsumer> CreateASTConsumer(
 	    CompilerInstance& CI, StringRef) override
 	{
+		CI.getPreprocessor().addPPCallbacks(
+		    std::make_unique<SemindexPPCallbacks>(
+		        CI.getSourceManager(), out));
+
 		return std::make_unique<SemindexASTConsumer>(
 		    CI.getASTContext(), out);
 	}

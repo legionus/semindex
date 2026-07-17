@@ -1,0 +1,9 @@
+SYMBOLS:
+tests/test7.c:2:9 macro    FOO        
+tests/test7.c:3:9 macro    BAR        
+tests/test7.c:5:5 var      v          int
+
+USES:
+tests/test7.c:5:9 READ  macro:BAR
+tests/test7.c:3:23 READ  macro:FOO
+tests/test7.c:5:5 WRITE c:@v
