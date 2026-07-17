@@ -167,7 +167,44 @@ struct SemindUse {
 struct semind {
 	std::vector<SemindSymbol> symbols;
 	std::vector<SemindUse> uses;
+	std::vector<semind_symbol_t> symbol_records;
+	std::vector<semind_use_t> use_records;
 };
+
+static void rebuildRecords(semind* s)
+{
+	s->symbol_records.clear();
+	s->symbol_records.reserve(s->symbols.size());
+
+	for (const auto& sym : s->symbols) {
+		semind_symbol_t rec;
+
+		rec.kind = sym.kind;
+		rec.name = sym.name.c_str();
+		rec.type = sym.type.c_str();
+		rec.usr = sym.usr.c_str();
+		rec.file = sym.file.c_str();
+		rec.line = sym.line;
+		rec.column = sym.column;
+
+		s->symbol_records.push_back(rec);
+	}
+
+	s->use_records.clear();
+	s->use_records.reserve(s->uses.size());
+
+	for (const auto& use : s->uses) {
+		semind_use_t rec;
+
+		rec.kind = use.kind;
+		rec.usr = use.usr.c_str();
+		rec.file = use.file.c_str();
+		rec.line = use.line;
+		rec.column = use.column;
+
+		s->use_records.push_back(rec);
+	}
+}
 
 /* ============================================================
  * AST Visitor
@@ -380,7 +417,11 @@ int semind_index_file(semind_t* s, const char* compile_commands_json, const char
 	ClangTool tool(*db, { source_file });
 
 	SemindActionFactory factory(s);
-	return tool.run(&factory);
+	int ret = tool.run(&factory);
+	if (ret == 0)
+		rebuildRecords(s);
+
+	return ret;
 }
 
 size_t semind_symbol_count(const semind_t* s)
@@ -390,40 +431,20 @@ size_t semind_symbol_count(const semind_t* s)
 
 const semind_symbol_t* semind_get_symbol(const semind_t* s, size_t idx)
 {
-	if (!s || idx >= s->symbols.size())
+	if (!s || idx >= s->symbol_records.size())
 		return nullptr;
 
-	static semind_symbol_t out;
-	const auto& sym = s->symbols[idx];
-
-	out.kind = sym.kind;
-	out.name = sym.name.c_str();
-	out.type = sym.type.c_str();
-	out.usr = sym.usr.c_str();
-	out.file = sym.file.c_str();
-	out.line = sym.line;
-	out.column = sym.column;
-
-	return &out;
+	return &s->symbol_records[idx];
 }
 
 size_t semind_use_count(const semind_t* s) { return s ? s->uses.size() : 0; }
 
 const semind_use_t* semind_get_use(const semind_t* s, size_t idx)
 {
-	if (!s || idx >= s->uses.size())
+	if (!s || idx >= s->use_records.size())
 		return nullptr;
 
-	static semind_use_t out;
-	const auto& u = s->uses[idx];
-
-	out.kind = u.kind;
-	out.usr = u.usr.c_str();
-	out.file = u.file.c_str();
-	out.line = u.line;
-	out.column = u.column;
-
-	return &out;
+	return &s->use_records[idx];
 }
 
 } /* extern "C" */

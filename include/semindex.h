@@ -57,9 +57,11 @@ int semind_index_file(semind_t* s, const char* compile_commands_json, const char
 
 /* queries */
 size_t semind_symbol_count(const semind_t* s);
+/* returned pointer is valid until the next semind_index_file() or destroy */
 const semind_symbol_t* semind_get_symbol(const semind_t* s, size_t idx);
 
 size_t semind_use_count(const semind_t* s);
+/* returned pointer is valid until the next semind_index_file() or destroy */
 const semind_use_t* semind_get_use(const semind_t* s, size_t idx);
 
 #ifdef __cplusplus
