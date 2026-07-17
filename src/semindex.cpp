@@ -447,11 +447,48 @@ public:
 	void MacroExpands(const Token& macroNameTok, const MacroDefinition&,
 	    SourceRange, const MacroArgs*) override
 	{
+		SourceLocation spelling = sm.getSpellingLoc(macroNameTok.getLocation());
+		addMacroUse(macroNameTok, spelling);
+	}
+
+	void Defined(const Token& macroNameTok, const MacroDefinition&,
+	    SourceRange) override
+	{
+		addMacroUse(macroNameTok, macroNameTok.getLocation());
+	}
+
+	void Ifdef(SourceLocation, const Token& macroNameTok,
+	    const MacroDefinition&) override
+	{
+		addMacroUse(macroNameTok, macroNameTok.getLocation());
+	}
+
+	void Elifdef(SourceLocation, const Token& macroNameTok,
+	    const MacroDefinition&) override
+	{
+		addMacroUse(macroNameTok, macroNameTok.getLocation());
+	}
+
+	void Ifndef(SourceLocation, const Token& macroNameTok,
+	    const MacroDefinition&) override
+	{
+		addMacroUse(macroNameTok, macroNameTok.getLocation());
+	}
+
+	void Elifndef(SourceLocation, const Token& macroNameTok,
+	    const MacroDefinition&) override
+	{
+		addMacroUse(macroNameTok, macroNameTok.getLocation());
+	}
+
+private:
+	void addMacroUse(const Token& macroNameTok, SourceLocation loc)
+	{
 		IdentifierInfo* ident = macroNameTok.getIdentifierInfo();
 		if (!ident)
 			return;
 
-		SourceLocation spelling = sm.getSpellingLoc(macroNameTok.getLocation());
+		SourceLocation spelling = sm.getSpellingLoc(loc);
 		if (!locInScope(sm, out->scope, spelling))
 			return;
 
@@ -470,7 +507,6 @@ public:
 		out->uses.push_back(std::move(u));
 	}
 
-private:
 	SourceManager& sm;
 	semindex* out;
 };
