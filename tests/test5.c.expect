@@ -1,7 +1,7 @@
 SYMBOLS:
-tests/test5.c:2:5 function foo        int (void)
-tests/test5.c:7:5 function call       int (int (*)(void))
-tests/test5.c:7:16 var      fn         int (*)(void)
+tests/test5.c:2:5 defined  function foo        int (void)
+tests/test5.c:7:5 defined  function call       int (int (*)(void))
+tests/test5.c:7:16 defined  var      fn         int (*)(void)
 
 USES:
 tests/test5.c:9:9 READ  c:test5.c@84@F@call@fn

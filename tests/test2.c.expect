@@ -1,8 +1,8 @@
 SYMBOLS:
-tests/test2.c:3:5 function foo        int (int)
-tests/test2.c:3:13 var      x          int
-tests/test2.c:8:5 function main       int (void)
-tests/test2.c:10:6 var      y          int
+tests/test2.c:3:5 defined  function foo        int (int)
+tests/test2.c:3:13 defined  var      x          int
+tests/test2.c:8:5 defined  function main       int (void)
+tests/test2.c:10:6 defined  var      y          int
 
 USES:
 tests/test2.c:5:9 READ  c:test2.c@54@F@foo@x

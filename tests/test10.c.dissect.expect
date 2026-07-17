@@ -1,0 +1,9 @@
+
+FILE: tests/test10.c
+
+   2:5                    decl   f declared                         int (int)
+   3:5                    decl   f defined                          int (int)
+   5:17  defined          def . v x                                int
+   7:9   defined          -r- . v x                                int
+  10:5                    def   f call                             int (void)
+  12:9   call             --r   f defined                          int (int)

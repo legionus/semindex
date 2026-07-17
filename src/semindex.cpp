@@ -368,6 +368,7 @@ struct SemindexSymbol {
 	unsigned line;
 	unsigned column;
 	bool local;
+	bool definition;
 };
 
 struct SemindexUse {
@@ -421,6 +422,7 @@ public:
 		s.context = "";
 		s.file = locToFile(sm, loc, s.line, s.column);
 		s.local = false;
+		s.definition = true;
 
 		out->symbols.push_back(std::move(s));
 	}
@@ -474,6 +476,7 @@ static void rebuildRecords(semindex* s)
 		rec.line = sym.line;
 		rec.column = sym.column;
 		rec.local = sym.local;
+		rec.definition = sym.definition;
 
 		s->symbol_records.push_back(rec);
 	}
@@ -527,6 +530,9 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 
 	bool VisitVarDecl(VarDecl* D)
 	{
+		if (isPrototypeParameter(D))
+			return true;
+
 		const RecordDecl* anonymousRecord = recordDeclForType(D->getType());
 		std::string anonymousName;
 		std::string typeName;
@@ -550,6 +556,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.context = currentFunction;
 		s.file = locToFile(ctx, D->getLocation(), s.line, s.column);
 		s.local = !currentFunction.empty();
+		s.definition = true;
 
 		out->symbols.push_back(std::move(s));
 
@@ -586,6 +593,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.context = "";
 		s.file = locToFile(ctx, D->getLocation(), s.line, s.column);
 		s.local = false;
+		s.definition = true;
 
 		out->symbols.push_back(std::move(s));
 		return true;
@@ -611,6 +619,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.context = currentFunction;
 		s.file = locToFile(ctx, D->getLocation(), s.line, s.column);
 		s.local = !currentFunction.empty();
+		s.definition = true;
 
 		out->symbols.push_back(std::move(s));
 		return true;
@@ -719,6 +728,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.context = "";
 		s.file = locToFile(ctx, D->getLocation(), s.line, s.column);
 		s.local = false;
+		s.definition = true;
 
 		out->symbols.push_back(std::move(s));
 		return true;
@@ -740,6 +750,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.context = "";
 		s.file = locToFile(ctx, D->getLocation(), s.line, s.column);
 		s.local = false;
+		s.definition = true;
 
 		out->symbols.push_back(std::move(s));
 		return true;
@@ -756,6 +767,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.context = "";
 		s.file = locToFile(ctx, D->getLocation(), s.line, s.column);
 		s.local = false;
+		s.definition = true;
 
 		out->symbols.push_back(std::move(s));
 		return true;
@@ -763,7 +775,9 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 
 	bool VisitFunctionDecl(FunctionDecl* D)
 	{
-		if (!D->isThisDeclarationADefinition())
+		if (!D->isThisDeclarationADefinition() && !D->hasPrototype())
+			return true;
+		if (!functionSymbols.insert(getUSR(D, ctx)).second)
 			return true;
 
 		SemindexSymbol s;
@@ -775,6 +789,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.context = "";
 		s.file = locToFile(ctx, D->getLocation(), s.line, s.column);
 		s.local = false;
+		s.definition = D->isThisDeclarationADefinition();
 
 		out->symbols.push_back(std::move(s));
 		return true;
@@ -803,6 +818,16 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 	}
 
     private:
+	static bool isPrototypeParameter(const VarDecl* D)
+	{
+		const auto* P = dyn_cast<ParmVarDecl>(D);
+		if (!P)
+			return false;
+
+		const auto* F = dyn_cast_or_null<FunctionDecl>(P->getDeclContext());
+		return F && !F->doesThisDeclarationHaveABody();
+	}
+
 	void addTypeUse(const TypeDecl* D, semindex_symbol_kind_t kind,
 	    SourceLocation loc, const std::string& type)
 	{
@@ -850,6 +875,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		        : D->getLocation(),
 		    s.line, s.column);
 		s.local = false;
+		s.definition = true;
 
 		out->symbols.push_back(std::move(s));
 		addAnonymousRecordFields(D, name);
@@ -878,6 +904,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 			s.file = locToFileDisplayColumn(ctx, field->getLocation(),
 			    s.line, s.column);
 			s.local = false;
+			s.definition = true;
 
 			out->symbols.push_back(std::move(s));
 		}
@@ -887,6 +914,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 	semindex* out;
 	std::string currentFunction;
 	std::set<std::string> typeUses;
+	std::set<std::string> functionSymbols;
 };
 
 /* ============================================================

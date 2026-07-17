@@ -85,18 +85,19 @@ static void print_dissect_symbol(FILE* out, const semindex_symbol_t* sym)
 {
 	char name[256];
 	const char* symbol_name;
+	const char* action = sym->definition ? "def" : "decl";
 
 	symbol_name = symbol_name_for_dissect(sym->owner, sym->name, name,
 	    sizeof(name));
 	if (sym->type && sym->type[0])
-		fprintf(out, "%4u:%-3u %-16s def %c %c %-32s %s\n",
+		fprintf(out, "%4u:%-3u %-16s %s %c %c %-32s %s\n",
 		    sym->line, sym->column, sym->context,
-		    sym->local ? '.' : ' ',
+		    action, sym->local ? '.' : ' ',
 		    kind_to_dissect_char(sym->kind), symbol_name, sym->type);
 	else
-		fprintf(out, "%4u:%-3u %-16s def %c %c %s\n",
+		fprintf(out, "%4u:%-3u %-16s %s %c %c %s\n",
 		    sym->line, sym->column, sym->context,
-		    sym->local ? '.' : ' ',
+		    action, sym->local ? '.' : ' ',
 		    kind_to_dissect_char(sym->kind), symbol_name);
 }
 

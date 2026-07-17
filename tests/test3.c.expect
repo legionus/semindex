@@ -1,8 +1,8 @@
 SYMBOLS:
-tests/test3.c:2:5 var      g          int
-tests/test3.c:4:5 function f          int (void)
-tests/test3.c:6:6 var      x          int
-tests/test3.c:7:7 var      p          int *
+tests/test3.c:2:5 defined  var      g          int
+tests/test3.c:4:5 defined  function f          int (void)
+tests/test3.c:6:6 defined  var      x          int
+tests/test3.c:7:7 defined  var      p          int *
 
 USES:
 tests/test3.c:9:2 WRITE c:test3.c@80@F@f@p

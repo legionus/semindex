@@ -1,7 +1,7 @@
 SYMBOLS:
-tests/test6.c:2:8 struct   :var       
-tests/test6.c:4:21 field    x          int
-tests/test6.c:6:3 var      var        struct :var
+tests/test6.c:2:8 defined  struct   :var
+tests/test6.c:4:21 defined  field    x          int
+tests/test6.c:6:3 defined  var      var        struct :var
 
 USES:
 tests/test6.c:6:3 WRITE c:@var

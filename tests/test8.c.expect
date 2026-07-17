@@ -1,14 +1,14 @@
 SYMBOLS:
-tests/test8.c:2:13 typedef  counter_t  int
-tests/test8.c:4:8 struct   Pair       
-tests/test8.c:5:6 field    x          int
-tests/test8.c:7:21 typedef  pair_t     struct Pair
-tests/test8.c:9:16 struct   :anon_t    
-tests/test8.c:10:13 field    y          int
-tests/test8.c:11:3 typedef  anon_t     struct :anon_t
-tests/test8.c:13:11 var      c          counter_t
-tests/test8.c:14:8 var      p          pair_t
-tests/test8.c:15:8 var      a          anon_t
+tests/test8.c:2:13 defined  typedef  counter_t  int
+tests/test8.c:4:8 defined  struct   Pair
+tests/test8.c:5:6 defined  field    x          int
+tests/test8.c:7:21 defined  typedef  pair_t     struct Pair
+tests/test8.c:9:16 defined  struct   :anon_t
+tests/test8.c:10:13 defined  field    y          int
+tests/test8.c:11:3 defined  typedef  anon_t     struct :anon_t
+tests/test8.c:13:11 defined  var      c          counter_t
+tests/test8.c:14:8 defined  var      p          pair_t
+tests/test8.c:15:8 defined  var      a          anon_t
 
 USES:
 tests/test8.c:7:16 READ  c:@S@Pair

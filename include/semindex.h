@@ -52,6 +52,7 @@ typedef struct {
 	unsigned line;
 	unsigned column;
 	int local;
+	int definition;
 } semindex_symbol_t;
 
 /* usage record */

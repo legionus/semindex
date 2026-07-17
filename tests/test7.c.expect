@@ -1,7 +1,7 @@
 SYMBOLS:
-tests/test7.c:2:9 macro    FOO        
-tests/test7.c:3:9 macro    BAR        
-tests/test7.c:5:5 var      v          int
+tests/test7.c:2:9 defined  macro    FOO
+tests/test7.c:3:9 defined  macro    BAR
+tests/test7.c:5:5 defined  var      v          int
 
 USES:
 tests/test7.c:5:9 READ  macro:BAR

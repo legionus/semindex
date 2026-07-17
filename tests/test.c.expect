@@ -1,9 +1,9 @@
 SYMBOLS:
-tests/test.c:1:8 struct   S          
-tests/test.c:2:9 field    x          int
-tests/test.c:5:5 var      g          int
-tests/test.c:7:5 function main       int ()
-tests/test.c:8:14 var      s          struct S
+tests/test.c:1:8 defined  struct   S
+tests/test.c:2:9 defined  field    x          int
+tests/test.c:5:5 defined  var      g          int
+tests/test.c:7:5 defined  function main       int ()
+tests/test.c:8:14 defined  var      s          struct S
 
 USES:
 tests/test.c:8:12 READ  c:@S@S

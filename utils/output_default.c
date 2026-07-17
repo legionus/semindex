@@ -37,10 +37,16 @@ int output_default(FILE* out, semindex_t* s)
 
 	for (size_t i = 0; i < semindex_symbol_count(s); i++) {
 		const semindex_symbol_t* sym = semindex_get_symbol(s, i);
+		const char* action = sym->definition ? "defined" : "declared";
 
-		fprintf(out, "%s:%u:%u %-8s %-10s %s\n", sym->file,
-		    sym->line, sym->column, kind_to_string(sym->kind),
-		    sym->name, sym->type);
+		if (sym->type && sym->type[0])
+			fprintf(out, "%s:%u:%u %-8s %-8s %-10s %s\n",
+			    sym->file, sym->line, sym->column, action,
+			    kind_to_string(sym->kind), sym->name, sym->type);
+		else
+			fprintf(out, "%s:%u:%u %-8s %-8s %s\n",
+			    sym->file, sym->line, sym->column, action,
+			    kind_to_string(sym->kind), sym->name);
 	}
 
 	fprintf(out, "\nUSES:\n");
