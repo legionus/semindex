@@ -1,0 +1,12 @@
+
+FILE: tests/include/test14.h
+
+   2:9                    def   d TEST14_VALUE
+
+FILE: tests/test14.c
+
+   2:10                   -r-   i tests/include/test14.h
+   3:10                   -r-   i <stddef.h>
+   5:5                    def   v include_value                    int
+   5:5                    -w-   v include_value                    int
+   5:21                   -r-   d TEST14_VALUE

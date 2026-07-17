@@ -22,6 +22,7 @@ typedef enum {
 	SEMINDEX_SYMBOL_TYPEDEF,
 	SEMINDEX_SYMBOL_FUNCTION,
 	SEMINDEX_SYMBOL_MACRO,
+	SEMINDEX_SYMBOL_FILE,
 } semindex_symbol_kind_t;
 
 typedef enum {

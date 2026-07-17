@@ -14,6 +14,7 @@ static const char* kind_to_string(semindex_symbol_kind_t kind)
 		case SEMINDEX_SYMBOL_TYPEDEF:  return "typedef";
 		case SEMINDEX_SYMBOL_FUNCTION: return "function";
 		case SEMINDEX_SYMBOL_MACRO:    return "macro";
+		case SEMINDEX_SYMBOL_FILE:     return "file";
 		default:
 			return "?";
 	};

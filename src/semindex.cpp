@@ -481,7 +481,51 @@ public:
 		addMacroUse(macroNameTok, macroNameTok.getLocation());
 	}
 
+	void InclusionDirective(SourceLocation, const Token&, StringRef fileName,
+	    bool isAngled, CharSourceRange filenameRange,
+	    OptionalFileEntryRef file, StringRef, StringRef, const Module*,
+	    bool, SrcMgr::CharacteristicKind) override
+	{
+		if (!file)
+			return;
+
+		addIncludeUse(fileName, isAngled, file, filenameRange.getBegin());
+	}
+
 private:
+	static std::string includeTarget(StringRef fileName, bool isAngled,
+	    OptionalFileEntryRef file)
+	{
+		if (isAngled)
+			return "<" + fileName.str() + ">";
+
+		return file->getName().str();
+	}
+
+	void addIncludeUse(StringRef fileName, bool isAngled,
+	    OptionalFileEntryRef file, SourceLocation loc)
+	{
+		SourceLocation spelling = sm.getSpellingLoc(loc);
+		if (!locInScope(sm, out->scope, spelling))
+			return;
+
+		std::string target = includeTarget(fileName, isAngled, file);
+
+		SemindexUse u;
+		u.kind = SEMINDEX_USE_READ;
+		u.symbol_kind = SEMINDEX_SYMBOL_FILE;
+		u.mode = SEMINDEX_MODE_R_VAL;
+		u.name = target;
+		u.owner = "";
+		u.type = "";
+		u.usr = "file:" + target;
+		u.context = "";
+		u.file = locToFile(sm, spelling, u.line, u.column);
+		u.local = false;
+
+		out->uses.push_back(std::move(u));
+	}
+
 	void addMacroUse(const Token& macroNameTok, SourceLocation loc)
 	{
 		IdentifierInfo* ident = macroNameTok.getIdentifierInfo();
