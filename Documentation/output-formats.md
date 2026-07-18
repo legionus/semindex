@@ -6,6 +6,7 @@ format.  Select the format with `--format=FORMAT`.
 ```sh
 semindex index --format=default --compile-commands build/compile_commands.json file.c
 semindex index --format=dissect --compile-commands build/compile_commands.json file.c
+semindex compiler --format=dissect -- cc -Iinclude -c file.c -o file.o
 ```
 
 If `--format` is omitted, `default` is used.

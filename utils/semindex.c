@@ -17,6 +17,8 @@ void semindex_help(void)
 	       "Index C source files using clang semantic information.\n"
 	       "\n"
 	       "Commands:\n"
+	       "  compiler                   index from an explicit compiler "
+	       "argument vector\n"
 	       "  index                      index a source file using "
 	       "compile_commands.json\n"
 	       "\n"
@@ -55,6 +57,14 @@ int parse_scope(const char *value, semindex_scope_t *scope)
 	return 0;
 }
 
+int output_index(enum output_format format, semindex_t *s)
+{
+	if (format == FORMAT_DISSECT)
+		return output_dissect(stdout, s);
+
+	return output_default(stdout, s);
+}
+
 int main(int argc, char **argv)
 {
 	static const struct option long_options[] = {
@@ -79,6 +89,8 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	if (!strcmp(argv[optind], "compiler"))
+		return cmd_compiler(argc - optind, argv + optind);
 	if (!strcmp(argv[optind], "index"))
 		return cmd_index(argc - optind, argv + optind);
 

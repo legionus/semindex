@@ -101,10 +101,7 @@ int cmd_index(int argc, char **argv)
 		return 1;
 	}
 
-	if (format == FORMAT_DISSECT)
-		ret = output_dissect(stdout, s);
-	else
-		ret = output_default(stdout, s);
+	ret = output_index(format, s);
 
 	semindex_destroy(s);
 	return ret ? 1 : 0;

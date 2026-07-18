@@ -30,6 +30,7 @@ set(SEMINDEX_FORMAT_SOURCES
 	tests/test12.c
 	tests/test13.c
 	tests/test14.c
+	utils/cmd_compiler.c
 	utils/cmd_index.c
 	utils/output.h
 	utils/output_default.c
@@ -104,6 +105,7 @@ target_link_directories(semindex_parser PRIVATE ${LLVM_LIBDIR})
 target_link_libraries(semindex_parser PRIVATE clang-cpp ${LLVM_LIBS})
 
 add_executable(semindex
+	utils/cmd_compiler.c
 	utils/cmd_index.c
 	utils/output_default.c
 	utils/output_dissect.c
@@ -164,5 +166,13 @@ if(BUILD_TESTING)
 			COMPILE_COMMANDS=${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-scope-tests.sh
+	)
+	add_test(
+		NAME semindex-compiler
+		COMMAND
+			${CMAKE_COMMAND} -E env
+			SEMINDEX=$<TARGET_FILE:semindex>
+			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-compiler-tests.sh
 	)
 endif()

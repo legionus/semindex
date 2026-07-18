@@ -86,6 +86,12 @@ The CLI can print either the default prototype output or a Sparse
 semindex index --format=dissect --compile-commands build/compile_commands.json path/to/file.c
 ```
 
+The CLI can also index a single compile command directly:
+
+```sh
+semindex compiler -- cc -Iinclude -DDEBUG -c path/to/file.c -o file.o
+```
+
 ## Current limitations
 
 This is still a prototype.
