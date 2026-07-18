@@ -30,10 +30,12 @@ set(SEMINDEX_FORMAT_SOURCES
 	tests/test12.c
 	tests/test13.c
 	tests/test14.c
+	utils/cmd_index.c
 	utils/output.h
 	utils/output_default.c
 	utils/output_dissect.c
 	utils/semindex.c
+	utils/semindex_cli.h
 )
 
 find_program(CLANG_FORMAT clang-format)
@@ -102,6 +104,7 @@ target_link_directories(semindex_parser PRIVATE ${LLVM_LIBDIR})
 target_link_libraries(semindex_parser PRIVATE clang-cpp ${LLVM_LIBS})
 
 add_executable(semindex
+	utils/cmd_index.c
 	utils/output_default.c
 	utils/output_dissect.c
 	utils/semindex.c

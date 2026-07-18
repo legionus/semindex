@@ -9,6 +9,8 @@
 
 #include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
 using namespace clang::tooling;
 
@@ -33,6 +35,32 @@ static std::unique_ptr<CompilationDatabase> loadCompileCommands(const char *comp
 	return CompilationDatabase::loadFromDirectory(directory, error);
 }
 
+class SingleCompilationDatabase : public CompilationDatabase
+{
+public:
+	explicit SingleCompilationDatabase(CompileCommand command) : command(std::move(command))
+	{
+	}
+
+	std::vector<CompileCommand> getCompileCommands(llvm::StringRef) const override
+	{
+		return { command };
+	}
+
+private:
+	CompileCommand command;
+};
+
+static void clearIndex(semindex_t *s)
+{
+	s->next_order = 0;
+	s->symbols.clear();
+	s->uses.clear();
+	s->symbol_records.clear();
+	s->use_records.clear();
+	s->files.clear();
+}
+
 extern "C" {
 
 semindex_t *semindex_create(void)
@@ -51,17 +79,34 @@ void semindex_set_scope(semindex_t *s, semindex_scope_t scope)
 		s->scope = scope;
 }
 
+int semindex_index_command(semindex_t *s, const semindex_compile_command_t *cmd)
+{
+	if (!s || !cmd || !cmd->file || !cmd->argv || !cmd->argc)
+		return -1;
+
+	clearIndex(s);
+
+	std::vector<std::string> args;
+	args.reserve(cmd->argc);
+	for (size_t i = 0; i < cmd->argc; i++)
+		args.emplace_back(cmd->argv[i]);
+
+	CompileCommand compile(cmd->directory ? cmd->directory : ".", cmd->file, args, "");
+	SingleCompilationDatabase db(compile);
+	ClangTool tool(db, { cmd->file });
+	std::unique_ptr<FrontendActionFactory> factory = createSemindexActionFactory(s);
+	int ret = tool.run(factory.get());
+
+	if (ret == 0)
+		rebuildRecords(s);
+
+	return ret;
+}
+
 int semindex_index_file(semindex_t *s, const char *compile_commands_json, const char *source_file)
 {
 	if (!s || !source_file)
 		return -1;
-
-	s->next_order = 0;
-	s->symbols.clear();
-	s->uses.clear();
-	s->symbol_records.clear();
-	s->use_records.clear();
-	s->files.clear();
 
 	std::string error;
 	std::unique_ptr<CompilationDatabase> db = loadCompileCommands(compile_commands_json, error);
@@ -76,14 +121,26 @@ int semindex_index_file(semindex_t *s, const char *compile_commands_json, const 
 		return -1;
 	}
 
-	ClangTool tool(*db, { source_file });
-	std::unique_ptr<FrontendActionFactory> factory = createSemindexActionFactory(s);
-	int ret = tool.run(factory.get());
+	std::vector<CompileCommand> commands = db->getCompileCommands(source_file);
+	if (commands.empty()) {
+		llvm::errs() << "semindex: no compile command for '" << source_file << "'\n";
+		return -1;
+	}
 
-	if (ret == 0)
-		rebuildRecords(s);
+	std::vector<const char *> argv;
+	const CompileCommand &compile = commands[0];
+	argv.reserve(compile.CommandLine.size());
+	for (const auto &arg : compile.CommandLine)
+		argv.push_back(arg.c_str());
 
-	return ret;
+	semindex_compile_command_t cmd;
+
+	cmd.directory = compile.Directory.c_str();
+	cmd.file = source_file;
+	cmd.argc = argv.size();
+	cmd.argv = argv.data();
+
+	return semindex_index_command(s, &cmd);
 }
 
 size_t semindex_symbol_count(const semindex_t *s)
