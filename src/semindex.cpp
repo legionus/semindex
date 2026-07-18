@@ -430,7 +430,10 @@ public:
 		return locInScope(sm, out->scope, loc);
 	}
 
-	SourceManager& sourceManager() const { return sm; }
+	SourceLocation spellingLoc(SourceLocation loc) const
+	{
+		return sm.getSpellingLoc(loc);
+	}
 
 	SemindexSourceLocation location(SourceLocation loc)
 	{
@@ -452,6 +455,37 @@ public:
 		return ret;
 	}
 
+	void addSymbolInScope(SemindexSymbol&& s, SourceLocation loc)
+	{
+		if (!inScope(loc))
+			return;
+
+		addSymbol(std::move(s));
+	}
+
+	void addUseInScope(SemindexUse&& u, SourceLocation loc)
+	{
+		if (!inScope(loc))
+			return;
+
+		addUse(std::move(u));
+	}
+
+	std::string locationKey(const SemindexSourceLocation& loc) const
+	{
+		std::string file = loc.file ? *loc.file : "";
+
+		return file + "|" + std::to_string(loc.line) + "|"
+		    + std::to_string(loc.column);
+	}
+
+private:
+	const std::string* internFile(std::string file)
+	{
+		auto ret = out->files.insert(std::move(file));
+		return &*ret.first;
+	}
+
 	void addSymbol(SemindexSymbol&& s)
 	{
 		s.order = out->next_order++;
@@ -462,13 +496,6 @@ public:
 	{
 		u.order = out->next_order++;
 		out->uses.push_back(std::move(u));
-	}
-
-private:
-	const std::string* internFile(std::string file)
-	{
-		auto ret = out->files.insert(std::move(file));
-		return &*ret.first;
 	}
 
 	semindex* out;
@@ -490,9 +517,6 @@ public:
 			return;
 
 		SourceLocation loc = macroNameTok.getLocation();
-		if (!index.inScope(loc))
-			return;
-
 		SemindexSymbol s;
 		s.kind = SEMINDEX_SYMBOL_MACRO;
 		s.name = ident->getName().str();
@@ -504,14 +528,14 @@ public:
 		s.local = false;
 		s.definition = true;
 
-		index.addSymbol(std::move(s));
+		index.addSymbolInScope(std::move(s), loc);
 	}
 
 	void MacroExpands(const Token& macroNameTok, const MacroDefinition&,
 	    SourceRange, const MacroArgs*) override
 	{
 		SourceLocation spelling =
-		    index.sourceManager().getSpellingLoc(macroNameTok.getLocation());
+		    index.spellingLoc(macroNameTok.getLocation());
 		addMacroUse(macroNameTok, spelling);
 	}
 
@@ -569,9 +593,7 @@ private:
 	void addIncludeUse(StringRef fileName, bool isAngled,
 	    OptionalFileEntryRef file, SourceLocation loc)
 	{
-		SourceLocation spelling = index.sourceManager().getSpellingLoc(loc);
-		if (!index.inScope(spelling))
-			return;
+		SourceLocation spelling = index.spellingLoc(loc);
 
 		std::string target = includeTarget(fileName, isAngled, file);
 
@@ -587,7 +609,7 @@ private:
 		u.loc = index.location(spelling);
 		u.local = false;
 
-		index.addUse(std::move(u));
+		index.addUseInScope(std::move(u), spelling);
 	}
 
 	void addMacroUse(const Token& macroNameTok, SourceLocation loc)
@@ -596,9 +618,7 @@ private:
 		if (!ident)
 			return;
 
-		SourceLocation spelling = index.sourceManager().getSpellingLoc(loc);
-		if (!index.inScope(spelling))
-			return;
+		SourceLocation spelling = index.spellingLoc(loc);
 
 		SemindexUse u;
 		u.kind = SEMINDEX_USE_READ;
@@ -612,7 +632,7 @@ private:
 		u.loc = index.location(spelling);
 		u.local = false;
 
-		index.addUse(std::move(u));
+		index.addUseInScope(std::move(u), spelling);
 	}
 
 	SemindexContext index;
@@ -720,7 +740,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.local = !currentFunction.empty();
 		s.definition = true;
 
-		addSymbol(std::move(s), D->getLocation());
+		index.addSymbolInScope(std::move(s), D->getLocation());
 
 		if (D->hasInit()) {
 			SemindexUse u;
@@ -735,7 +755,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 			u.loc = index.location(D->getLocation());
 			u.local = !currentFunction.empty();
 
-			addUse(std::move(u), D->getLocation());
+			index.addUseInScope(std::move(u), D->getLocation());
 		}
 
 		return true;
@@ -757,7 +777,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.local = false;
 		s.definition = true;
 
-		addSymbol(std::move(s), D->getLocation());
+		index.addSymbolInScope(std::move(s), D->getLocation());
 		return true;
 	}
 
@@ -783,7 +803,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.local = !currentFunction.empty();
 		s.definition = true;
 
-		addSymbol(std::move(s), D->getLocation());
+		index.addSymbolInScope(std::move(s), D->getLocation());
 		return true;
 	}
 
@@ -846,7 +866,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		u.loc = index.location(E->getExprLoc());
 		u.local = !currentFunction.empty() && !D->hasExternalFormalLinkage();
 
-		addUse(std::move(u), E->getExprLoc());
+		index.addUseInScope(std::move(u), E->getExprLoc());
 
 		if (!isa<FunctionDecl>(D) && isCallCallee(E, ctx))
 			addValueUse(D, SEMINDEX_USE_CALL, SEMINDEX_MODE_R_PTR,
@@ -905,7 +925,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.local = false;
 		s.definition = true;
 
-		addSymbol(std::move(s), D->getLocation());
+		index.addSymbolInScope(std::move(s), D->getLocation());
 		return true;
 	}
 
@@ -927,7 +947,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.local = false;
 		s.definition = true;
 
-		addSymbol(std::move(s), D->getLocation());
+		index.addSymbolInScope(std::move(s), D->getLocation());
 		return true;
 	}
 
@@ -944,7 +964,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.local = false;
 		s.definition = true;
 
-		addSymbol(std::move(s), D->getLocation());
+		index.addSymbolInScope(std::move(s), D->getLocation());
 		return true;
 	}
 
@@ -966,7 +986,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.local = false;
 		s.definition = D->isThisDeclarationADefinition();
 
-		addSymbol(std::move(s), D->getLocation());
+		index.addSymbolInScope(std::move(s), D->getLocation());
 		return true;
 	}
 
@@ -988,27 +1008,11 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		u.loc = index.location(E->getExprLoc());
 		u.local = false;
 
-		addUse(std::move(u), E->getExprLoc());
+		index.addUseInScope(std::move(u), E->getExprLoc());
 		return true;
 	}
 
-    private:
-	void addSymbol(SemindexSymbol&& s, SourceLocation loc)
-	{
-		if (!index.inScope(loc))
-			return;
-
-		index.addSymbol(std::move(s));
-	}
-
-	void addUse(SemindexUse&& u, SourceLocation loc)
-	{
-		if (!index.inScope(loc))
-			return;
-
-		index.addUse(std::move(u));
-	}
-
+private:
 	static bool isPrototypeParameter(const VarDecl* D)
 	{
 		const auto* P = dyn_cast<ParmVarDecl>(D);
@@ -1025,8 +1029,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		if (!D || loc.isInvalid())
 			return;
 
-		const SourceManager& sm = ctx.getSourceManager();
-		SourceLocation spelling = sm.getSpellingLoc(loc);
+		SourceLocation spelling = index.spellingLoc(loc);
 		if (!index.inScope(spelling))
 			return;
 
@@ -1042,13 +1045,12 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		u.loc = index.location(spelling);
 		u.local = !currentFunction.empty();
 
-		std::string key = u.usr + "|" + *u.loc.file + "|"
-		    + std::to_string(u.loc.line) + "|" + std::to_string(u.loc.column)
-		    + "|" + u.context;
+		std::string key = u.usr + "|" + index.locationKey(u.loc) + "|"
+		    + u.context;
 		if (!typeUses.insert(key).second)
 			return;
 
-		addUse(std::move(u), spelling);
+		index.addUseInScope(std::move(u), spelling);
 	}
 
 	void addValueUse(const ValueDecl* D, semindex_use_kind_t kind,
@@ -1067,7 +1069,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		u.loc = index.location(loc);
 		u.local = local;
 
-		addUse(std::move(u), loc);
+		index.addUseInScope(std::move(u), loc);
 	}
 
 	void addAnonymousRecordSymbols(const RecordDecl* D, const std::string& name)
@@ -1086,7 +1088,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		s.local = false;
 		s.definition = true;
 
-		addSymbol(std::move(s), D->getLocation());
+		index.addSymbolInScope(std::move(s), D->getLocation());
 		addAnonymousRecordFields(D, name);
 	}
 
@@ -1114,7 +1116,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 			s.local = false;
 			s.definition = true;
 
-			addSymbol(std::move(s), field->getLocation());
+			index.addSymbolInScope(std::move(s), field->getLocation());
 		}
 	}
 
