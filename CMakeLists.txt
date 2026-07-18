@@ -4,6 +4,52 @@ project(semindex C CXX)
 include(CTest)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+set(SEMINDEX_FORMAT_SOURCES
+	include/semindex.h
+	src/index_ast.cpp
+	src/index_context.cpp
+	src/index_pp.cpp
+	src/index_pp.h
+	src/semindex.cpp
+	src/semindex_internal.h
+	tests/include/test14.h
+	tests/scope/api.h
+	tests/scope/use.c
+	tests/test.c
+	tests/test1.c
+	tests/test2.c
+	tests/test3.c
+	tests/test4.c
+	tests/test5.c
+	tests/test6.c
+	tests/test7.c
+	tests/test8.c
+	tests/test9.c
+	tests/test10.c
+	tests/test11.c
+	tests/test12.c
+	tests/test13.c
+	tests/test14.c
+	utils/output.h
+	utils/output_default.c
+	utils/output_dissect.c
+	utils/semindex.c
+)
+
+find_program(CLANG_FORMAT clang-format)
+if(CLANG_FORMAT)
+	add_custom_target(format
+		COMMAND ${CLANG_FORMAT} -i ${SEMINDEX_FORMAT_SOURCES}
+		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+		COMMENT "Formatting source files"
+	)
+	add_custom_target(format-check
+		COMMAND ${CLANG_FORMAT} --dry-run --Werror ${SEMINDEX_FORMAT_SOURCES}
+		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+		COMMENT "Checking source formatting"
+	)
+endif()
+
 # LLVM paths from llvm-config
 execute_process(
 	COMMAND llvm-config --includedir

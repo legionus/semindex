@@ -50,12 +50,12 @@ typedef enum {
 /* symbol record */
 typedef struct {
 	semindex_symbol_kind_t kind;
-	const char* name; /* may be NULL or "" for anonymous */
-	const char* owner; /* containing record for fields */
-	const char* type; /* textual type */
-	const char* usr;  /* stable unique id */
-	const char* context; /* containing function for local symbols */
-	const char* file;
+	const char *name;    /* may be NULL or "" for anonymous */
+	const char *owner;   /* containing record for fields */
+	const char *type;    /* textual type */
+	const char *usr;     /* stable unique id */
+	const char *context; /* containing function for local symbols */
+	const char *file;
 	unsigned line;
 	unsigned column;
 	int local;
@@ -67,13 +67,13 @@ typedef struct {
 typedef struct {
 	semindex_use_kind_t kind;
 	semindex_symbol_kind_t symbol_kind;
-	unsigned mode; /* semindex_use_mode_t bitmask */
-	const char* name; /* target symbol */
-	const char* owner; /* containing record for fields */
-	const char* type; /* textual type */
-	const char* usr; /* target symbol */
-	const char* context; /* containing function */
-	const char* file;
+	unsigned mode;	     /* semindex_use_mode_t bitmask */
+	const char *name;    /* target symbol */
+	const char *owner;   /* containing record for fields */
+	const char *type;    /* textual type */
+	const char *usr;     /* target symbol */
+	const char *context; /* containing function */
+	const char *file;
 	unsigned line;
 	unsigned column;
 	int local;
@@ -81,21 +81,21 @@ typedef struct {
 } semindex_use_t;
 
 /* lifecycle */
-semindex_t* semindex_create(void);
-void semindex_destroy(semindex_t* s);
-void semindex_set_scope(semindex_t* s, semindex_scope_t scope);
+semindex_t *semindex_create(void);
+void semindex_destroy(semindex_t *s);
+void semindex_set_scope(semindex_t *s, semindex_scope_t scope);
 
 /* indexing */
-int semindex_index_file(semindex_t* s, const char* compile_commands_json, const char* source_file);
+int semindex_index_file(semindex_t *s, const char *compile_commands_json, const char *source_file);
 
 /* queries */
-size_t semindex_symbol_count(const semindex_t* s);
+size_t semindex_symbol_count(const semindex_t *s);
 /* returned pointer is valid until the next semindex_index_file() or destroy */
-const semindex_symbol_t* semindex_get_symbol(const semindex_t* s, size_t idx);
+const semindex_symbol_t *semindex_get_symbol(const semindex_t *s, size_t idx);
 
-size_t semindex_use_count(const semindex_t* s);
+size_t semindex_use_count(const semindex_t *s);
 /* returned pointer is valid until the next semindex_index_file() or destroy */
-const semindex_use_t* semindex_get_use(const semindex_t* s, size_t idx);
+const semindex_use_t *semindex_get_use(const semindex_t *s, size_t idx);
 
 #ifdef __cplusplus
 }

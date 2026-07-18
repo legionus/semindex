@@ -10,17 +10,19 @@
 #include <string>
 #include <vector>
 
-namespace clang {
+namespace clang
+{
 class ASTContext;
 class SourceManager;
 
-namespace tooling {
+namespace tooling
+{
 class FrontendActionFactory;
 }
-}
+} // namespace clang
 
 struct SemindexSourceLocation {
-	const std::string* file = nullptr;
+	const std::string *file = nullptr;
 	unsigned line = 0;
 	unsigned column = 0;
 };
@@ -62,31 +64,30 @@ struct semindex {
 	std::vector<semindex_use_t> use_records;
 };
 
-class SemindexContext {
+class SemindexContext
+{
 public:
-	SemindexContext(semindex* out, clang::SourceManager& sm);
+	SemindexContext(semindex *out, clang::SourceManager &sm);
 
 	bool inScope(clang::SourceLocation loc) const;
 	clang::SourceLocation spellingLoc(clang::SourceLocation loc) const;
 	SemindexSourceLocation location(clang::SourceLocation loc);
-	SemindexSourceLocation displayLocation(const clang::ASTContext& ast,
-	    clang::SourceLocation loc);
+	SemindexSourceLocation displayLocation(const clang::ASTContext &ast, clang::SourceLocation loc);
 
-	void addSymbolInScope(SemindexSymbol&& s, clang::SourceLocation loc);
-	void addUseInScope(SemindexUse&& u, clang::SourceLocation loc);
+	void addSymbolInScope(SemindexSymbol &&s, clang::SourceLocation loc);
+	void addUseInScope(SemindexUse &&u, clang::SourceLocation loc);
 
-	std::string locationKey(const SemindexSourceLocation& loc) const;
+	std::string locationKey(const SemindexSourceLocation &loc) const;
 
 private:
-	const std::string* internFile(std::string file);
-	void addSymbol(SemindexSymbol&& s);
-	void addUse(SemindexUse&& u);
+	const std::string *internFile(std::string file);
+	void addSymbol(SemindexSymbol &&s);
+	void addUse(SemindexUse &&u);
 
-	semindex* out;
-	clang::SourceManager& sm;
+	semindex *out;
+	clang::SourceManager &sm;
 };
 
-void rebuildRecords(semindex* s);
+void rebuildRecords(semindex *s);
 
-std::unique_ptr<clang::tooling::FrontendActionFactory>
-createSemindexActionFactory(semindex* out);
+std::unique_ptr<clang::tooling::FrontendActionFactory> createSemindexActionFactory(semindex *out);

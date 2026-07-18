@@ -7,19 +7,19 @@
 
 using namespace clang;
 
-namespace {
+namespace
+{
 
-class SemindexPPCallbacks : public PPCallbacks {
+class SemindexPPCallbacks : public PPCallbacks
+{
 public:
-	explicit SemindexPPCallbacks(SemindexContext index)
-	    : index(index)
+	explicit SemindexPPCallbacks(SemindexContext index) : index(index)
 	{
 	}
 
-	void MacroDefined(const Token& macroNameTok,
-	    const MacroDirective*) override
+	void MacroDefined(const Token &macroNameTok, const MacroDirective *) override
 	{
-		IdentifierInfo* ident = macroNameTok.getIdentifierInfo();
+		IdentifierInfo *ident = macroNameTok.getIdentifierInfo();
 		if (!ident)
 			return;
 
@@ -38,48 +38,40 @@ public:
 		index.addSymbolInScope(std::move(s), loc);
 	}
 
-	void MacroExpands(const Token& macroNameTok, const MacroDefinition&,
-	    SourceRange, const MacroArgs*) override
+	void MacroExpands(const Token &macroNameTok, const MacroDefinition &, SourceRange, const MacroArgs *) override
 	{
-		SourceLocation spelling =
-		    index.spellingLoc(macroNameTok.getLocation());
+		SourceLocation spelling = index.spellingLoc(macroNameTok.getLocation());
 		addMacroUse(macroNameTok, spelling);
 	}
 
-	void Defined(const Token& macroNameTok, const MacroDefinition&,
-	    SourceRange) override
+	void Defined(const Token &macroNameTok, const MacroDefinition &, SourceRange) override
 	{
 		addMacroUse(macroNameTok, macroNameTok.getLocation());
 	}
 
-	void Ifdef(SourceLocation, const Token& macroNameTok,
-	    const MacroDefinition&) override
+	void Ifdef(SourceLocation, const Token &macroNameTok, const MacroDefinition &) override
 	{
 		addMacroUse(macroNameTok, macroNameTok.getLocation());
 	}
 
-	void Elifdef(SourceLocation, const Token& macroNameTok,
-	    const MacroDefinition&) override
+	void Elifdef(SourceLocation, const Token &macroNameTok, const MacroDefinition &) override
 	{
 		addMacroUse(macroNameTok, macroNameTok.getLocation());
 	}
 
-	void Ifndef(SourceLocation, const Token& macroNameTok,
-	    const MacroDefinition&) override
+	void Ifndef(SourceLocation, const Token &macroNameTok, const MacroDefinition &) override
 	{
 		addMacroUse(macroNameTok, macroNameTok.getLocation());
 	}
 
-	void Elifndef(SourceLocation, const Token& macroNameTok,
-	    const MacroDefinition&) override
+	void Elifndef(SourceLocation, const Token &macroNameTok, const MacroDefinition &) override
 	{
 		addMacroUse(macroNameTok, macroNameTok.getLocation());
 	}
 
-	void InclusionDirective(SourceLocation, const Token&, StringRef fileName,
-	    bool isAngled, CharSourceRange filenameRange,
-	    OptionalFileEntryRef file, StringRef, StringRef, const Module*,
-	    bool, SrcMgr::CharacteristicKind) override
+	void InclusionDirective(SourceLocation, const Token &, StringRef fileName, bool isAngled,
+		CharSourceRange filenameRange, OptionalFileEntryRef file, StringRef, StringRef, const Module *, bool,
+		SrcMgr::CharacteristicKind) override
 	{
 		if (!file)
 			return;
@@ -88,8 +80,7 @@ public:
 	}
 
 private:
-	static std::string includeTarget(StringRef fileName, bool isAngled,
-	    OptionalFileEntryRef file)
+	static std::string includeTarget(StringRef fileName, bool isAngled, OptionalFileEntryRef file)
 	{
 		if (isAngled)
 			return "<" + fileName.str() + ">";
@@ -97,8 +88,7 @@ private:
 		return file->getName().str();
 	}
 
-	void addIncludeUse(StringRef fileName, bool isAngled,
-	    OptionalFileEntryRef file, SourceLocation loc)
+	void addIncludeUse(StringRef fileName, bool isAngled, OptionalFileEntryRef file, SourceLocation loc)
 	{
 		SourceLocation spelling = index.spellingLoc(loc);
 
@@ -119,9 +109,9 @@ private:
 		index.addUseInScope(std::move(u), spelling);
 	}
 
-	void addMacroUse(const Token& macroNameTok, SourceLocation loc)
+	void addMacroUse(const Token &macroNameTok, SourceLocation loc)
 	{
-		IdentifierInfo* ident = macroNameTok.getIdentifierInfo();
+		IdentifierInfo *ident = macroNameTok.getIdentifierInfo();
 		if (!ident)
 			return;
 
@@ -145,7 +135,7 @@ private:
 	SemindexContext index;
 };
 
-}
+} // namespace
 
 std::unique_ptr<PPCallbacks> createSemindexPPCallbacks(SemindexContext index)
 {

@@ -21,35 +21,35 @@
 using namespace clang;
 using namespace clang::tooling;
 
-static std::string getName(const Decl* D)
+static std::string getName(const Decl *D)
 {
-	if (const auto* ND = llvm::dyn_cast<NamedDecl>(D))
+	if (const auto *ND = llvm::dyn_cast<NamedDecl>(D))
 		return ND->getNameAsString();
 	return "";
 }
 
-static std::string getUSR(const Decl* D, const ASTContext& ctx)
+static std::string getUSR(const Decl *D, const ASTContext &ctx)
 {
 	llvm::SmallVector<char, 128> buf;
 	if (index::generateUSRForDecl(D, buf, ctx.getLangOpts()))
 		return "";
 	return std::string(buf.begin(), buf.end());
 }
-static bool isDirectCallCallee(const Expr* E, ASTContext& ctx)
+static bool isDirectCallCallee(const Expr *E, ASTContext &ctx)
 {
-	const Expr* current = E;
-	const Expr* target = E->IgnoreParenImpCasts();
+	const Expr *current = E;
+	const Expr *target = E->IgnoreParenImpCasts();
 
 	for (;;) {
 		auto parents = ctx.getParents(*current);
 		if (parents.empty())
 			return false;
 
-		const Stmt* parent = parents.begin()->get<Stmt>();
+		const Stmt *parent = parents.begin()->get<Stmt>();
 		if (!parent)
 			return false;
 
-		if (const auto* call = dyn_cast<CallExpr>(parent))
+		if (const auto *call = dyn_cast<CallExpr>(parent))
 			return call->getCallee()->IgnoreParenImpCasts() == target;
 
 		if (!isa<ParenExpr>(parent) && !isa<ImplicitCastExpr>(parent))
@@ -59,7 +59,7 @@ static bool isDirectCallCallee(const Expr* E, ASTContext& ctx)
 	}
 }
 
-static const Stmt* getParentStmt(const Expr* E, ASTContext& ctx)
+static const Stmt *getParentStmt(const Expr *E, ASTContext &ctx)
 {
 	auto parents = ctx.getParents(*E);
 	if (parents.empty())
@@ -68,28 +68,27 @@ static const Stmt* getParentStmt(const Expr* E, ASTContext& ctx)
 	return parents.begin()->get<Stmt>();
 }
 
-static const Expr* ignoreParenImpCasts(const Expr* E)
+static const Expr *ignoreParenImpCasts(const Expr *E)
 {
 	return E ? E->IgnoreParenImpCasts() : nullptr;
 }
 
-static bool isPointerReadOperand(const Expr* E, ASTContext& ctx)
+static bool isPointerReadOperand(const Expr *E, ASTContext &ctx)
 {
-	const Expr* current = E;
+	const Expr *current = E;
 
 	for (;;) {
-		const Stmt* parent = getParentStmt(current, ctx);
+		const Stmt *parent = getParentStmt(current, ctx);
 		if (!parent)
 			return false;
 
-		if (const auto* U = dyn_cast<UnaryOperator>(parent)) {
+		if (const auto *U = dyn_cast<UnaryOperator>(parent)) {
 			if (U->getOpcode() == UO_Deref)
 				return true;
 		}
 
-		if (const auto* M = dyn_cast<MemberExpr>(parent)) {
-			if (M->isArrow()
-			    && ignoreParenImpCasts(M->getBase()) == ignoreParenImpCasts(E))
+		if (const auto *M = dyn_cast<MemberExpr>(parent)) {
+			if (M->isArrow() && ignoreParenImpCasts(M->getBase()) == ignoreParenImpCasts(E))
 				return true;
 		}
 
@@ -100,17 +99,17 @@ static bool isPointerReadOperand(const Expr* E, ASTContext& ctx)
 	}
 }
 
-static bool isCallCallee(const Expr* E, ASTContext& ctx)
+static bool isCallCallee(const Expr *E, ASTContext &ctx)
 {
-	const Expr* current = E;
-	const Expr* target = E->IgnoreParenImpCasts();
+	const Expr *current = E;
+	const Expr *target = E->IgnoreParenImpCasts();
 
 	for (;;) {
-		const Stmt* parent = getParentStmt(current, ctx);
+		const Stmt *parent = getParentStmt(current, ctx);
 		if (!parent)
 			return false;
 
-		if (const auto* call = dyn_cast<CallExpr>(parent))
+		if (const auto *call = dyn_cast<CallExpr>(parent))
 			return ignoreParenImpCasts(call->getCallee()) == target;
 
 		if (!isa<ParenExpr>(parent) && !isa<ImplicitCastExpr>(parent))
@@ -120,21 +119,21 @@ static bool isCallCallee(const Expr* E, ASTContext& ctx)
 	}
 }
 
-static semindex_use_kind_t classifyUse(const Expr* E, ASTContext& ctx)
+static semindex_use_kind_t classifyUse(const Expr *E, ASTContext &ctx)
 {
-	const Stmt* parent = nullptr;
+	const Stmt *parent = nullptr;
 
 	E = E->IgnoreParenImpCasts();
 
 	auto parents = ctx.getParents(*E);
 	if (!parents.empty()) {
-		if (const Stmt* S = parents.begin()->get<Stmt>())
+		if (const Stmt *S = parents.begin()->get<Stmt>())
 			parent = S;
 	}
 
 	/* &x */
 	if (parent) {
-		if (const auto* U = dyn_cast<UnaryOperator>(parent)) {
+		if (const auto *U = dyn_cast<UnaryOperator>(parent)) {
 			if (U->getOpcode() == UO_AddrOf)
 				return SEMINDEX_USE_ADDR;
 		}
@@ -142,7 +141,7 @@ static semindex_use_kind_t classifyUse(const Expr* E, ASTContext& ctx)
 
 	/* x = ... */
 	if (parent) {
-		if (const auto* B = dyn_cast<BinaryOperator>(parent)) {
+		if (const auto *B = dyn_cast<BinaryOperator>(parent)) {
 			if (B->isAssignmentOp() && B->getLHS() == E)
 				return SEMINDEX_USE_WRITE;
 		}
@@ -150,7 +149,7 @@ static semindex_use_kind_t classifyUse(const Expr* E, ASTContext& ctx)
 
 	/* ++x, x++ */
 	if (parent) {
-		if (const auto* U = dyn_cast<UnaryOperator>(parent)) {
+		if (const auto *U = dyn_cast<UnaryOperator>(parent)) {
 			if (U->isIncrementDecrementOp())
 				return SEMINDEX_USE_WRITE;
 		}
@@ -159,7 +158,7 @@ static semindex_use_kind_t classifyUse(const Expr* E, ASTContext& ctx)
 	return SEMINDEX_USE_READ;
 }
 
-static unsigned accessModeForUse(semindex_use_kind_t kind, const Expr* E, ASTContext& ctx)
+static unsigned accessModeForUse(semindex_use_kind_t kind, const Expr *E, ASTContext &ctx)
 {
 	switch (kind) {
 	case SEMINDEX_USE_ADDR:
@@ -177,7 +176,7 @@ static unsigned accessModeForUse(semindex_use_kind_t kind, const Expr* E, ASTCon
 	return 0;
 }
 
-static semindex_symbol_kind_t symbolKindForDecl(const ValueDecl* D)
+static semindex_symbol_kind_t symbolKindForDecl(const ValueDecl *D)
 {
 	if (isa<FieldDecl>(D))
 		return SEMINDEX_SYMBOL_FIELD;
@@ -188,24 +187,24 @@ static semindex_symbol_kind_t symbolKindForDecl(const ValueDecl* D)
 	return SEMINDEX_SYMBOL_VAR;
 }
 
-static std::string getOwnerName(const Decl* D)
+static std::string getOwnerName(const Decl *D)
 {
-	const auto* FD = dyn_cast<FieldDecl>(D);
+	const auto *FD = dyn_cast<FieldDecl>(D);
 	if (!FD)
 		return "";
 
-	const auto* RD = FD->getParent();
+	const auto *RD = FD->getParent();
 	if (!RD)
 		return "";
 
 	return getName(RD);
 }
 
-static const RecordDecl* recordDeclForType(QualType type)
+static const RecordDecl *recordDeclForType(QualType type)
 {
 	type = type.getCanonicalType();
 
-	if (const auto* RT = type->getAs<RecordType>())
+	if (const auto *RT = type->getAs<RecordType>())
 		return RT->getDecl();
 
 	return nullptr;
@@ -216,41 +215,37 @@ static bool isTypedefType(QualType type)
 	return type->getAs<TypedefType>() != nullptr;
 }
 
-static bool isWrittenAsTypedef(TypeSourceInfo* typeSourceInfo)
+static bool isWrittenAsTypedef(TypeSourceInfo *typeSourceInfo)
 {
-	return typeSourceInfo
-	    && !typeSourceInfo->getTypeLoc()
-	            .getAsAdjusted<TypedefTypeLoc>()
-	            .isNull();
+	return typeSourceInfo && !typeSourceInfo->getTypeLoc().getAsAdjusted<TypedefTypeLoc>().isNull();
 }
 
-static bool isAnonymousRecord(const RecordDecl* D)
+static bool isAnonymousRecord(const RecordDecl *D)
 {
 	return D && getName(D).empty();
 }
 
-static std::string anonymousRecordNameForVar(const VarDecl* D)
+static std::string anonymousRecordNameForVar(const VarDecl *D)
 {
 	return ":" + getName(D);
 }
 
-static std::string anonymousRecordNameForTypedef(const TypedefNameDecl* D)
+static std::string anonymousRecordNameForTypedef(const TypedefNameDecl *D)
 {
 	return ":" + getName(D);
 }
 
-static std::string typeNameForRecord(const RecordDecl* D, const std::string& name)
+static std::string typeNameForRecord(const RecordDecl *D, const std::string &name)
 {
 	return std::string(D->isUnion() ? "union " : "struct ") + name;
 }
 
-static std::string typeNameForTypedef(const TypedefNameDecl* D)
+static std::string typeNameForTypedef(const TypedefNameDecl *D)
 {
-	const RecordDecl* anonymousRecord = recordDeclForType(D->getUnderlyingType());
+	const RecordDecl *anonymousRecord = recordDeclForType(D->getUnderlyingType());
 
 	if (isAnonymousRecord(anonymousRecord))
-		return typeNameForRecord(anonymousRecord,
-		    anonymousRecordNameForTypedef(D));
+		return typeNameForRecord(anonymousRecord, anonymousRecordNameForTypedef(D));
 
 	return D->getUnderlyingType().getAsString();
 }
@@ -259,15 +254,14 @@ static std::string typeNameForTypedef(const TypedefNameDecl* D)
  * AST Visitor
  * ============================================================ */
 
-class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
-    public:
-	SemindexVisitor(ASTContext& ctx, SemindexContext& index)
-	    : ctx(ctx)
-	    , index(index)
+class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor>
+{
+public:
+	SemindexVisitor(ASTContext &ctx, SemindexContext &index) : ctx(ctx), index(index)
 	{
 	}
 
-	bool TraverseFunctionDecl(FunctionDecl* D)
+	bool TraverseFunctionDecl(FunctionDecl *D)
 	{
 		if (!D)
 			return true;
@@ -279,18 +273,17 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		return ret;
 	}
 
-	bool VisitVarDecl(VarDecl* D)
+	bool VisitVarDecl(VarDecl *D)
 	{
 		if (isPrototypeParameter(D))
 			return true;
 
-		const RecordDecl* anonymousRecord = recordDeclForType(D->getType());
+		const RecordDecl *anonymousRecord = recordDeclForType(D->getType());
 		std::string anonymousName;
 		std::string typeName;
 
-		if (!isTypedefType(D->getType())
-		    && !isWrittenAsTypedef(D->getTypeSourceInfo())
-		    && isAnonymousRecord(anonymousRecord)) {
+		if (!isTypedefType(D->getType()) && !isWrittenAsTypedef(D->getTypeSourceInfo()) &&
+			isAnonymousRecord(anonymousRecord)) {
 			anonymousName = anonymousRecordNameForVar(D);
 			typeName = typeNameForRecord(anonymousRecord, anonymousName);
 			addAnonymousRecordSymbols(anonymousRecord, anonymousName);
@@ -330,7 +323,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		return true;
 	}
 
-	bool VisitFieldDecl(FieldDecl* D)
+	bool VisitFieldDecl(FieldDecl *D)
 	{
 		if (isAnonymousRecord(D->getParent()))
 			return true;
@@ -350,9 +343,9 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		return true;
 	}
 
-	bool VisitTypedefNameDecl(TypedefNameDecl* D)
+	bool VisitTypedefNameDecl(TypedefNameDecl *D)
 	{
-		const RecordDecl* anonymousRecord = recordDeclForType(D->getUnderlyingType());
+		const RecordDecl *anonymousRecord = recordDeclForType(D->getUnderlyingType());
 		std::string anonymousName;
 		std::string typeName = typeNameForTypedef(D);
 
@@ -378,10 +371,9 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 
 	bool VisitTypedefTypeLoc(TypedefTypeLoc TL)
 	{
-		const TypedefNameDecl* D = TL.getTypedefNameDecl();
+		const TypedefNameDecl *D = TL.getTypedefNameDecl();
 
-		addTypeUse(D, SEMINDEX_SYMBOL_TYPEDEF, TL.getNameLoc(),
-		    typeNameForTypedef(D));
+		addTypeUse(D, SEMINDEX_SYMBOL_TYPEDEF, TL.getNameLoc(), typeNameForTypedef(D));
 		return true;
 	}
 
@@ -390,14 +382,11 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		if (TL.isDefinition())
 			return true;
 
-		const RecordDecl* D = TL.getDecl();
+		const RecordDecl *D = TL.getDecl();
 		if (isAnonymousRecord(D))
 			return true;
 
-		addTypeUse(D,
-		    D->isUnion() ? SEMINDEX_SYMBOL_UNION
-		                 : SEMINDEX_SYMBOL_STRUCT,
-		    TL.getNameLoc(), "");
+		addTypeUse(D, D->isUnion() ? SEMINDEX_SYMBOL_UNION : SEMINDEX_SYMBOL_STRUCT, TL.getNameLoc(), "");
 		return true;
 	}
 
@@ -406,7 +395,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		if (TL.isDefinition())
 			return true;
 
-		const EnumDecl* D = TL.getDecl();
+		const EnumDecl *D = TL.getDecl();
 		if (!D || getName(D).empty())
 			return true;
 
@@ -414,9 +403,9 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		return true;
 	}
 
-	bool VisitDeclRefExpr(DeclRefExpr* E)
+	bool VisitDeclRefExpr(DeclRefExpr *E)
 	{
-		const ValueDecl* D = E->getDecl();
+		const ValueDecl *D = E->getDecl();
 		if (!D)
 			return true;
 
@@ -438,43 +427,41 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		index.addUseInScope(std::move(u), E->getExprLoc());
 
 		if (!isa<FunctionDecl>(D) && isCallCallee(E, ctx))
-			addValueUse(D, SEMINDEX_USE_CALL, SEMINDEX_MODE_R_PTR,
-			    currentFunction, E->getExprLoc(),
-			    !currentFunction.empty() && !D->hasExternalFormalLinkage());
+			addValueUse(D, SEMINDEX_USE_CALL, SEMINDEX_MODE_R_PTR, currentFunction, E->getExprLoc(),
+				!currentFunction.empty() && !D->hasExternalFormalLinkage());
 
 		return true;
 	}
 
-	bool VisitMemberExpr(MemberExpr* E)
+	bool VisitMemberExpr(MemberExpr *E)
 	{
-		const ValueDecl* D = E->getMemberDecl();
+		const ValueDecl *D = E->getMemberDecl();
 		if (!D)
 			return true;
 
 		semindex_use_kind_t kind = classifyUse(E, ctx);
-		addValueUse(D, kind, accessModeForUse(kind, E, ctx),
-		    currentFunction, E->getExprLoc(), false);
+		addValueUse(D, kind, accessModeForUse(kind, E, ctx), currentFunction, E->getExprLoc(), false);
 		return true;
 	}
 
-	bool VisitDesignatedInitExpr(DesignatedInitExpr* E)
+	bool VisitDesignatedInitExpr(DesignatedInitExpr *E)
 	{
-		for (const auto& designator : E->designators()) {
+		for (const auto &designator : E->designators()) {
 			if (!designator.isFieldDesignator())
 				continue;
 
-			const FieldDecl* D = designator.getFieldDecl();
+			const FieldDecl *D = designator.getFieldDecl();
 			if (!D)
 				continue;
 
-			addValueUse(D, SEMINDEX_USE_WRITE, SEMINDEX_MODE_W_VAL,
-			    currentFunction, designator.getFieldLoc(), false);
+			addValueUse(D, SEMINDEX_USE_WRITE, SEMINDEX_MODE_W_VAL, currentFunction,
+				designator.getFieldLoc(), false);
 		}
 
 		return true;
 	}
 
-	bool VisitRecordDecl(RecordDecl* D)
+	bool VisitRecordDecl(RecordDecl *D)
 	{
 		if (!D->isThisDeclarationADefinition())
 			return true;
@@ -482,8 +469,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 			return true;
 
 		SemindexSymbol s;
-		s.kind
-		    = D->isUnion() ? SEMINDEX_SYMBOL_UNION : SEMINDEX_SYMBOL_STRUCT;
+		s.kind = D->isUnion() ? SEMINDEX_SYMBOL_UNION : SEMINDEX_SYMBOL_STRUCT;
 
 		s.name = getName(D);
 		s.owner = "";
@@ -498,7 +484,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		return true;
 	}
 
-	bool VisitEnumDecl(EnumDecl* D)
+	bool VisitEnumDecl(EnumDecl *D)
 	{
 		if (!D->isThisDeclarationADefinition())
 			return true;
@@ -520,7 +506,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		return true;
 	}
 
-	bool VisitEnumConstantDecl(EnumConstantDecl* D)
+	bool VisitEnumConstantDecl(EnumConstantDecl *D)
 	{
 		SemindexSymbol s;
 		s.kind = SEMINDEX_SYMBOL_ENUM_CONSTANT;
@@ -537,7 +523,7 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		return true;
 	}
 
-	bool VisitFunctionDecl(FunctionDecl* D)
+	bool VisitFunctionDecl(FunctionDecl *D)
 	{
 		if (!D->isThisDeclarationADefinition() && !D->hasPrototype())
 			return true;
@@ -559,9 +545,9 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 		return true;
 	}
 
-	bool VisitCallExpr(CallExpr* E)
+	bool VisitCallExpr(CallExpr *E)
 	{
-		const FunctionDecl* FD = E->getDirectCallee();
+		const FunctionDecl *FD = E->getDirectCallee();
 		if (!FD)
 			return true; /* indirect call: fp() */
 
@@ -582,18 +568,17 @@ class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor> {
 	}
 
 private:
-	static bool isPrototypeParameter(const VarDecl* D)
+	static bool isPrototypeParameter(const VarDecl *D)
 	{
-		const auto* P = dyn_cast<ParmVarDecl>(D);
+		const auto *P = dyn_cast<ParmVarDecl>(D);
 		if (!P)
 			return false;
 
-		const auto* F = dyn_cast_or_null<FunctionDecl>(P->getDeclContext());
+		const auto *F = dyn_cast_or_null<FunctionDecl>(P->getDeclContext());
 		return F && !F->doesThisDeclarationHaveABody();
 	}
 
-	void addTypeUse(const TypeDecl* D, semindex_symbol_kind_t kind,
-	    SourceLocation loc, const std::string& type)
+	void addTypeUse(const TypeDecl *D, semindex_symbol_kind_t kind, SourceLocation loc, const std::string &type)
 	{
 		if (!D || loc.isInvalid())
 			return;
@@ -614,17 +599,15 @@ private:
 		u.loc = index.location(spelling);
 		u.local = !currentFunction.empty();
 
-		std::string key = u.usr + "|" + index.locationKey(u.loc) + "|"
-		    + u.context;
+		std::string key = u.usr + "|" + index.locationKey(u.loc) + "|" + u.context;
 		if (!typeUses.insert(key).second)
 			return;
 
 		index.addUseInScope(std::move(u), spelling);
 	}
 
-	void addValueUse(const ValueDecl* D, semindex_use_kind_t kind,
-	    unsigned mode, const std::string& context, SourceLocation loc,
-	    bool local)
+	void addValueUse(const ValueDecl *D, semindex_use_kind_t kind, unsigned mode, const std::string &context,
+		SourceLocation loc, bool local)
 	{
 		SemindexUse u;
 		u.kind = kind;
@@ -641,7 +624,7 @@ private:
 		index.addUseInScope(std::move(u), loc);
 	}
 
-	void addAnonymousRecordSymbols(const RecordDecl* D, const std::string& name)
+	void addAnonymousRecordSymbols(const RecordDecl *D, const std::string &name)
 	{
 		SemindexSymbol s;
 		s.kind = D->isUnion() ? SEMINDEX_SYMBOL_UNION : SEMINDEX_SYMBOL_STRUCT;
@@ -651,9 +634,7 @@ private:
 		s.usr = getUSR(D, ctx);
 		s.context = "";
 		s.loc = index.displayLocation(ctx,
-		    D->getBraceRange().getBegin().isValid()
-		        ? D->getBraceRange().getBegin()
-		        : D->getLocation());
+			D->getBraceRange().getBegin().isValid() ? D->getBraceRange().getBegin() : D->getLocation());
 		s.local = false;
 		s.definition = true;
 
@@ -661,10 +642,10 @@ private:
 		addAnonymousRecordFields(D, name);
 	}
 
-	void addAnonymousRecordFields(const RecordDecl* D, const std::string& owner)
+	void addAnonymousRecordFields(const RecordDecl *D, const std::string &owner)
 	{
-		for (const FieldDecl* field : D->fields()) {
-			const RecordDecl* nested = recordDeclForType(field->getType());
+		for (const FieldDecl *field : D->fields()) {
+			const RecordDecl *nested = recordDeclForType(field->getType());
 
 			if (isAnonymousRecord(nested) && getName(field).empty()) {
 				addAnonymousRecordFields(nested, owner);
@@ -689,8 +670,8 @@ private:
 		}
 	}
 
-	ASTContext& ctx;
-	SemindexContext& index;
+	ASTContext &ctx;
+	SemindexContext &index;
 	std::string currentFunction;
 	std::set<std::string> typeUses;
 	std::set<std::string> functionSymbols;
@@ -700,15 +681,14 @@ private:
  * AST Consumer / FrontendAction
  * ============================================================ */
 
-class SemindexASTConsumer : public ASTConsumer {
+class SemindexASTConsumer : public ASTConsumer
+{
 public:
-	SemindexASTConsumer(ASTContext& ctx, SemindexContext index)
-	    : index(index)
-	    , visitor(ctx, this->index)
+	SemindexASTConsumer(ASTContext &ctx, SemindexContext index) : index(index), visitor(ctx, this->index)
 	{
 	}
 
-	void HandleTranslationUnit(ASTContext& ctx) override
+	void HandleTranslationUnit(ASTContext &ctx) override
 	{
 		visitor.TraverseDecl(ctx.getTranslationUnitDecl());
 	}
@@ -718,33 +698,30 @@ private:
 	SemindexVisitor visitor;
 };
 
-class SemindexFrontendAction : public ASTFrontendAction {
+class SemindexFrontendAction : public ASTFrontendAction
+{
 public:
-	explicit SemindexFrontendAction(semindex* out)
-	    : out(out)
+	explicit SemindexFrontendAction(semindex *out) : out(out)
 	{
 	}
 
-	std::unique_ptr<ASTConsumer> CreateASTConsumer(
-	    CompilerInstance& CI, StringRef) override
+	std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI, StringRef) override
 	{
 		SemindexContext index(out, CI.getSourceManager());
 
-		CI.getPreprocessor().addPPCallbacks(
-		    createSemindexPPCallbacks(index));
+		CI.getPreprocessor().addPPCallbacks(createSemindexPPCallbacks(index));
 
-		return std::make_unique<SemindexASTConsumer>(
-		    CI.getASTContext(), index);
+		return std::make_unique<SemindexASTConsumer>(CI.getASTContext(), index);
 	}
 
 private:
-	semindex* out;
+	semindex *out;
 };
 
-class SemindexActionFactory : public FrontendActionFactory {
+class SemindexActionFactory : public FrontendActionFactory
+{
 public:
-	explicit SemindexActionFactory(semindex* out)
-	    : out(out)
+	explicit SemindexActionFactory(semindex *out) : out(out)
 	{
 	}
 
@@ -754,11 +731,10 @@ public:
 	}
 
 private:
-	semindex* out;
+	semindex *out;
 };
 
-std::unique_ptr<FrontendActionFactory> createSemindexActionFactory(
-    semindex* out)
+std::unique_ptr<FrontendActionFactory> createSemindexActionFactory(semindex *out)
 {
 	return std::make_unique<SemindexActionFactory>(out);
 }

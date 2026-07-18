@@ -5,9 +5,9 @@
 
 #include <memory>
 
-namespace clang {
+namespace clang
+{
 class PPCallbacks;
 }
 
-std::unique_ptr<clang::PPCallbacks> createSemindexPPCallbacks(
-    SemindexContext index);
+std::unique_ptr<clang::PPCallbacks> createSemindexPPCallbacks(SemindexContext index);

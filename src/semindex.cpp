@@ -12,8 +12,7 @@
 
 using namespace clang::tooling;
 
-static std::unique_ptr<CompilationDatabase> loadCompileCommands(
-    const char* compile_commands_json, std::string& error)
+static std::unique_ptr<CompilationDatabase> loadCompileCommands(const char *compile_commands_json, std::string &error)
 {
 	if (!compile_commands_json || !compile_commands_json[0]) {
 		error = "missing compile_commands.json path";
@@ -36,18 +35,23 @@ static std::unique_ptr<CompilationDatabase> loadCompileCommands(
 
 extern "C" {
 
-semindex_t* semindex_create(void) { return new semindex {}; }
+semindex_t *semindex_create(void)
+{
+	return new semindex{};
+}
 
-void semindex_destroy(semindex_t* s) { delete s; }
+void semindex_destroy(semindex_t *s)
+{
+	delete s;
+}
 
-void semindex_set_scope(semindex_t* s, semindex_scope_t scope)
+void semindex_set_scope(semindex_t *s, semindex_scope_t scope)
 {
 	if (s)
 		s->scope = scope;
 }
 
-int semindex_index_file(semindex_t* s, const char* compile_commands_json,
-    const char* source_file)
+int semindex_index_file(semindex_t *s, const char *compile_commands_json, const char *source_file)
 {
 	if (!s || !source_file)
 		return -1;
@@ -60,8 +64,7 @@ int semindex_index_file(semindex_t* s, const char* compile_commands_json,
 	s->files.clear();
 
 	std::string error;
-	std::unique_ptr<CompilationDatabase> db
-	    = loadCompileCommands(compile_commands_json, error);
+	std::unique_ptr<CompilationDatabase> db = loadCompileCommands(compile_commands_json, error);
 
 	if (!db) {
 		llvm::errs() << "semindex: failed to load compilation database";
@@ -74,8 +77,7 @@ int semindex_index_file(semindex_t* s, const char* compile_commands_json,
 	}
 
 	ClangTool tool(*db, { source_file });
-	std::unique_ptr<FrontendActionFactory> factory =
-	    createSemindexActionFactory(s);
+	std::unique_ptr<FrontendActionFactory> factory = createSemindexActionFactory(s);
 	int ret = tool.run(factory.get());
 
 	if (ret == 0)
@@ -84,12 +86,12 @@ int semindex_index_file(semindex_t* s, const char* compile_commands_json,
 	return ret;
 }
 
-size_t semindex_symbol_count(const semindex_t* s)
+size_t semindex_symbol_count(const semindex_t *s)
 {
 	return s ? s->symbols.size() : 0;
 }
 
-const semindex_symbol_t* semindex_get_symbol(const semindex_t* s, size_t idx)
+const semindex_symbol_t *semindex_get_symbol(const semindex_t *s, size_t idx)
 {
 	if (!s || idx >= s->symbol_records.size())
 		return nullptr;
@@ -97,9 +99,12 @@ const semindex_symbol_t* semindex_get_symbol(const semindex_t* s, size_t idx)
 	return &s->symbol_records[idx];
 }
 
-size_t semindex_use_count(const semindex_t* s) { return s ? s->uses.size() : 0; }
+size_t semindex_use_count(const semindex_t *s)
+{
+	return s ? s->uses.size() : 0;
+}
 
-const semindex_use_t* semindex_get_use(const semindex_t* s, size_t idx)
+const semindex_use_t *semindex_get_use(const semindex_t *s, size_t idx)
 {
 	if (!s || idx >= s->use_records.size())
 		return nullptr;

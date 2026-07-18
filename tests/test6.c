@@ -3,6 +3,4 @@ struct {
 	union {
 		int x;
 	};
-} var = {
-	{}
-};
+} var = { {} };

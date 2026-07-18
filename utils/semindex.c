@@ -5,10 +5,9 @@
 
 #include "output.h"
 
-static void usage(FILE* f)
+static void usage(FILE *f)
 {
-	fprintf(f,
-	    "Usage: semindex [OPTION]... SOURCE\n");
+	fprintf(f, "Usage: semindex [OPTION]... SOURCE\n");
 }
 
 static void help(void)
@@ -21,21 +20,23 @@ static void help(void)
 	       "  SOURCE                     C source file to index\n"
 	       "\n"
 	       "Options:\n"
-	       "  -f, --format=FORMAT        select output format: default, dissect\n"
+	       "  -f, --format=FORMAT        select output format: default, "
+	       "dissect\n"
 	       "                             (default: default)\n"
-	       "  -s, --scope=SCOPE          select indexed source scope: file, project, all\n"
+	       "  -s, --scope=SCOPE          select indexed source scope: "
+	       "file, project, all\n"
 	       "                             (default: project)\n"
 	       "  -c, --compile-commands=PATH\n"
-	       "                             path to compile_commands.json or its directory\n"
+	       "                             path to compile_commands.json or "
+	       "its directory\n"
 	       "                             (default: .)\n"
 	       "  -h, --help                 display this help and exit\n"
 	       "\n"
 	       "Report bugs to authors.\n"
-	       "\n"
-	);
+	       "\n");
 }
 
-static int parse_format(const char* value, enum output_format* format)
+static int parse_format(const char *value, enum output_format *format)
 {
 	if (!strcmp(value, "default"))
 		*format = FORMAT_DEFAULT;
@@ -47,7 +48,7 @@ static int parse_format(const char* value, enum output_format* format)
 	return 0;
 }
 
-static int parse_scope(const char* value, semindex_scope_t* scope)
+static int parse_scope(const char *value, semindex_scope_t *scope)
 {
 	if (!strcmp(value, "file"))
 		*scope = SEMINDEX_SCOPE_FILE;
@@ -61,7 +62,7 @@ static int parse_scope(const char* value, semindex_scope_t* scope)
 	return 0;
 }
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
 	static const struct option long_options[] = {
 		{ "format", required_argument, NULL, 'f' },
@@ -72,8 +73,8 @@ int main(int argc, char** argv)
 	};
 	enum output_format format = FORMAT_DEFAULT;
 	semindex_scope_t scope = SEMINDEX_SCOPE_PROJECT;
-	const char* source_file = NULL;
-	const char* compile_commands = ".";
+	const char *source_file = NULL;
+	const char *compile_commands = ".";
 	int opt;
 
 	while ((opt = getopt_long(argc, argv, "f:s:c:h", long_options, NULL)) != -1) {
@@ -115,12 +116,11 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	semindex_t* s = semindex_create();
+	semindex_t *s = semindex_create();
 	semindex_set_scope(s, scope);
 
 	if (semindex_index_file(s, compile_commands, source_file) != 0) {
-		fprintf(stderr, "semindex: failed to index '%s' using '%s'\n",
-		    source_file, compile_commands);
+		fprintf(stderr, "semindex: failed to index '%s' using '%s'\n", source_file, compile_commands);
 		semindex_destroy(s);
 		return 1;
 	}

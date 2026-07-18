@@ -11,7 +11,7 @@ enum output_format {
 	FORMAT_DISSECT,
 };
 
-int output_default(FILE* out, semindex_t* s);
-int output_dissect(FILE* out, semindex_t* s);
+int output_default(FILE *out, semindex_t *s);
+int output_dissect(FILE *out, semindex_t *s);
 
 #endif /* SEMINDEX_OUTPUT_H */

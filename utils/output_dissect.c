@@ -6,22 +6,29 @@
 static char kind_to_dissect_char(semindex_symbol_kind_t kind)
 {
 	switch (kind) {
-		case SEMINDEX_SYMBOL_FIELD:    return 'm';
-		case SEMINDEX_SYMBOL_STRUCT:
-		case SEMINDEX_SYMBOL_UNION:    return 's';
-		case SEMINDEX_SYMBOL_ENUM:     return 'e';
-		case SEMINDEX_SYMBOL_ENUM_CONSTANT:
-			return 'v';
-		case SEMINDEX_SYMBOL_TYPEDEF:  return 't';
-		case SEMINDEX_SYMBOL_FUNCTION: return 'f';
-		case SEMINDEX_SYMBOL_MACRO:    return 'd';
-		case SEMINDEX_SYMBOL_FILE:     return 'i';
-		default:                       return 'v';
+	case SEMINDEX_SYMBOL_FIELD:
+		return 'm';
+	case SEMINDEX_SYMBOL_STRUCT:
+	case SEMINDEX_SYMBOL_UNION:
+		return 's';
+	case SEMINDEX_SYMBOL_ENUM:
+		return 'e';
+	case SEMINDEX_SYMBOL_ENUM_CONSTANT:
+		return 'v';
+	case SEMINDEX_SYMBOL_TYPEDEF:
+		return 't';
+	case SEMINDEX_SYMBOL_FUNCTION:
+		return 'f';
+	case SEMINDEX_SYMBOL_MACRO:
+		return 'd';
+	case SEMINDEX_SYMBOL_FILE:
+		return 'i';
+	default:
+		return 'v';
 	}
 }
 
-static const char* symbol_name_for_dissect(const char* owner, const char* name,
-    char* buf, size_t len)
+static const char *symbol_name_for_dissect(const char *owner, const char *name, char *buf, size_t len)
 {
 	if (owner && owner[0]) {
 		snprintf(buf, len, "%s.%s", owner, name ? name : "");
@@ -31,7 +38,7 @@ static const char* symbol_name_for_dissect(const char* owner, const char* name,
 	return name ? name : "";
 }
 
-static const char* mode_to_string(unsigned mode)
+static const char *mode_to_string(unsigned mode)
 {
 	static char str[4];
 
@@ -56,7 +63,7 @@ static const char* mode_to_string(unsigned mode)
 	return str;
 }
 
-static int same_string(const char* a, const char* b)
+static int same_string(const char *a, const char *b)
 {
 	if (!a)
 		a = "";
@@ -66,74 +73,57 @@ static int same_string(const char* a, const char* b)
 	return !strcmp(a, b);
 }
 
-static int same_dissect_use(const semindex_use_t* a, const semindex_use_t* b)
+static int same_dissect_use(const semindex_use_t *a, const semindex_use_t *b)
 {
-	return a->line == b->line &&
-	    a->column == b->column &&
-	    a->local == b->local &&
-	    a->mode == b->mode &&
-	    a->symbol_kind == b->symbol_kind &&
-	    same_string(a->context, b->context) &&
-	    same_string(a->owner, b->owner) &&
-	    same_string(a->name, b->name) &&
-	    same_string(a->type, b->type);
+	return a->line == b->line && a->column == b->column && a->local == b->local && a->mode == b->mode &&
+		a->symbol_kind == b->symbol_kind && same_string(a->context, b->context) &&
+		same_string(a->owner, b->owner) && same_string(a->name, b->name) && same_string(a->type, b->type);
 }
 
-static void print_dissect_symbol(FILE* out, const semindex_symbol_t* sym)
+static void print_dissect_symbol(FILE *out, const semindex_symbol_t *sym)
 {
 	char name[256];
-	const char* symbol_name;
-	const char* action = sym->definition ? "def" : "decl";
+	const char *symbol_name;
+	const char *action = sym->definition ? "def" : "decl";
 
-	symbol_name = symbol_name_for_dissect(sym->owner, sym->name, name,
-	    sizeof(name));
+	symbol_name = symbol_name_for_dissect(sym->owner, sym->name, name, sizeof(name));
 	if (sym->type && sym->type[0])
-		fprintf(out, "%4u:%-3u %-16s %s %c %c %-32s %s\n",
-		    sym->line, sym->column, sym->context,
-		    action, sym->local ? '.' : ' ',
-		    kind_to_dissect_char(sym->kind), symbol_name, sym->type);
+		fprintf(out, "%4u:%-3u %-16s %s %c %c %-32s %s\n", sym->line, sym->column, sym->context, action,
+			sym->local ? '.' : ' ', kind_to_dissect_char(sym->kind), symbol_name, sym->type);
 	else
-		fprintf(out, "%4u:%-3u %-16s %s %c %c %s\n",
-		    sym->line, sym->column, sym->context,
-		    action, sym->local ? '.' : ' ',
-		    kind_to_dissect_char(sym->kind), symbol_name);
+		fprintf(out, "%4u:%-3u %-16s %s %c %c %s\n", sym->line, sym->column, sym->context, action,
+			sym->local ? '.' : ' ', kind_to_dissect_char(sym->kind), symbol_name);
 }
 
-static void print_dissect_use(FILE* out, const semindex_use_t* use)
+static void print_dissect_use(FILE *out, const semindex_use_t *use)
 {
 	char name[256];
-	const char* symbol_name;
+	const char *symbol_name;
 
-	symbol_name = symbol_name_for_dissect(use->owner, use->name, name,
-	    sizeof(name));
+	symbol_name = symbol_name_for_dissect(use->owner, use->name, name, sizeof(name));
 	if (use->type && use->type[0])
-		fprintf(out, "%4u:%-3u %-16s %s %c %c %-32s %s\n",
-		    use->line, use->column, use->context,
-		    mode_to_string(use->mode),
-		    use->local ? '.' : ' ',
-		    kind_to_dissect_char(use->symbol_kind), symbol_name,
-		    use->type);
+		fprintf(out, "%4u:%-3u %-16s %s %c %c %-32s %s\n", use->line, use->column, use->context,
+			mode_to_string(use->mode), use->local ? '.' : ' ', kind_to_dissect_char(use->symbol_kind),
+			symbol_name, use->type);
 	else
-		fprintf(out, "%4u:%-3u %-16s %s %c %c %s\n",
-		    use->line, use->column, use->context,
-		    mode_to_string(use->mode),
-		    use->local ? '.' : ' ',
-		    kind_to_dissect_char(use->symbol_kind), symbol_name);
+		fprintf(out, "%4u:%-3u %-16s %s %c %c %s\n", use->line, use->column, use->context,
+			mode_to_string(use->mode), use->local ? '.' : ' ', kind_to_dissect_char(use->symbol_kind),
+			symbol_name);
 }
 
-int output_dissect(FILE* out, semindex_t* s)
+int output_dissect(FILE *out, semindex_t *s)
 {
 	size_t symbol_count = semindex_symbol_count(s);
 	size_t use_count = semindex_use_count(s);
 	size_t symbol_index = 0;
 	size_t use_index = 0;
-	const char* current_file = NULL;
-	const semindex_use_t* prev_use = NULL;
+	const char *current_file = NULL;
+	const semindex_use_t *prev_use = NULL;
 	int prev_was_use = 0;
 
 	while (symbol_index < symbol_count || use_index < use_count) {
-		const semindex_symbol_t* sym = NULL;
-		const semindex_use_t* use = NULL;
+		const semindex_symbol_t *sym = NULL;
+		const semindex_use_t *use = NULL;
 		int is_symbol;
 
 		if (symbol_index < symbol_count)
@@ -141,8 +131,7 @@ int output_dissect(FILE* out, semindex_t* s)
 		if (use_index < use_count)
 			use = semindex_get_use(s, use_index);
 
-		is_symbol = use_index >= use_count ||
-		    (sym && sym->order <= use->order);
+		is_symbol = use_index >= use_count || (sym && sym->order <= use->order);
 
 		if (is_symbol) {
 			if (!current_file || strcmp(current_file, sym->file)) {
@@ -156,9 +145,8 @@ int output_dissect(FILE* out, semindex_t* s)
 			continue;
 		}
 
-		if (prev_was_use && prev_use &&
-		    same_string(current_file, use->file) &&
-		    same_dissect_use(use, prev_use)) {
+		if (prev_was_use && prev_use && same_string(current_file, use->file) &&
+			same_dissect_use(use, prev_use)) {
 			use_index++;
 			continue;
 		}
