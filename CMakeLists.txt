@@ -37,6 +37,9 @@ execute_process(
 
 # libsemindex (C++)
 add_library(semindex_parser SHARED
+	src/index_ast.cpp
+	src/index_context.cpp
+	src/index_pp.cpp
 	src/semindex.cpp
 )
 set_target_properties(semindex_parser PROPERTIES OUTPUT_NAME semindex)
