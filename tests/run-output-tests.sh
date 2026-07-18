@@ -22,7 +22,7 @@ run_case()
 		set -- "$@" --format "$format"
 	fi
 
-	if ! "$SEMINDEX" "$@" "$SOURCE_DIR/$src" >"$out" 2>"$err"; then
+	if ! "$SEMINDEX" index "$@" "$SOURCE_DIR/$src" >"$out" 2>"$err"; then
 		cat "$err" >&2
 		cat "$out" >&2
 		fail "$src did not index successfully"

@@ -4,8 +4,8 @@ The `semindex` command can print indexed records in more than one textual
 format.  Select the format with `--format=FORMAT`.
 
 ```sh
-semindex --format=default --compile-commands build/compile_commands.json file.c
-semindex --format=dissect --compile-commands build/compile_commands.json file.c
+semindex index --format=default --compile-commands build/compile_commands.json file.c
+semindex index --format=dissect --compile-commands build/compile_commands.json file.c
 ```
 
 If `--format` is omitted, `default` is used.

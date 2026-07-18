@@ -7,7 +7,7 @@
 
 static void usage(FILE *f)
 {
-	fprintf(f, "Usage: semindex [OPTION]... SOURCE\n");
+	fprintf(f, "Usage: semindex COMMAND [OPTION]...\n");
 }
 
 static void help(void)
@@ -15,6 +15,30 @@ static void help(void)
 	usage(stdout);
 	printf("\n"
 	       "Index C source files using clang semantic information.\n"
+	       "\n"
+	       "Commands:\n"
+	       "  index                      index a source file using "
+	       "compile_commands.json\n"
+	       "\n"
+	       "Run 'semindex COMMAND --help' for command-specific help.\n"
+	       "\n"
+	       "Options:\n"
+	       "  -h, --help                 display this help and exit\n"
+	       "\n"
+	       "Report bugs to authors.\n"
+	       "\n");
+}
+
+static void index_usage(FILE *f)
+{
+	fprintf(f, "Usage: semindex index [OPTION]... SOURCE\n");
+}
+
+static void index_help(void)
+{
+	index_usage(stdout);
+	printf("\n"
+	       "Index a C source file using clang semantic information.\n"
 	       "\n"
 	       "Arguments:\n"
 	       "  SOURCE                     C source file to index\n"
@@ -62,7 +86,7 @@ static int parse_scope(const char *value, semindex_scope_t *scope)
 	return 0;
 }
 
-int main(int argc, char **argv)
+static int cmd_index(int argc, char **argv)
 {
 	static const struct option long_options[] = {
 		{ "format", required_argument, NULL, 'f' },
@@ -75,8 +99,11 @@ int main(int argc, char **argv)
 	semindex_scope_t scope = SEMINDEX_SCOPE_PROJECT;
 	const char *source_file = NULL;
 	const char *compile_commands = ".";
+	semindex_t *s;
+	int ret;
 	int opt;
 
+	optind = 1;
 	while ((opt = getopt_long(argc, argv, "f:s:c:h", long_options, NULL)) != -1) {
 		switch (opt) {
 		case 'f':
@@ -95,10 +122,10 @@ int main(int argc, char **argv)
 			compile_commands = optarg;
 			break;
 		case 'h':
-			help();
+			index_help();
 			return 0;
 		default:
-			usage(stderr);
+			index_usage(stderr);
 			return 1;
 		}
 	}
@@ -107,16 +134,16 @@ int main(int argc, char **argv)
 		source_file = argv[optind++];
 
 	if (optind < argc) {
-		usage(stderr);
+		index_usage(stderr);
 		return 1;
 	}
 
 	if (!source_file) {
-		usage(stderr);
+		index_usage(stderr);
 		return 1;
 	}
 
-	semindex_t *s = semindex_create();
+	s = semindex_create();
 	semindex_set_scope(s, scope);
 
 	if (semindex_index_file(s, compile_commands, source_file) != 0) {
@@ -126,11 +153,42 @@ int main(int argc, char **argv)
 	}
 
 	if (format == FORMAT_DISSECT)
-		output_dissect(stdout, s);
+		ret = output_dissect(stdout, s);
 	else
-		output_default(stdout, s);
+		ret = output_default(stdout, s);
 
 	semindex_destroy(s);
+	return ret ? 1 : 0;
+}
 
-	return 0;
+int main(int argc, char **argv)
+{
+	static const struct option long_options[] = {
+		{ "help", no_argument, NULL, 'h' },
+		{ NULL, 0, NULL, 0 },
+	};
+	int opt;
+
+	while ((opt = getopt_long(argc, argv, "+h", long_options, NULL)) != -1) {
+		switch (opt) {
+		case 'h':
+			help();
+			return 0;
+		default:
+			usage(stderr);
+			return 1;
+		}
+	}
+
+	if (optind >= argc) {
+		usage(stderr);
+		return 1;
+	}
+
+	if (!strcmp(argv[optind], "index"))
+		return cmd_index(argc - optind, argv + optind);
+
+	fprintf(stderr, "semindex: unknown command: %s\n", argv[optind]);
+	usage(stderr);
+	return 1;
 }
