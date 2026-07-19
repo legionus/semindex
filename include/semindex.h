@@ -91,6 +91,8 @@ typedef struct {
 semindex_t *semindex_create(void);
 void semindex_destroy(semindex_t *s);
 void semindex_set_scope(semindex_t *s, semindex_scope_t scope);
+void semindex_set_details(semindex_t *s, int enabled);
+void semindex_set_include_local(semindex_t *s, int enabled);
 
 /* indexing */
 int semindex_index_command(semindex_t *s, const semindex_compile_command_t *cmd);

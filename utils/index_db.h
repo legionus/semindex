@@ -20,7 +20,7 @@ typedef struct {
 	int has_kind;
 } index_db_search_options_t;
 
-int index_db_store(const char *path, semindex_t *s, const char *main_file);
+int index_db_store(const char *path, semindex_t *s, const char *main_file, int include_local);
 int index_db_search(const char *path, const index_db_search_options_t *opts, FILE *out);
 
 #endif /* SEMINDEX_INDEX_DB_H */

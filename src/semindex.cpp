@@ -129,6 +129,18 @@ void semindex_set_scope(semindex_t *s, semindex_scope_t scope)
 		s->scope = scope;
 }
 
+void semindex_set_details(semindex_t *s, int enabled)
+{
+	if (s)
+		s->details = enabled;
+}
+
+void semindex_set_include_local(semindex_t *s, int enabled)
+{
+	if (s)
+		s->include_local = enabled;
+}
+
 int semindex_index_command(semindex_t *s, const semindex_compile_command_t *cmd)
 {
 	if (!s || !cmd || !cmd->file || !cmd->argv || !cmd->argc)

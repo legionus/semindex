@@ -93,6 +93,16 @@ bool SemindexContext::inScope(clang::SourceLocation loc) const
 	return locInScope(sm, out->scope, loc);
 }
 
+bool SemindexContext::details() const
+{
+	return out->details;
+}
+
+bool SemindexContext::includeLocal() const
+{
+	return out->include_local;
+}
+
 clang::SourceLocation SemindexContext::spellingLoc(clang::SourceLocation loc) const
 {
 	return sm.getSpellingLoc(loc);

@@ -32,6 +32,7 @@ static void index_help(void)
 	       "                             (default: .)\n"
 	       "  -d, --database=PATH        path to the semindex database\n"
 	       "                             (default: .semindex/semindex.db)\n"
+	       "      --include-local         store local symbols and their uses\n"
 	       "  -h, --help                 display this help and exit\n"
 	       "\n"
 	       "Report bugs to authors.\n"
@@ -41,6 +42,7 @@ static void index_help(void)
 int cmd_index(int argc, char **argv)
 {
 	static const struct option long_options[] = {
+		{ "include-local", no_argument, NULL, 1 },
 		{ "format", required_argument, NULL, 'f' },
 		{ "scope", required_argument, NULL, 's' },
 		{ "compile-commands", required_argument, NULL, 'c' },
@@ -55,11 +57,15 @@ int cmd_index(int argc, char **argv)
 	const char *database = ".semindex/semindex.db";
 	semindex_t *s;
 	int ret;
+	int include_local = 0;
 	int opt;
 
 	optind = 1;
 	while ((opt = getopt_long(argc, argv, "f:s:c:d:h", long_options, NULL)) != -1) {
 		switch (opt) {
+		case 1:
+			include_local = 1;
+			break;
 		case 'f':
 			if (parse_format(optarg, &format) < 0) {
 				fprintf(stderr, "semindex: unknown format: %s\n", optarg);
@@ -108,7 +114,7 @@ int cmd_index(int argc, char **argv)
 		semindex_destroy(s);
 		return 1;
 	}
-	if (index_db_store(database, s, source_file) < 0) {
+	if (index_db_store(database, s, source_file, include_local) < 0) {
 		semindex_destroy(s);
 		return 1;
 	}

@@ -27,6 +27,7 @@ static void compiler_help(void)
 	       "                             (default: project)\n"
 	       "  -d, --database=PATH        path to the semindex database\n"
 	       "                             (default: .semindex/semindex.db)\n"
+	       "      --include-local         store local symbols and their uses\n"
 	       "  -h, --help                 display this help and exit\n"
 	       "\n"
 	       "Report bugs to authors.\n"
@@ -138,6 +139,7 @@ static int find_source_file(int argc, char **argv, const char **source_file)
 int cmd_compiler(int argc, char **argv)
 {
 	static const struct option long_options[] = {
+		{ "include-local", no_argument, NULL, 1 },
 		{ "database", required_argument, NULL, 'd' },
 		{ "format", required_argument, NULL, 'f' },
 		{ "scope", required_argument, NULL, 's' },
@@ -154,11 +156,15 @@ int cmd_compiler(int argc, char **argv)
 	char **compiler_argv;
 	int ret;
 	int print_output = 0;
+	int include_local = 0;
 	int opt;
 
 	optind = 1;
 	while ((opt = getopt_long(argc, argv, "+d:f:s:h", long_options, NULL)) != -1) {
 		switch (opt) {
+		case 1:
+			include_local = 1;
+			break;
 		case 'd':
 			database = optarg;
 			break;
@@ -200,6 +206,8 @@ int cmd_compiler(int argc, char **argv)
 
 	s = semindex_create();
 	semindex_set_scope(s, scope);
+	semindex_set_details(s, print_output);
+	semindex_set_include_local(s, print_output || include_local);
 
 	cmd.directory = ".";
 	cmd.file = source_file;
@@ -211,7 +219,7 @@ int cmd_compiler(int argc, char **argv)
 		semindex_destroy(s);
 		return 1;
 	}
-	if (index_db_store(database, s, source_file) < 0) {
+	if (index_db_store(database, s, source_file, include_local) < 0) {
 		semindex_destroy(s);
 		return 1;
 	}

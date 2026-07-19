@@ -29,7 +29,8 @@ public:
 		s.name = ident->getName().str();
 		s.owner = "";
 		s.type = "";
-		s.usr = "macro:" + s.name;
+		if (index.details())
+			s.usr = "macro:" + s.name;
 		s.context = "";
 		s.loc = index.location(loc);
 		s.local = false;
@@ -101,7 +102,8 @@ private:
 		u.name = target;
 		u.owner = "";
 		u.type = "";
-		u.usr = "file:" + target;
+		if (index.details())
+			u.usr = "file:" + target;
 		u.context = "";
 		u.loc = index.location(spelling);
 		u.local = false;
@@ -124,7 +126,8 @@ private:
 		u.name = ident->getName().str();
 		u.owner = "";
 		u.type = "";
-		u.usr = "macro:" + u.name;
+		if (index.details())
+			u.usr = "macro:" + u.name;
 		u.context = "";
 		u.loc = index.location(spelling);
 		u.local = false;

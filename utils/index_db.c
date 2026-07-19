@@ -216,7 +216,7 @@ static int open_writer(const char *path, sqlite3 **db)
 	}
 	if (sqlite3_busy_timeout(*db, INT_MAX) != SQLITE_OK)
 		return -1;
-	if (exec_sql(*db, "PRAGMA journal_mode = WAL") < 0 || exec_sql(*db, "PRAGMA synchronous = NORMAL") < 0 ||
+	if (exec_sql(*db, "PRAGMA journal_mode = WAL") < 0 || exec_sql(*db, "PRAGMA synchronous = OFF") < 0 ||
 		exec_sql(*db, "PRAGMA temp_store = MEMORY") < 0 || init_schema(*db) < 0)
 		return -1;
 
@@ -285,7 +285,7 @@ out:
 	return ret;
 }
 
-static int stage_records(sqlite3 *db, semindex_t *s)
+static int stage_records(sqlite3 *db, semindex_t *s, int include_local)
 {
 	static const char *sql =
 		"INSERT OR IGNORE INTO staging_records(symbol, record, action, kind, mode, path, line, column, "
@@ -302,6 +302,8 @@ static int stage_records(sqlite3 *db, semindex_t *s)
 
 		if (!sym)
 			goto out;
+		if (sym->local && !include_local)
+			continue;
 		if (stage_record(db, stmt, STORED_RECORD_SYMBOL, sym->definition, sym->kind, 0, sym->file, sym->line,
 			    sym->column, sym->owner, sym->name, sym->context, sym->local) < 0)
 			goto out;
@@ -311,6 +313,8 @@ static int stage_records(sqlite3 *db, semindex_t *s)
 
 		if (!use)
 			goto out;
+		if (use->local && !include_local)
+			continue;
 		if (stage_record(db, stmt, STORED_RECORD_USE, use->kind, use->symbol_kind, use->mode, use->file,
 			    use->line, use->column, use->owner, use->name, use->context, use->local) < 0)
 			goto out;
@@ -426,7 +430,7 @@ rollback:
 	return -1;
 }
 
-int index_db_store(const char *path, semindex_t *s, const char *main_file)
+int index_db_store(const char *path, semindex_t *s, const char *main_file, int include_local)
 {
 	sqlite3 *db = NULL;
 	int ret = -1;
@@ -437,7 +441,7 @@ int index_db_store(const char *path, semindex_t *s, const char *main_file)
 		goto out;
 	if (create_staging(db) < 0 || exec_sql(db, "BEGIN") < 0)
 		goto out;
-	if (stage_records(db, s) < 0 || stage_files(db, main_file) < 0) {
+	if (stage_records(db, s, include_local) < 0 || stage_files(db, main_file) < 0) {
 		exec_sql(db, "ROLLBACK");
 		goto out;
 	}

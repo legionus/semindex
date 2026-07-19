@@ -17,6 +17,8 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <tuple>
+#include <unordered_map>
 
 using namespace clang;
 using namespace clang::tooling;
@@ -257,7 +259,7 @@ static std::string typeNameForTypedef(const TypedefNameDecl *D)
 class SemindexVisitor : public RecursiveASTVisitor<SemindexVisitor>
 {
 public:
-	SemindexVisitor(ASTContext &ctx, SemindexContext &index) : ctx(ctx), index(index)
+	SemindexVisitor(ASTContext &ctx, SemindexContext &index) : ctx(ctx), index(index), details(index.details())
 	{
 	}
 
@@ -277,6 +279,8 @@ public:
 	{
 		if (isPrototypeParameter(D))
 			return true;
+		if (!index.includeLocal() && !currentFunction.empty())
+			return true;
 
 		const RecordDecl *anonymousRecord = recordDeclForType(D->getType());
 		std::string anonymousName;
@@ -285,9 +289,10 @@ public:
 		if (!isTypedefType(D->getType()) && !isWrittenAsTypedef(D->getTypeSourceInfo()) &&
 			isAnonymousRecord(anonymousRecord)) {
 			anonymousName = anonymousRecordNameForVar(D);
-			typeName = typeNameForRecord(anonymousRecord, anonymousName);
+			if (details)
+				typeName = typeNameForRecord(anonymousRecord, anonymousName);
 			addAnonymousRecordSymbols(anonymousRecord, anonymousName);
-		} else {
+		} else if (details) {
 			typeName = D->getType().getAsString();
 		}
 
@@ -296,7 +301,7 @@ public:
 		s.name = getName(D);
 		s.owner = "";
 		s.type = typeName;
-		s.usr = getUSR(D, ctx);
+		s.usr = detailedUSR(D);
 		s.context = currentFunction;
 		s.loc = index.location(D->getLocation());
 		s.local = !currentFunction.empty();
@@ -312,7 +317,7 @@ public:
 			u.name = getName(D);
 			u.owner = "";
 			u.type = typeName;
-			u.usr = getUSR(D, ctx);
+			u.usr = detailedUSR(D);
 			u.context = currentFunction;
 			u.loc = index.location(D->getLocation());
 			u.local = !currentFunction.empty();
@@ -327,13 +332,13 @@ public:
 	{
 		if (isAnonymousRecord(D->getParent()))
 			return true;
-
+		const ValueInfo &info = valueInfo(D);
 		SemindexSymbol s;
-		s.kind = SEMINDEX_SYMBOL_FIELD;
-		s.name = getName(D);
-		s.owner = getOwnerName(D);
-		s.type = D->getType().getAsString();
-		s.usr = getUSR(D, ctx);
+		s.kind = info.kind;
+		s.name = info.name;
+		s.owner = info.owner;
+		s.type = info.type;
+		s.usr = info.usr;
 		s.context = "";
 		s.loc = index.location(D->getLocation());
 		s.local = false;
@@ -345,9 +350,12 @@ public:
 
 	bool VisitTypedefNameDecl(TypedefNameDecl *D)
 	{
+		if (!index.includeLocal() && !currentFunction.empty())
+			return true;
+
 		const RecordDecl *anonymousRecord = recordDeclForType(D->getUnderlyingType());
 		std::string anonymousName;
-		std::string typeName = typeNameForTypedef(D);
+		std::string typeName = details ? typeNameForTypedef(D) : "";
 
 		if (isAnonymousRecord(anonymousRecord)) {
 			anonymousName = anonymousRecordNameForTypedef(D);
@@ -359,7 +367,7 @@ public:
 		s.name = getName(D);
 		s.owner = "";
 		s.type = typeName;
-		s.usr = getUSR(D, ctx);
+		s.usr = detailedUSR(D);
 		s.context = currentFunction;
 		s.loc = index.location(D->getLocation());
 		s.local = !currentFunction.empty();
@@ -373,7 +381,7 @@ public:
 	{
 		const TypedefNameDecl *D = TL.getTypePtr()->getDecl();
 
-		addTypeUse(D, SEMINDEX_SYMBOL_TYPEDEF, TL.getNameLoc(), typeNameForTypedef(D));
+		addTypeUse(D, SEMINDEX_SYMBOL_TYPEDEF, TL.getNameLoc(), details ? typeNameForTypedef(D) : "");
 		return true;
 	}
 
@@ -406,29 +414,34 @@ public:
 	bool VisitDeclRefExpr(DeclRefExpr *E)
 	{
 		const ValueDecl *D = E->getDecl();
+		bool local;
+
 		if (!D)
+			return true;
+		local = !currentFunction.empty() && !D->hasExternalFormalLinkage();
+		if (local && !index.includeLocal())
 			return true;
 
 		if (isa<FunctionDecl>(D) && isDirectCallCallee(E, ctx))
 			return true;
 
+		const ValueInfo &info = valueInfo(D);
 		SemindexUse u;
 		u.kind = classifyUse(E, ctx);
-		u.symbol_kind = symbolKindForDecl(D);
+		u.symbol_kind = info.kind;
 		u.mode = accessModeForUse(u.kind, E, ctx);
-		u.name = getName(D);
-		u.owner = getOwnerName(D);
-		u.type = D->getType().getAsString();
-		u.usr = getUSR(D, ctx);
+		u.name = info.name;
+		u.owner = info.owner;
+		u.type = info.type;
+		u.usr = info.usr;
 		u.context = currentFunction;
 		u.loc = index.location(E->getExprLoc());
-		u.local = !currentFunction.empty() && !D->hasExternalFormalLinkage();
+		u.local = local;
 
 		index.addUseInScope(std::move(u), E->getExprLoc());
 
 		if (!isa<FunctionDecl>(D) && isCallCallee(E, ctx))
-			addValueUse(D, SEMINDEX_USE_CALL, SEMINDEX_MODE_R_PTR, currentFunction, E->getExprLoc(),
-				!currentFunction.empty() && !D->hasExternalFormalLinkage());
+			addValueUse(D, SEMINDEX_USE_CALL, SEMINDEX_MODE_R_PTR, currentFunction, E->getExprLoc(), local);
 
 		return true;
 	}
@@ -453,7 +466,6 @@ public:
 			const FieldDecl *D = designator.getFieldDecl();
 			if (!D)
 				continue;
-
 			addValueUse(D, SEMINDEX_USE_WRITE, SEMINDEX_MODE_W_VAL, currentFunction,
 				designator.getFieldLoc(), false);
 		}
@@ -474,7 +486,7 @@ public:
 		s.name = getName(D);
 		s.owner = "";
 		s.type = ""; // TODO: fill it later
-		s.usr = getUSR(D, ctx);
+		s.usr = detailedUSR(D);
 		s.context = "";
 		s.loc = index.location(D->getLocation());
 		s.local = false;
@@ -496,7 +508,7 @@ public:
 		s.name = getName(D);
 		s.owner = "";
 		s.type = "";
-		s.usr = getUSR(D, ctx);
+		s.usr = detailedUSR(D);
 		s.context = "";
 		s.loc = index.location(D->getLocation());
 		s.local = false;
@@ -512,8 +524,9 @@ public:
 		s.kind = SEMINDEX_SYMBOL_ENUM_CONSTANT;
 		s.name = getName(D);
 		s.owner = "";
-		s.type = D->getType().getAsString();
-		s.usr = getUSR(D, ctx);
+		if (details)
+			s.type = D->getType().getAsString();
+		s.usr = detailedUSR(D);
 		s.context = "";
 		s.loc = index.location(D->getLocation());
 		s.local = false;
@@ -527,15 +540,16 @@ public:
 	{
 		if (!D->isThisDeclarationADefinition() && !D->hasPrototype())
 			return true;
-		if (!functionSymbols.insert(getUSR(D, ctx)).second)
+		if (!functionSymbols.insert(D->getCanonicalDecl()).second)
 			return true;
+		const ValueInfo &info = valueInfo(D);
 
 		SemindexSymbol s;
 		s.kind = SEMINDEX_SYMBOL_FUNCTION;
-		s.name = getName(D);
+		s.name = info.name;
 		s.owner = "";
-		s.type = D->getType().getAsString();
-		s.usr = getUSR(D, ctx);
+		s.type = info.type;
+		s.usr = info.usr;
 		s.context = "";
 		s.loc = index.location(D->getLocation());
 		s.local = false;
@@ -551,14 +565,15 @@ public:
 		if (!FD)
 			return true; /* indirect call: fp() */
 
+		const ValueInfo &info = valueInfo(FD);
 		SemindexUse u;
 		u.kind = SEMINDEX_USE_CALL;
 		u.symbol_kind = SEMINDEX_SYMBOL_FUNCTION;
 		u.mode = SEMINDEX_MODE_R_PTR;
-		u.name = getName(FD);
+		u.name = info.name;
 		u.owner = "";
-		u.type = FD->getType().getAsString();
-		u.usr = getUSR(FD, ctx);
+		u.type = info.type;
+		u.usr = info.usr;
 		u.context = currentFunction;
 		u.loc = index.location(E->getExprLoc());
 		u.local = false;
@@ -568,6 +583,35 @@ public:
 	}
 
 private:
+	struct ValueInfo {
+		semindex_symbol_kind_t kind;
+		std::string name;
+		std::string owner;
+		std::string type;
+		std::string usr;
+	};
+
+	std::string detailedUSR(const Decl *D) const
+	{
+		return details ? getUSR(D, ctx) : "";
+	}
+
+	const ValueInfo &valueInfo(const ValueDecl *D)
+	{
+		auto [entry, inserted] = valueInfoCache.try_emplace(D);
+
+		if (inserted) {
+			entry->second.kind = symbolKindForDecl(D);
+			entry->second.name = getName(D);
+			entry->second.owner = getOwnerName(D);
+			if (details) {
+				entry->second.type = D->getType().getAsString();
+				entry->second.usr = getUSR(D, ctx);
+			}
+		}
+		return entry->second;
+	}
+
 	static bool isPrototypeParameter(const VarDecl *D)
 	{
 		const auto *P = dyn_cast<ParmVarDecl>(D);
@@ -582,9 +626,13 @@ private:
 	{
 		if (!D || loc.isInvalid())
 			return;
+		if (!index.includeLocal() && !currentFunction.empty())
+			return;
 
 		SourceLocation spelling = index.spellingLoc(loc);
 		if (!index.inScope(spelling))
+			return;
+		if (!typeUses.emplace(D->getCanonicalDecl(), spelling.getRawEncoding(), currentFunction).second)
 			return;
 
 		SemindexUse u;
@@ -594,14 +642,10 @@ private:
 		u.name = getName(D);
 		u.owner = "";
 		u.type = type;
-		u.usr = getUSR(D, ctx);
+		u.usr = detailedUSR(D);
 		u.context = currentFunction;
 		u.loc = index.location(spelling);
 		u.local = !currentFunction.empty();
-
-		std::string key = u.usr + "|" + index.locationKey(u.loc) + "|" + u.context;
-		if (!typeUses.insert(key).second)
-			return;
 
 		index.addUseInScope(std::move(u), spelling);
 	}
@@ -609,14 +653,15 @@ private:
 	void addValueUse(const ValueDecl *D, semindex_use_kind_t kind, unsigned mode, const std::string &context,
 		SourceLocation loc, bool local)
 	{
+		const ValueInfo &info = valueInfo(D);
 		SemindexUse u;
 		u.kind = kind;
-		u.symbol_kind = symbolKindForDecl(D);
+		u.symbol_kind = info.kind;
 		u.mode = mode;
-		u.name = getName(D);
-		u.owner = getOwnerName(D);
-		u.type = D->getType().getAsString();
-		u.usr = getUSR(D, ctx);
+		u.name = info.name;
+		u.owner = info.owner;
+		u.type = info.type;
+		u.usr = info.usr;
 		u.context = context;
 		u.loc = index.location(loc);
 		u.local = local;
@@ -631,7 +676,7 @@ private:
 		s.name = name;
 		s.owner = "";
 		s.type = "";
-		s.usr = getUSR(D, ctx);
+		s.usr = detailedUSR(D);
 		s.context = "";
 		s.loc = index.displayLocation(ctx,
 			D->getBraceRange().getBegin().isValid() ? D->getBraceRange().getBegin() : D->getLocation());
@@ -659,8 +704,9 @@ private:
 			s.kind = SEMINDEX_SYMBOL_FIELD;
 			s.name = getName(field);
 			s.owner = owner;
-			s.type = field->getType().getAsString();
-			s.usr = getUSR(field, ctx);
+			if (details)
+				s.type = field->getType().getAsString();
+			s.usr = detailedUSR(field);
 			s.context = "";
 			s.loc = index.displayLocation(ctx, field->getLocation());
 			s.local = false;
@@ -672,9 +718,11 @@ private:
 
 	ASTContext &ctx;
 	SemindexContext &index;
+	bool details;
 	std::string currentFunction;
-	std::set<std::string> typeUses;
-	std::set<std::string> functionSymbols;
+	std::set<std::tuple<const Decl *, unsigned, std::string>> typeUses;
+	std::set<const FunctionDecl *> functionSymbols;
+	std::unordered_map<const ValueDecl *, ValueInfo> valueInfoCache;
 };
 
 /* ============================================================

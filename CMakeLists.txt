@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.13)
 project(semindex C CXX)
 
+if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
+	set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
+endif()
+
 include(CTest)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 

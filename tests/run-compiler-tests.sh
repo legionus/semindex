@@ -27,8 +27,24 @@ run_quiet_case()
 	if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM records")" -lt 1 ]; then
 		fail "compiler did not store index records"
 	fi
+	if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM records WHERE local != 0")" != 0 ]; then
+		fail "compiler stored local records by default"
+	fi
 	if sqlite3 "$db" "SELECT 1 FROM compile_commands" >/dev/null 2>&1; then
 		fail "compiler command storage is still enabled"
+	fi
+}
+
+run_include_local_case()
+{
+	db=$tmpdir/local/.semindex/semindex.db
+
+	if ! "$SEMINDEX" compiler --include-local --database "$db" -- \
+	     cc -I"$SOURCE_DIR/tests/include" "$SOURCE_DIR/tests/test.c"; then
+		fail "compiler --include-local failed"
+	fi
+	if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM records WHERE local != 0")" -lt 1 ]; then
+		fail "compiler --include-local did not store local records"
 	fi
 }
 
@@ -79,6 +95,7 @@ tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT
 
 run_quiet_case
+run_include_local_case
 run_format_case default tests/test.c.expect
 run_format_case dissect tests/test.c.dissect.expect
 run_kernel_flags_case

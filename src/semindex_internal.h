@@ -56,6 +56,8 @@ struct SemindexUse {
 
 struct semindex {
 	semindex_scope_t scope = SEMINDEX_SCOPE_PROJECT;
+	bool details = true;
+	bool include_local = true;
 	unsigned long long next_order = 0;
 	std::set<std::string> files;
 	std::vector<SemindexSymbol> symbols;
@@ -70,6 +72,8 @@ public:
 	SemindexContext(semindex *out, clang::SourceManager &sm);
 
 	bool inScope(clang::SourceLocation loc) const;
+	bool details() const;
+	bool includeLocal() const;
 	clang::SourceLocation spellingLoc(clang::SourceLocation loc) const;
 	SemindexSourceLocation location(clang::SourceLocation loc);
 	SemindexSourceLocation displayLocation(const clang::ASTContext &ast, clang::SourceLocation loc);
