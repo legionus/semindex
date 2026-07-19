@@ -2,6 +2,7 @@
 #include <getopt.h>
 #include <stdio.h>
 
+#include "index_db.h"
 #include "semindex_cli.h"
 
 static void index_usage(FILE *f)
@@ -29,6 +30,8 @@ static void index_help(void)
 	       "                             path to compile_commands.json or "
 	       "its directory\n"
 	       "                             (default: .)\n"
+	       "  -d, --database=PATH        path to the semindex database\n"
+	       "                             (default: .semindex/semindex.db)\n"
 	       "  -h, --help                 display this help and exit\n"
 	       "\n"
 	       "Report bugs to authors.\n"
@@ -41,6 +44,7 @@ int cmd_index(int argc, char **argv)
 		{ "format", required_argument, NULL, 'f' },
 		{ "scope", required_argument, NULL, 's' },
 		{ "compile-commands", required_argument, NULL, 'c' },
+		{ "database", required_argument, NULL, 'd' },
 		{ "help", no_argument, NULL, 'h' },
 		{ NULL, 0, NULL, 0 },
 	};
@@ -48,12 +52,13 @@ int cmd_index(int argc, char **argv)
 	semindex_scope_t scope = SEMINDEX_SCOPE_PROJECT;
 	const char *source_file = NULL;
 	const char *compile_commands = ".";
+	const char *database = ".semindex/semindex.db";
 	semindex_t *s;
 	int ret;
 	int opt;
 
 	optind = 1;
-	while ((opt = getopt_long(argc, argv, "f:s:c:h", long_options, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "f:s:c:d:h", long_options, NULL)) != -1) {
 		switch (opt) {
 		case 'f':
 			if (parse_format(optarg, &format) < 0) {
@@ -69,6 +74,9 @@ int cmd_index(int argc, char **argv)
 			break;
 		case 'c':
 			compile_commands = optarg;
+			break;
+		case 'd':
+			database = optarg;
 			break;
 		case 'h':
 			index_help();
@@ -97,6 +105,10 @@ int cmd_index(int argc, char **argv)
 
 	if (semindex_index_file(s, compile_commands, source_file) != 0) {
 		fprintf(stderr, "semindex: failed to index '%s' using '%s'\n", source_file, compile_commands);
+		semindex_destroy(s);
+		return 1;
+	}
+	if (index_db_store(database, s, source_file) < 0) {
 		semindex_destroy(s);
 		return 1;
 	}

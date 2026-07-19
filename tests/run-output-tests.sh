@@ -17,7 +17,7 @@ run_case()
 	err=$4
 	format=$5
 
-	set -- --compile-commands "$COMPILE_COMMANDS"
+	set -- --compile-commands "$COMPILE_COMMANDS" --database "$tmpdir/semindex.db"
 	if [ "$format" != "default" ]; then
 		set -- "$@" --format "$format"
 	fi

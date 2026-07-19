@@ -32,6 +32,8 @@ set(SEMINDEX_FORMAT_SOURCES
 	tests/test14.c
 	utils/cmd_compiler.c
 	utils/cmd_index.c
+	utils/index_db.c
+	utils/index_db.h
 	utils/output.h
 	utils/output_default.c
 	utils/output_dissect.c
@@ -51,6 +53,11 @@ if(CLANG_FORMAT)
 		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 		COMMENT "Checking source formatting"
 	)
+endif()
+
+find_package(SQLite3 3.35 REQUIRED)
+if(NOT TARGET SQLite3::SQLite3 AND TARGET SQLite::SQLite3)
+	add_library(SQLite3::SQLite3 ALIAS SQLite::SQLite3)
 endif()
 
 # LLVM paths from llvm-config
@@ -107,13 +114,14 @@ target_link_libraries(semindex_parser PRIVATE clang-cpp ${LLVM_LIBS})
 add_executable(semindex
 	utils/cmd_compiler.c
 	utils/cmd_index.c
+	utils/index_db.c
 	utils/output_default.c
 	utils/output_dissect.c
 	utils/semindex.c
 )
 
 target_include_directories(semindex PRIVATE include)
-target_link_libraries(semindex PRIVATE semindex_parser)
+target_link_libraries(semindex PRIVATE semindex_parser SQLite3::SQLite3)
 
 if(BUILD_TESTING)
 	foreach(test_source IN ITEMS
@@ -174,5 +182,12 @@ if(BUILD_TESTING)
 			SEMINDEX=$<TARGET_FILE:semindex>
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-compiler-tests.sh
+	)
+	add_test(
+		NAME semindex-database
+		COMMAND
+			${CMAKE_COMMAND} -E env
+			SEMINDEX=$<TARGET_FILE:semindex>
+			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-database-tests.sh
 	)
 endif()

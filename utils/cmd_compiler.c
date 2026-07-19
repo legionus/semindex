@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "index_db.h"
 #include "semindex_cli.h"
 
 static void compiler_usage(FILE *f)
@@ -20,10 +21,12 @@ static void compiler_help(void)
 	       "Commands with exactly one C source file are indexed.\n"
 	       "\n"
 	       "Options:\n"
-	       "  -f, --format=FORMAT        select output format: default, dissect\n"
-	       "                             (default: default)\n"
+	       "  -f, --format=FORMAT        print index using selected format: default,\n"
+	       "                             dissect\n"
 	       "  -s, --scope=SCOPE          select indexed source scope: file, project, all\n"
 	       "                             (default: project)\n"
+	       "  -d, --database=PATH        path to the semindex database\n"
+	       "                             (default: .semindex/semindex.db)\n"
 	       "  -h, --help                 display this help and exit\n"
 	       "\n"
 	       "Report bugs to authors.\n"
@@ -135,6 +138,7 @@ static int find_source_file(int argc, char **argv, const char **source_file)
 int cmd_compiler(int argc, char **argv)
 {
 	static const struct option long_options[] = {
+		{ "database", required_argument, NULL, 'd' },
 		{ "format", required_argument, NULL, 'f' },
 		{ "scope", required_argument, NULL, 's' },
 		{ "help", no_argument, NULL, 'h' },
@@ -142,22 +146,28 @@ int cmd_compiler(int argc, char **argv)
 	};
 	enum output_format format = FORMAT_DEFAULT;
 	semindex_scope_t scope = SEMINDEX_SCOPE_PROJECT;
+	const char *database = ".semindex/semindex.db";
 	const char *source_file = NULL;
 	semindex_t *s;
 	semindex_compile_command_t cmd;
 	int compiler_argc;
 	char **compiler_argv;
 	int ret;
+	int print_output = 0;
 	int opt;
 
 	optind = 1;
-	while ((opt = getopt_long(argc, argv, "+f:s:h", long_options, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "+d:f:s:h", long_options, NULL)) != -1) {
 		switch (opt) {
+		case 'd':
+			database = optarg;
+			break;
 		case 'f':
 			if (parse_format(optarg, &format) < 0) {
 				fprintf(stderr, "semindex: unknown format: %s\n", optarg);
 				return 1;
 			}
+			print_output = 1;
 			break;
 		case 's':
 			if (parse_scope(optarg, &scope) < 0) {
@@ -201,8 +211,12 @@ int cmd_compiler(int argc, char **argv)
 		semindex_destroy(s);
 		return 1;
 	}
+	if (index_db_store(database, s, source_file) < 0) {
+		semindex_destroy(s);
+		return 1;
+	}
 
-	ret = output_index(format, s);
+	ret = print_output ? output_index(format, s) : 0;
 
 	semindex_destroy(s);
 	return ret ? 1 : 0;

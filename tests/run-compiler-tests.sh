@@ -9,49 +9,55 @@ fail()
 	exit 1
 }
 
-run_case()
+run_quiet_case()
 {
-	src=$1
-	expect=$2
-	out=$3
-	err=$4
-	format=$5
+	db=$tmpdir/quiet/.semindex/semindex.db
+	out=$tmpdir/quiet.out
+	err=$tmpdir/quiet.err
 
-	set -- compiler
-	if [ "$format" != "default" ]; then
-		set -- "$@" --format "$format"
-	fi
-	set -- "$@" -- cc -I"$SOURCE_DIR/tests/include" -c "$SOURCE_DIR/$src" -o "$out.o"
-
-	if ! "$SEMINDEX" "$@" >"$out" 2>"$err"; then
+	if ! "$SEMINDEX" compiler --database "$db" -- cc -I"$SOURCE_DIR/tests/include" \
+	     -c "$SOURCE_DIR/tests/test.c" -o "$tmpdir/quiet.o" >"$out" 2>"$err"; then
 		cat "$err" >&2
-		cat "$out" >&2
-		fail "$src did not index successfully"
+		fail "quiet compiler command failed"
 	fi
-
-	sed "s|$SOURCE_DIR/||g" "$out" >"$out.normalized"
-	if ! diff -u "$SOURCE_DIR/$expect" "$out.normalized"; then
-		fail "$src output differs from $expect"
+	if [ -s "$out" ]; then
+		cat "$out" >&2
+		fail "compiler wrote output without --format"
+	fi
+	if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM records")" -lt 1 ]; then
+		fail "compiler did not store index records"
+	fi
+	if sqlite3 "$db" "SELECT 1 FROM compile_commands" >/dev/null 2>&1; then
+		fail "compiler command storage is still enabled"
 	fi
 }
 
-run_no_compile_only_case()
+run_format_case()
 {
-	out=$tmpdir/no-c.out
-	err=$tmpdir/no-c.err
+	format=$1
+	expect=$2
+	out=$tmpdir/$format.out
+	err=$tmpdir/$format.err
+	db=$tmpdir/$format/.semindex/semindex.db
 
-	if ! "$SEMINDEX" compiler -- cc -I"$SOURCE_DIR/tests/include" \
-	     "$SOURCE_DIR/tests/test.c" >"$out" 2>"$err"; then
+	if ! "$SEMINDEX" compiler --format "$format" --database "$db" -- \
+	     cc -I"$SOURCE_DIR/tests/include" -c "$SOURCE_DIR/tests/test.c" >"$out" 2>"$err"; then
 		cat "$err" >&2
-		fail "compiler command without -c failed"
+		fail "compiler --format=$format failed"
+	fi
+	sed "s|$SOURCE_DIR/||g" "$out" >"$out.normalized"
+	if ! diff -u "$SOURCE_DIR/$expect" "$out.normalized"; then
+		fail "compiler output differs from $expect"
 	fi
 }
 
 run_kernel_flags_case()
 {
+	db=$tmpdir/kernel/.semindex/semindex.db
+	out=$tmpdir/kernel.out
 	err=$tmpdir/kernel.err
 
-	if ! "$SEMINDEX" compiler -- cc \
+	if ! "$SEMINDEX" compiler --database "$db" -- cc \
 	     -D__STDC__ -Werror -Wbitwise -Wno-return-void \
 	     -Wimplicit-fallthrough=5 -Werror=designated-init -Werror=date-time \
 	     --arch=x86 --arch arm64 -mpreferred-stack-boundary=3 \
@@ -59,7 +65,7 @@ run_kernel_flags_case()
 	     -fno-allow-store-data-races -fzero-init-padding-bits=all \
 	     -fdiagnostics-show-context=2 -fmin-function-alignment=16 \
 	     -fconserve-stack -falign-jumps=1 "$SOURCE_DIR/tests/test.c" \
-	     >/dev/null 2>"$err"; then
+	     >"$out" 2>"$err"; then
 		cat "$err" >&2
 		fail "kernel compiler flags were not sanitized"
 	fi
@@ -72,7 +78,7 @@ fi
 tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT
 
-run_case tests/test.c tests/test.c.expect "$tmpdir/default.out" "$tmpdir/default.err" default
-run_case tests/test.c tests/test.c.dissect.expect "$tmpdir/dissect.out" "$tmpdir/dissect.err" dissect
-run_no_compile_only_case
+run_quiet_case
+run_format_case default tests/test.c.expect
+run_format_case dissect tests/test.c.dissect.expect
 run_kernel_flags_case

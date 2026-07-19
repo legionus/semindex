@@ -17,7 +17,8 @@ run_scope()
 	err=$4
 
 	if ! "$SEMINDEX" index --compile-commands "$COMPILE_COMMANDS" \
-	     --scope "$scope" "$SOURCE_DIR/tests/scope/use.c" >"$out" 2>"$err"; then
+	     --database "$tmpdir/$scope.db" --scope "$scope" "$SOURCE_DIR/tests/scope/use.c" \
+	     >"$out" 2>"$err"; then
 		cat "$err" >&2
 		cat "$out" >&2
 		fail "scope=$scope did not index successfully"
