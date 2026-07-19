@@ -15,6 +15,7 @@ typedef enum {
 typedef struct {
 	const char *pattern;
 	const char *path;
+	const char *format;
 	index_db_record_t record;
 	int kind;
 	int has_kind;

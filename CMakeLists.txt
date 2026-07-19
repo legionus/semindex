@@ -41,8 +41,10 @@ set(SEMINDEX_FORMAT_SOURCES
 	utils/index_db.c
 	utils/index_db.h
 	utils/output.h
+	utils/output_common.c
 	utils/output_default.c
 	utils/output_dissect.c
+	utils/output_search.c
 	utils/semindex.c
 	utils/semindex_cli.h
 )
@@ -122,8 +124,10 @@ add_executable(semindex
 	utils/cmd_index.c
 	utils/cmd_search.c
 	utils/index_db.c
+	utils/output_common.c
 	utils/output_default.c
 	utils/output_dissect.c
+	utils/output_search.c
 	utils/semindex.c
 )
 

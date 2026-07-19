@@ -140,9 +140,43 @@ Consecutive duplicate use records in the same file are suppressed when their
 printed dissect identity is the same.  This mirrors the compact style expected
 from dissect-like output.
 
+## Search output
+
+`semindex search` uses the same configurable output style as `semind search`.
+Its default format is:
+
+```text
+(%m) %f\t%l\t%c\t%C\t%s
+```
+
+Select another format with `-f STRING` or `--format=STRING`.  Each result gets
+one output line.  The following substitutions are available:
+
+* `%f`: source file path;
+* `%l`: line number;
+* `%c`: column number;
+* `%C`: containing function context;
+* `%n`: qualified symbol name;
+* `%m`: access mode;
+* `%k`: one-character symbol kind;
+* `%s`: source line text.
+
+The escapes `\t`, `\r`, and `\n` insert a tab, carriage return, and newline.
+Other escaped characters are inserted literally.
+
+Definitions use the mode `def`, declarations use `decl`, and uses have the
+same three-character access mode described for the `dissect` format.  The `%k`
+substitution uses the same one-character tags as `dissect`.
+
+For example:
+
+```sh
+semindex search --format='%m %k %n at %f:%l:%c' 'task_struct.pid'
+```
+
 ## Stability
 
-Both text formats are currently project interfaces for tests and development,
+The text formats are currently project interfaces for tests and development,
 not a finalized machine-readable API.  Source locations, type spelling, and
 USR strings come from Clang and may change when the indexed source, compiler
 version, or compile flags change.

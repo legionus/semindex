@@ -1,0 +1,2 @@
+(def) @SOURCE_DIR@/tests/test11.c	8	6			int y;
+(-w-) @SOURCE_DIR@/tests/test11.c	14	3			.y = 2,

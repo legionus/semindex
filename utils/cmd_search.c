@@ -25,6 +25,7 @@ static void search_help(void)
 	       "  -d, --database=PATH        path to the semindex database\n"
 	       "                             (default: .semindex/semindex.db)\n"
 	       "  -p, --path=PATTERN         limit results to matching file paths\n"
+	       "  -f, --format=STRING        set the output format\n"
 	       "  -r, --record=RECORD        select record type: all, symbol, use\n"
 	       "                             (default: all)\n"
 	       "  -k, --kind=KIND            limit results to a symbol kind\n"
@@ -32,6 +33,10 @@ static void search_help(void)
 	       "\n"
 	       "KIND is one of: var, field, struct, union, enum, enumerator,\n"
 	       "typedef, function, macro, file.\n"
+	       "\n"
+	       "Format substitutions are: %%f file, %%l line, %%c column, %%C context,\n"
+	       "%%n symbol, %%m access mode, %%k kind, and %%s source line.\n"
+	       "Backslash escapes \\t, \\r, and \\n are supported.\n"
 	       "\n"
 	       "Report bugs to authors.\n"
 	       "\n");
@@ -84,6 +89,7 @@ int cmd_search(int argc, char **argv)
 	static const struct option long_options[] = {
 		{ "database", required_argument, NULL, 'd' },
 		{ "path", required_argument, NULL, 'p' },
+		{ "format", required_argument, NULL, 'f' },
 		{ "record", required_argument, NULL, 'r' },
 		{ "kind", required_argument, NULL, 'k' },
 		{ "help", no_argument, NULL, 'h' },
@@ -96,13 +102,16 @@ int cmd_search(int argc, char **argv)
 	int opt;
 
 	optind = 1;
-	while ((opt = getopt_long(argc, argv, "+d:p:r:k:h", long_options, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "+d:p:f:r:k:h", long_options, NULL)) != -1) {
 		switch (opt) {
 		case 'd':
 			database = optarg;
 			break;
 		case 'p':
 			opts.path = optarg;
+			break;
+		case 'f':
+			opts.format = optarg;
 			break;
 		case 'r':
 			if (parse_record(optarg, &opts.record) < 0) {

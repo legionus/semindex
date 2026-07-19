@@ -24,7 +24,35 @@ db=$tmpdir/.semindex/semindex.db
 if ! "$SEMINDEX" search --database "$db" Outer.y >"$tmpdir/search.out"; then
 	fail "exact field search failed"
 fi
-if [ "$(grep -c 'Outer.y' "$tmpdir/search.out")" != 2 ]; then
+sed "s|@SOURCE_DIR@|$SOURCE_DIR|g" \
+	"$SOURCE_DIR/tests/test11.c.search.expect" >"$tmpdir/search.expect"
+if ! cmp -s "$tmpdir/search.expect" "$tmpdir/search.out"; then
+	diff -u "$tmpdir/search.expect" "$tmpdir/search.out" >&2 || true
+	fail "default search output differs"
+fi
+
+if ! "$SEMINDEX" search --database "$db" \
+	--format='%m|%f|%l|%c|%C|%n|%k|%s\tEND' Outer.y \
+	>"$tmpdir/custom.out"; then
+	fail "custom field search failed"
+fi
+sed "s|@SOURCE_DIR@|$SOURCE_DIR|g" \
+	"$SOURCE_DIR/tests/test11.c.search-format.expect" >"$tmpdir/custom.expect"
+if ! cmp -s "$tmpdir/custom.expect" "$tmpdir/custom.out"; then
+	diff -u "$tmpdir/custom.expect" "$tmpdir/custom.out" >&2 || true
+	fail "custom search output differs"
+fi
+
+if "$SEMINDEX" search --database "$db" --format='%x' Outer.y \
+	>"$tmpdir/invalid.out" 2>"$tmpdir/invalid.err"; then
+	fail "invalid search format succeeded"
+fi
+if ! grep -q 'invalid format specification: %x' "$tmpdir/invalid.err"; then
+	cat "$tmpdir/invalid.err" >&2
+	fail "invalid search format diagnostic differs"
+fi
+
+if [ "$(grep -c 'Outer.y' "$tmpdir/custom.out")" != 2 ]; then
 	cat "$tmpdir/search.out" >&2
 	fail "exact field search returned incomplete results"
 fi

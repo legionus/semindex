@@ -1,0 +1,2 @@
+def|@SOURCE_DIR@/tests/test11.c|8|6||Outer.y|m|	int y;	END
+-w-|@SOURCE_DIR@/tests/test11.c|14|3||Outer.y|m|	.y = 2,	END

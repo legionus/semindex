@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 
 #include "index_db.h"
+#include "output.h"
 
 #define INDEX_SCHEMA_VERSION 4
 #define STRINGIFY_VALUE(value) #value
@@ -455,50 +456,6 @@ out:
 	return ret;
 }
 
-static const char *symbol_kind_to_string(int kind)
-{
-	switch (kind) {
-	case SEMINDEX_SYMBOL_VAR:
-		return "var";
-	case SEMINDEX_SYMBOL_FIELD:
-		return "field";
-	case SEMINDEX_SYMBOL_STRUCT:
-		return "struct";
-	case SEMINDEX_SYMBOL_UNION:
-		return "union";
-	case SEMINDEX_SYMBOL_ENUM:
-		return "enum";
-	case SEMINDEX_SYMBOL_ENUM_CONSTANT:
-		return "enumerator";
-	case SEMINDEX_SYMBOL_TYPEDEF:
-		return "typedef";
-	case SEMINDEX_SYMBOL_FUNCTION:
-		return "function";
-	case SEMINDEX_SYMBOL_MACRO:
-		return "macro";
-	case SEMINDEX_SYMBOL_FILE:
-		return "file";
-	default:
-		return "?";
-	}
-}
-
-static const char *use_kind_to_string(int kind)
-{
-	switch (kind) {
-	case SEMINDEX_USE_READ:
-		return "READ";
-	case SEMINDEX_USE_WRITE:
-		return "WRITE";
-	case SEMINDEX_USE_ADDR:
-		return "ADDR";
-	case SEMINDEX_USE_CALL:
-		return "CALL";
-	default:
-		return "?";
-	}
-}
-
 static int pattern_uses_glob(const char *pattern)
 {
 	return pattern && strpbrk(pattern, "*?[]");
@@ -522,32 +479,33 @@ static int append_search_filter(sqlite3_str *query, const index_db_search_option
 	return sqlite3_str_errcode(query) == SQLITE_OK ? 0 : -1;
 }
 
-static int print_search_results(sqlite3 *db, const char *sql, FILE *out)
+static int print_search_results(sqlite3 *db, const char *sql, const char *format, FILE *out)
 {
+	output_search_t *search = NULL;
 	sqlite3_stmt *stmt = NULL;
 	int step;
 	int ret = -1;
 
-	if (prepare(db, sql, &stmt) < 0)
+	search = output_search_create(out, format);
+	if (!search)
 		return -1;
+	if (prepare(db, sql, &stmt) < 0)
+		goto out;
 	while ((step = sqlite3_step(stmt)) == SQLITE_ROW) {
-		const char *file = (const char *)sqlite3_column_text(stmt, 0);
-		int line = sqlite3_column_int(stmt, 1);
-		int column = sqlite3_column_int(stmt, 2);
-		int record = sqlite3_column_int(stmt, 3);
-		int action = sqlite3_column_int(stmt, 4);
-		int kind = sqlite3_column_int(stmt, 5);
-		const char *symbol = (const char *)sqlite3_column_text(stmt, 6);
-		const char *context = (const char *)sqlite3_column_text(stmt, 7);
-		const char *record_text = record == STORED_RECORD_SYMBOL ? "symbol" : "use";
-		const char *action_text =
-			record == STORED_RECORD_SYMBOL ? (action ? "defined" : "declared") : use_kind_to_string(action);
+		output_search_record_t result = {
+			.file = (const char *)sqlite3_column_text(stmt, 0),
+			.line = sqlite3_column_int(stmt, 1),
+			.column = sqlite3_column_int(stmt, 2),
+			.symbol_record = sqlite3_column_int(stmt, 3) == STORED_RECORD_SYMBOL,
+			.definition = sqlite3_column_int(stmt, 4),
+			.kind = sqlite3_column_int(stmt, 5),
+			.symbol = (const char *)sqlite3_column_text(stmt, 6),
+			.context = (const char *)sqlite3_column_text(stmt, 7),
+			.mode = sqlite3_column_int64(stmt, 8),
+		};
 
-		fprintf(out, "%s:%d:%d %-6s %-8s %-10s %s", file, line, column, record_text, action_text,
-			symbol_kind_to_string(kind), symbol);
-		if (context && context[0])
-			fprintf(out, " in %s", context);
-		fputc('\n', out);
+		if (output_search_write(search, &result) < 0)
+			goto out;
 	}
 	if (step != SQLITE_DONE) {
 		fprintf(stderr, "semindex: sqlite: %s\n", sqlite3_errmsg(db));
@@ -556,6 +514,7 @@ static int print_search_results(sqlite3 *db, const char *sql, FILE *out)
 
 	ret = ferror(out) ? -1 : 0;
 out:
+	output_search_destroy(search);
 	sqlite3_finalize(stmt);
 	return ret;
 }
@@ -595,7 +554,7 @@ int index_db_search(const char *path, const index_db_search_options_t *opts, FIL
 		goto out;
 	sqlite3_str_appendall(query,
 		"SELECT files.path, records.line, records.column, records.record, records.action, "
-		"records.kind, records.symbol, records.context "
+		"records.kind, records.symbol, records.context, records.mode "
 		"FROM records JOIN files ON files.id = records.file_id WHERE 1");
 	if (append_search_filter(query, opts) < 0)
 		goto out;
@@ -607,7 +566,7 @@ int index_db_search(const char *path, const index_db_search_options_t *opts, FIL
 	query = NULL;
 	if (!sql)
 		goto out;
-	ret = print_search_results(db, sql, out);
+	ret = print_search_results(db, sql, opts->format ? opts->format : OUTPUT_SEARCH_DEFAULT_FORMAT, out);
 out:
 	if (query)
 		sqlite3_str_finish(query);
