@@ -450,3 +450,165 @@ out:
 		sqlite3_close(db);
 	return ret;
 }
+
+static const char *symbol_kind_to_string(int kind)
+{
+	switch (kind) {
+	case SEMINDEX_SYMBOL_VAR:
+		return "var";
+	case SEMINDEX_SYMBOL_FIELD:
+		return "field";
+	case SEMINDEX_SYMBOL_STRUCT:
+		return "struct";
+	case SEMINDEX_SYMBOL_UNION:
+		return "union";
+	case SEMINDEX_SYMBOL_ENUM:
+		return "enum";
+	case SEMINDEX_SYMBOL_ENUM_CONSTANT:
+		return "enumerator";
+	case SEMINDEX_SYMBOL_TYPEDEF:
+		return "typedef";
+	case SEMINDEX_SYMBOL_FUNCTION:
+		return "function";
+	case SEMINDEX_SYMBOL_MACRO:
+		return "macro";
+	case SEMINDEX_SYMBOL_FILE:
+		return "file";
+	default:
+		return "?";
+	}
+}
+
+static const char *use_kind_to_string(int kind)
+{
+	switch (kind) {
+	case SEMINDEX_USE_READ:
+		return "READ";
+	case SEMINDEX_USE_WRITE:
+		return "WRITE";
+	case SEMINDEX_USE_ADDR:
+		return "ADDR";
+	case SEMINDEX_USE_CALL:
+		return "CALL";
+	default:
+		return "?";
+	}
+}
+
+static int pattern_uses_glob(const char *pattern)
+{
+	return pattern && strpbrk(pattern, "*?[]");
+}
+
+static int append_search_filter(sqlite3_str *query, const index_db_search_options_t *opts)
+{
+	if (opts->pattern) {
+		const char *op = pattern_uses_glob(opts->pattern) ? "GLOB" : "=";
+
+		sqlite3_str_appendf(query, " AND records.symbol %s %Q", op, opts->pattern);
+	}
+	if (opts->path)
+		sqlite3_str_appendf(query, " AND files.path GLOB %Q", opts->path);
+	if (opts->record != INDEX_DB_RECORD_ALL)
+		sqlite3_str_appendf(query, " AND records.record = %d",
+			opts->record == INDEX_DB_RECORD_SYMBOL ? STORED_RECORD_SYMBOL : STORED_RECORD_USE);
+	if (opts->has_kind)
+		sqlite3_str_appendf(query, " AND records.kind = %d", opts->kind);
+
+	return sqlite3_str_errcode(query) == SQLITE_OK ? 0 : -1;
+}
+
+static int print_search_results(sqlite3 *db, const char *sql, FILE *out)
+{
+	sqlite3_stmt *stmt = NULL;
+	int step;
+	int ret = -1;
+
+	if (prepare(db, sql, &stmt) < 0)
+		return -1;
+	while ((step = sqlite3_step(stmt)) == SQLITE_ROW) {
+		const char *file = (const char *)sqlite3_column_text(stmt, 0);
+		int line = sqlite3_column_int(stmt, 1);
+		int column = sqlite3_column_int(stmt, 2);
+		int record = sqlite3_column_int(stmt, 3);
+		int action = sqlite3_column_int(stmt, 4);
+		int kind = sqlite3_column_int(stmt, 5);
+		const char *symbol = (const char *)sqlite3_column_text(stmt, 6);
+		const char *context = (const char *)sqlite3_column_text(stmt, 7);
+		const char *record_text = record == STORED_RECORD_SYMBOL ? "symbol" : "use";
+		const char *action_text =
+			record == STORED_RECORD_SYMBOL ? (action ? "defined" : "declared") : use_kind_to_string(action);
+
+		fprintf(out, "%s:%d:%d %-6s %-8s %-10s %s", file, line, column, record_text, action_text,
+			symbol_kind_to_string(kind), symbol);
+		if (context && context[0])
+			fprintf(out, " in %s", context);
+		fputc('\n', out);
+	}
+	if (step != SQLITE_DONE) {
+		fprintf(stderr, "semindex: sqlite: %s\n", sqlite3_errmsg(db));
+		goto out;
+	}
+
+	ret = ferror(out) ? -1 : 0;
+out:
+	sqlite3_finalize(stmt);
+	return ret;
+}
+
+static int open_reader(const char *path, sqlite3 **db)
+{
+	if (sqlite3_open_v2(path, db, SQLITE_OPEN_READONLY, NULL) != SQLITE_OK) {
+		fprintf(stderr, "semindex: failed to open database '%s': %s\n", path,
+			*db ? sqlite3_errmsg(*db) : "unknown error");
+		return -1;
+	}
+	if (sqlite3_busy_timeout(*db, INT_MAX) != SQLITE_OK)
+		return -1;
+
+	return 0;
+}
+
+int index_db_search(const char *path, const index_db_search_options_t *opts, FILE *out)
+{
+	index_db_search_options_t defaults = {
+		.record = INDEX_DB_RECORD_ALL,
+	};
+	sqlite3_str *query = NULL;
+	sqlite3 *db = NULL;
+	char *sql = NULL;
+	int ret = -1;
+
+	if (!path || !out)
+		return -1;
+	if (!opts)
+		opts = &defaults;
+	if (open_reader(path, &db) < 0)
+		goto out;
+
+	query = sqlite3_str_new(db);
+	if (!query)
+		goto out;
+	sqlite3_str_appendall(query,
+		"SELECT files.path, records.line, records.column, records.record, records.action, "
+		"records.kind, records.symbol, records.context "
+		"FROM records JOIN files ON files.id = records.file_id WHERE 1");
+	if (append_search_filter(query, opts) < 0)
+		goto out;
+	sqlite3_str_appendall(query, " ORDER BY files.path, records.line, records.column, records.record");
+	if (sqlite3_str_errcode(query) != SQLITE_OK)
+		goto out;
+
+	sql = sqlite3_str_finish(query);
+	query = NULL;
+	if (!sql)
+		goto out;
+	ret = print_search_results(db, sql, out);
+out:
+	if (query)
+		sqlite3_str_finish(query);
+	sqlite3_free(sql);
+	if (db)
+		sqlite3_close(db);
+	return ret;
+}

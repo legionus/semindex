@@ -32,6 +32,7 @@ set(SEMINDEX_FORMAT_SOURCES
 	tests/test14.c
 	utils/cmd_compiler.c
 	utils/cmd_index.c
+	utils/cmd_search.c
 	utils/index_db.c
 	utils/index_db.h
 	utils/output.h
@@ -114,6 +115,7 @@ target_link_libraries(semindex_parser PRIVATE clang-cpp ${LLVM_LIBS})
 add_executable(semindex
 	utils/cmd_compiler.c
 	utils/cmd_index.c
+	utils/cmd_search.c
 	utils/index_db.c
 	utils/output_default.c
 	utils/output_dissect.c
@@ -182,6 +184,15 @@ if(BUILD_TESTING)
 			SEMINDEX=$<TARGET_FILE:semindex>
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-compiler-tests.sh
+	)
+	add_test(
+		NAME semindex-search
+		COMMAND
+			${CMAKE_COMMAND} -E env
+			SEMINDEX=$<TARGET_FILE:semindex>
+			COMPILE_COMMANDS=${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
+			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-search-tests.sh
 	)
 	add_test(
 		NAME semindex-database

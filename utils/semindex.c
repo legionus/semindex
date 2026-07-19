@@ -17,10 +17,9 @@ void semindex_help(void)
 	       "Index C source files using clang semantic information.\n"
 	       "\n"
 	       "Commands:\n"
-	       "  compiler                   index from an explicit compiler "
-	       "argument vector\n"
-	       "  index                      index a source file using "
-	       "compile_commands.json\n"
+	       "  compiler                   index from an explicit compiler argument vector\n"
+	       "  index                      index a source file using `compile_commands.json'\n"
+	       "  search                     search stored symbol and use records\n"
 	       "\n"
 	       "Run 'semindex COMMAND --help' for command-specific help.\n"
 	       "\n"
@@ -93,6 +92,8 @@ int main(int argc, char **argv)
 		return cmd_compiler(argc - optind, argv + optind);
 	if (!strcmp(argv[optind], "index"))
 		return cmd_index(argc - optind, argv + optind);
+	if (!strcmp(argv[optind], "search"))
+		return cmd_search(argc - optind, argv + optind);
 
 	fprintf(stderr, "semindex: unknown command: %s\n", argv[optind]);
 	semindex_usage(stderr);

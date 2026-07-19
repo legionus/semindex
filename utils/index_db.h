@@ -2,8 +2,25 @@
 #ifndef SEMINDEX_INDEX_DB_H
 #define SEMINDEX_INDEX_DB_H
 
+#include <stdio.h>
+
 #include "semindex.h"
 
+typedef enum {
+	INDEX_DB_RECORD_ALL,
+	INDEX_DB_RECORD_SYMBOL,
+	INDEX_DB_RECORD_USE,
+} index_db_record_t;
+
+typedef struct {
+	const char *pattern;
+	const char *path;
+	index_db_record_t record;
+	int kind;
+	int has_kind;
+} index_db_search_options_t;
+
 int index_db_store(const char *path, semindex_t *s, const char *main_file);
+int index_db_search(const char *path, const index_db_search_options_t *opts, FILE *out);
 
 #endif /* SEMINDEX_INDEX_DB_H */
