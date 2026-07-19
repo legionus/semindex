@@ -371,7 +371,7 @@ public:
 
 	bool VisitTypedefTypeLoc(TypedefTypeLoc TL)
 	{
-		const TypedefNameDecl *D = TL.getTypedefNameDecl();
+		const TypedefNameDecl *D = TL.getTypePtr()->getDecl();
 
 		addTypeUse(D, SEMINDEX_SYMBOL_TYPEDEF, TL.getNameLoc(), typeNameForTypedef(D));
 		return true;
