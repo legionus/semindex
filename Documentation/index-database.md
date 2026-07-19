@@ -18,18 +18,26 @@ until their cost and query requirements are understood. This avoids the joins
 and per-record string interning required by the previous normalized prototype.
 A secondary index supports file replacement.
 
+Each row in `files` is identified by `(variant, path)`.  Indexing commands use
+the variant `general` by default and accept `--variant=NAME`.  Consequently,
+the same physical source can have independent records for configurations such
+as `x86-defconfig` and `arm64-defconfig` without repeating the variant string
+in every symbol record.
+
 ## Concurrent writers
 
 Each indexing process first inserts its records into private SQLite TEMP tables.
 This work does not hold the shared database write lock. Once staging is complete,
 the process performs one short bulk merge into the WAL database.
 
-The main C source is replaced whenever its translation unit is indexed. This
-removes references that changed because of compiler options or included headers.
+The main C source is replaced within its variant whenever its translation unit
+is indexed. This removes references that changed because of compiler options
+or included headers without affecting other variants of the same source.
 Records from unchanged headers are merged with `INSERT OR IGNORE`, allowing
-different translation units to contribute semantic variants without physically
+different translation units to contribute semantic results without physically
 duplicating identical records. When a physical file's modification time or size
-changes, its old records are removed before merging the new records.
+changes, its old records in the current variant are removed before merging the
+new records.
 
 The WAL database uses `synchronous=OFF`. An application or indexing-process
 failure remains transaction-safe, but an operating-system crash can require

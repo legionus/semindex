@@ -10,7 +10,7 @@
 #include "index_db.h"
 #include "output.h"
 
-#define INDEX_SCHEMA_VERSION 4
+#define INDEX_SCHEMA_VERSION 5
 #define STRINGIFY_VALUE(value) #value
 #define STRINGIFY(value) STRINGIFY_VALUE(value)
 
@@ -146,9 +146,11 @@ static int init_schema(sqlite3 *db)
 	static const char *schema[] = {
 		"CREATE TABLE files ("
 		"  id INTEGER PRIMARY KEY,"
-		"  path TEXT NOT NULL UNIQUE,"
+		"  variant TEXT NOT NULL,"
+		"  path TEXT NOT NULL,"
 		"  mtime_ns INTEGER NOT NULL,"
-		"  size INTEGER NOT NULL"
+		"  size INTEGER NOT NULL,"
+		"  UNIQUE(variant, path)"
 		")",
 		"CREATE TABLE records ("
 		"  symbol TEXT NOT NULL,"
@@ -391,52 +393,65 @@ out:
 	return ret;
 }
 
-static int merge_staging(sqlite3 *db)
+static int merge_staging(sqlite3 *db, const char *variant)
 {
-	static const char *merge[] = {
-		"INSERT OR IGNORE INTO files(path, mtime_ns, size) "
-		"SELECT path, mtime_ns, size FROM staging_files",
-		"DELETE FROM records WHERE file_id IN ("
-		"  SELECT files.id FROM files JOIN staging_files ON staging_files.path = files.path"
-		"  WHERE staging_files.is_main OR files.mtime_ns != staging_files.mtime_ns"
-		"     OR files.size != staging_files.size"
-		")",
-		"UPDATE files SET"
-		"  mtime_ns = (SELECT mtime_ns FROM staging_files WHERE path = files.path),"
-		"  size = (SELECT size FROM staging_files WHERE path = files.path)"
-		"WHERE path IN (SELECT path FROM staging_files)",
+	char *merge[4] = { NULL };
+	size_t i;
+	int ret = -1;
+
+	merge[0] = sqlite3_mprintf("INSERT OR IGNORE INTO files(variant, path, mtime_ns, size) "
+				   "SELECT %Q, path, mtime_ns, size FROM staging_files",
+		variant);
+	merge[1] =
+		sqlite3_mprintf("DELETE FROM records WHERE file_id IN ("
+				"  SELECT files.id FROM files JOIN staging_files ON staging_files.path = files.path"
+				"  WHERE files.variant = %Q AND (staging_files.is_main"
+				"     OR files.mtime_ns != staging_files.mtime_ns OR files.size != staging_files.size)"
+				")",
+			variant);
+	merge[2] = sqlite3_mprintf("UPDATE files SET"
+				   "  mtime_ns = (SELECT mtime_ns FROM staging_files WHERE path = files.path),"
+				   "  size = (SELECT size FROM staging_files WHERE path = files.path)"
+				   "WHERE variant = %Q AND path IN (SELECT path FROM staging_files)",
+		variant);
+	merge[3] = sqlite3_mprintf(
 		"INSERT OR IGNORE INTO records(symbol, record, action, kind, mode, file_id, line, column, "
 		"context, local) "
 		"SELECT staging_records.symbol, staging_records.record, staging_records.action,"
 		"  staging_records.kind, staging_records.mode, files.id, staging_records.line,"
 		"  staging_records.column, staging_records.context, staging_records.local"
-		" FROM staging_records JOIN files ON files.path = staging_records.path",
-	};
-	size_t i;
-	int ret = -1;
-
+		" FROM staging_records JOIN files"
+		" ON files.path = staging_records.path AND files.variant = %Q",
+		variant);
+	for (i = 0; i < sizeof(merge) / sizeof(merge[0]); i++) {
+		if (!merge[i])
+			goto out;
+	}
 	if (exec_sql(db, "BEGIN IMMEDIATE") < 0)
-		return -1;
+		goto out;
 	for (i = 0; i < sizeof(merge) / sizeof(merge[0]); i++) {
 		if (exec_sql(db, merge[i]) < 0)
 			goto rollback;
 	}
 	if (exec_sql(db, "COMMIT") < 0)
-		return -1;
+		goto out;
 
 	ret = 0;
-	return ret;
+	goto out;
 rollback:
 	exec_sql(db, "ROLLBACK");
-	return -1;
+out:
+	for (i = 0; i < sizeof(merge) / sizeof(merge[0]); i++)
+		sqlite3_free(merge[i]);
+	return ret;
 }
 
-int index_db_store(const char *path, semindex_t *s, const char *main_file, int include_local)
+int index_db_store(const char *path, semindex_t *s, const char *main_file, const char *variant, int include_local)
 {
 	sqlite3 *db = NULL;
 	int ret = -1;
 
-	if (!path || !s)
+	if (!path || !s || !variant || !variant[0])
 		return -1;
 	if (open_writer(path, &db) < 0)
 		goto out;
@@ -446,7 +461,7 @@ int index_db_store(const char *path, semindex_t *s, const char *main_file, int i
 		exec_sql(db, "ROLLBACK");
 		goto out;
 	}
-	if (exec_sql(db, "COMMIT") < 0 || merge_staging(db) < 0)
+	if (exec_sql(db, "COMMIT") < 0 || merge_staging(db, variant) < 0)
 		goto out;
 
 	ret = 0;
@@ -470,6 +485,11 @@ static int append_search_filter(sqlite3_str *query, const index_db_search_option
 	}
 	if (opts->path)
 		sqlite3_str_appendf(query, " AND files.path GLOB %Q", opts->path);
+	if (opts->variant) {
+		const char *op = pattern_uses_glob(opts->variant) ? "GLOB" : "=";
+
+		sqlite3_str_appendf(query, " AND files.variant %s %Q", op, opts->variant);
+	}
 	if (opts->record != INDEX_DB_RECORD_ALL)
 		sqlite3_str_appendf(query, " AND records.record = %d",
 			opts->record == INDEX_DB_RECORD_SYMBOL ? STORED_RECORD_SYMBOL : STORED_RECORD_USE);
@@ -504,15 +524,16 @@ static int print_search_results(sqlite3 *db, const char *sql, const char *format
 		goto out;
 	while ((step = sqlite3_step(stmt)) == SQLITE_ROW) {
 		output_search_record_t result = {
-			.file = (const char *)sqlite3_column_text(stmt, 0),
-			.line = sqlite3_column_int(stmt, 1),
-			.column = sqlite3_column_int(stmt, 2),
-			.symbol_record = sqlite3_column_int(stmt, 3) == STORED_RECORD_SYMBOL,
-			.definition = sqlite3_column_int(stmt, 4),
-			.kind = sqlite3_column_int(stmt, 5),
-			.symbol = (const char *)sqlite3_column_text(stmt, 6),
-			.context = (const char *)sqlite3_column_text(stmt, 7),
-			.mode = sqlite3_column_int64(stmt, 8),
+			.variant = (const char *)sqlite3_column_text(stmt, 0),
+			.file = (const char *)sqlite3_column_text(stmt, 1),
+			.line = sqlite3_column_int(stmt, 2),
+			.column = sqlite3_column_int(stmt, 3),
+			.symbol_record = sqlite3_column_int(stmt, 4) == STORED_RECORD_SYMBOL,
+			.definition = sqlite3_column_int(stmt, 5),
+			.kind = sqlite3_column_int(stmt, 6),
+			.symbol = (const char *)sqlite3_column_text(stmt, 7),
+			.context = (const char *)sqlite3_column_text(stmt, 8),
+			.mode = sqlite3_column_int64(stmt, 9),
 		};
 
 		if (output_search_write(search, &result) < 0)
@@ -564,12 +585,13 @@ int index_db_search(const char *path, const index_db_search_options_t *opts, FIL
 	if (!query)
 		goto out;
 	sqlite3_str_appendall(query,
-		"SELECT files.path, records.line, records.column, records.record, records.action, "
+		"SELECT files.variant, files.path, records.line, records.column, records.record, records.action, "
 		"records.kind, records.symbol, records.context, records.mode "
 		"FROM records JOIN files ON files.id = records.file_id WHERE 1");
 	if (append_search_filter(query, opts) < 0)
 		goto out;
-	sqlite3_str_appendall(query, " ORDER BY files.path, records.line, records.column, records.record");
+	sqlite3_str_appendall(query,
+		" ORDER BY files.variant, files.path, records.line, records.column, records.record");
 	if (sqlite3_str_errcode(query) != SQLITE_OK)
 		goto out;
 

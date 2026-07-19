@@ -27,6 +27,8 @@ static void compiler_help(void)
 	       "                             (default: project)\n"
 	       "  -d, --database=PATH        path to the semindex database\n"
 	       "                             (default: .semindex/semindex.db)\n"
+	       "      --variant=NAME          store records in the named variant\n"
+	       "                             (default: general)\n"
 	       "      --include-local         store local symbols and their uses\n"
 	       "  -h, --help                 display this help and exit\n"
 	       "\n"
@@ -140,6 +142,7 @@ int cmd_compiler(int argc, char **argv)
 {
 	static const struct option long_options[] = {
 		{ "include-local", no_argument, NULL, 1 },
+		{ "variant", required_argument, NULL, 2 },
 		{ "database", required_argument, NULL, 'd' },
 		{ "format", required_argument, NULL, 'f' },
 		{ "scope", required_argument, NULL, 's' },
@@ -149,6 +152,7 @@ int cmd_compiler(int argc, char **argv)
 	enum output_format format = FORMAT_DEFAULT;
 	semindex_scope_t scope = SEMINDEX_SCOPE_PROJECT;
 	const char *database = ".semindex/semindex.db";
+	const char *variant = "general";
 	const char *source_file = NULL;
 	semindex_t *s;
 	semindex_compile_command_t cmd;
@@ -164,6 +168,9 @@ int cmd_compiler(int argc, char **argv)
 		switch (opt) {
 		case 1:
 			include_local = 1;
+			break;
+		case 2:
+			variant = optarg;
 			break;
 		case 'd':
 			database = optarg;
@@ -196,6 +203,10 @@ int cmd_compiler(int argc, char **argv)
 		compiler_usage(stderr);
 		return 1;
 	}
+	if (!variant[0]) {
+		fprintf(stderr, "semindex: variant name must not be empty\n");
+		return 1;
+	}
 
 	compiler_argc = argc - optind;
 	compiler_argv = argv + optind;
@@ -219,7 +230,7 @@ int cmd_compiler(int argc, char **argv)
 		semindex_destroy(s);
 		return 1;
 	}
-	if (index_db_store(database, s, source_file, include_local) < 0) {
+	if (index_db_store(database, s, source_file, variant, include_local) < 0) {
 		semindex_destroy(s);
 		return 1;
 	}

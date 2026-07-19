@@ -146,13 +146,15 @@ from dissect-like output.
 Its default format is:
 
 ```text
-(%m) %f\t%l\t%c\t%C\t%s
+(%m) %F\t%l\t%c\t%C\t%s
 ```
 
 Select another format with `-f STRING` or `--format=STRING`.  Each result gets
 one output line.  The following substitutions are available:
 
 * `%f`: source file path;
+* `%F`: variant-qualified source file path in `variant:path` form;
+* `%v`: index variant;
 * `%l`: line number;
 * `%c`: column number;
 * `%C`: containing function context;
@@ -172,6 +174,18 @@ For example:
 
 ```sh
 semindex search --format='%m %k %n at %f:%l:%c' 'task_struct.pid'
+```
+
+The default format uses `%F` so results from different variants remain
+distinguishable.  Use `%f` in a custom format when only the physical source
+path is wanted.
+
+Indexing commands store records in the `general` variant unless
+`--variant=NAME` is specified.  Search covers every variant by default and can
+be restricted with an exact name or GLOB pattern:
+
+```sh
+semindex search --variant='*-defconfig' task_struct.pid
 ```
 
 Search results can be filtered by access mode with `-m MODE` or

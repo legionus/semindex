@@ -148,6 +148,12 @@ int output_search_write(output_search_t *search, const output_search_record_t *r
 		case 'f':
 			fputs(record->file, search->out);
 			break;
+		case 'F':
+			fprintf(search->out, "%s:%s", record->variant, record->file);
+			break;
+		case 'v':
+			fputs(record->variant, search->out);
+			break;
 		case 'l':
 			fprintf(search->out, "%d", record->line);
 			break;

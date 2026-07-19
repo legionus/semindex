@@ -16,6 +16,7 @@ typedef struct {
 	const char *pattern;
 	const char *path;
 	const char *format;
+	const char *variant;
 	index_db_record_t record;
 	unsigned mode;
 	int kind;
@@ -24,7 +25,7 @@ typedef struct {
 	int mode_definition;
 } index_db_search_options_t;
 
-int index_db_store(const char *path, semindex_t *s, const char *main_file, int include_local);
+int index_db_store(const char *path, semindex_t *s, const char *main_file, const char *variant, int include_local);
 int index_db_search(const char *path, const index_db_search_options_t *opts, FILE *out);
 
 #endif /* SEMINDEX_INDEX_DB_H */

@@ -11,12 +11,13 @@ enum output_format {
 	FORMAT_DISSECT,
 };
 
-#define OUTPUT_SEARCH_DEFAULT_FORMAT "(%m) %f\\t%l\\t%c\\t%C\\t%s"
+#define OUTPUT_SEARCH_DEFAULT_FORMAT "(%m) %F\\t%l\\t%c\\t%C\\t%s"
 
 typedef struct output_search output_search_t;
 
 typedef struct {
 	const char *file;
+	const char *variant;
 	int line;
 	int column;
 	int symbol_record;

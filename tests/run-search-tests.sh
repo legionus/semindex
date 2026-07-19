@@ -45,6 +45,30 @@ if ! cmp -s "$tmpdir/custom.expect" "$tmpdir/custom.out"; then
 	fail "custom search output differs"
 fi
 
+"$SEMINDEX" index --variant=arm64-defconfig --database "$db" \
+	--compile-commands "$COMPILE_COMMANDS" "$SOURCE_DIR/tests/test11.c" \
+	>/dev/null
+if ! "$SEMINDEX" search --database "$db" \
+	--format='%v|%F|%f|%n' Outer.y >"$tmpdir/variant.out"; then
+	fail "multi-variant search failed"
+fi
+sed "s|@SOURCE_DIR@|$SOURCE_DIR|g" \
+	"$SOURCE_DIR/tests/test11.c.search-variant.expect" >"$tmpdir/variant.expect"
+if ! cmp -s "$tmpdir/variant.expect" "$tmpdir/variant.out"; then
+	diff -u "$tmpdir/variant.expect" "$tmpdir/variant.out" >&2 || true
+	fail "multi-variant search output differs"
+fi
+
+if ! "$SEMINDEX" search --database "$db" --variant='arm64-*' \
+	--format='%v' Outer.y >"$tmpdir/variant-filter.out"; then
+	fail "variant-filtered search failed"
+fi
+if [ "$(wc -l <"$tmpdir/variant-filter.out")" != 2 ] || \
+	grep -qv '^arm64-defconfig$' "$tmpdir/variant-filter.out"; then
+	cat "$tmpdir/variant-filter.out" >&2
+	fail "variant filter returned unexpected results"
+fi
+
 if "$SEMINDEX" search --database "$db" --format='%x' Outer.y \
 	>"$tmpdir/invalid.out" 2>"$tmpdir/invalid.err"; then
 	fail "invalid search format succeeded"
@@ -54,7 +78,7 @@ if ! grep -q 'invalid format specification: %x' "$tmpdir/invalid.err"; then
 	fail "invalid search format diagnostic differs"
 fi
 
-if ! "$SEMINDEX" search --database "$db" --format='%m' --mode=def \
+if ! "$SEMINDEX" search --database "$db" --variant=general --format='%m' --mode=def \
 	Outer.y >"$tmpdir/mode-def.out"; then
 	fail "definition mode search failed"
 fi
@@ -63,7 +87,7 @@ if [ "$(cat "$tmpdir/mode-def.out")" != def ]; then
 	fail "definition mode search returned unexpected results"
 fi
 
-if ! "$SEMINDEX" search --database "$db" --format='%m' --mode=w \
+if ! "$SEMINDEX" search --database "$db" --variant=general --format='%m' --mode=w \
 	Outer.y >"$tmpdir/mode-write.out"; then
 	fail "write mode search failed"
 fi
@@ -72,7 +96,7 @@ if [ "$(cat "$tmpdir/mode-write.out")" != -w- ]; then
 	fail "write mode search returned unexpected results"
 fi
 
-if ! "$SEMINDEX" search --database "$db" --format='%m' --mode=-w- \
+if ! "$SEMINDEX" search --database "$db" --variant=general --format='%m' --mode=-w- \
 	Outer.y >"$tmpdir/mode-exact.out"; then
 	fail "three-character mode search failed"
 fi
@@ -81,7 +105,7 @@ if ! cmp -s "$tmpdir/mode-write.out" "$tmpdir/mode-exact.out"; then
 	fail "three-character mode search returned unexpected results"
 fi
 
-if ! "$SEMINDEX" search --database "$db" --mode=r Outer.y \
+if ! "$SEMINDEX" search --database "$db" --variant=general --mode=r Outer.y \
 	>"$tmpdir/mode-read.out"; then
 	fail "read mode search failed"
 fi
@@ -90,7 +114,7 @@ if [ -s "$tmpdir/mode-read.out" ]; then
 	fail "read mode search returned a write operation"
 fi
 
-if ! "$SEMINDEX" search --database "$db" --mode=- Outer.y \
+if ! "$SEMINDEX" search --database "$db" --variant=general --mode=- Outer.y \
 	>"$tmpdir/mode-none.out"; then
 	fail "empty mode search failed"
 fi

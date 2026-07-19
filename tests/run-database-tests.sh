@@ -52,6 +52,28 @@ if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM records WHERE symbol = 'shared.other
 	fail "reindexed source did not replace its old records"
 fi
 
+variant_db=$tmpdir/variant.db
+printf '%s\n' '#include "shared.h"' \
+	'int variant_read(struct shared *p) { return p->pid; }' >"$tmpdir/variant.c"
+"$SEMINDEX" compiler --database "$variant_db" -- cc -I"$tmpdir" "$tmpdir/variant.c"
+"$SEMINDEX" compiler --variant=debug --database "$variant_db" -- \
+	cc -I"$tmpdir" "$tmpdir/variant.c"
+
+if [ "$(sqlite3 "$variant_db" "SELECT COUNT(DISTINCT variant) FROM files WHERE path = '$tmpdir/variant.c'")" != 2 ]; then
+	fail "source file variants were not stored separately"
+fi
+
+printf '%s\n' '#include "shared.h"' \
+	'int variant_read(struct shared *p) { return p->other; }' >"$tmpdir/variant.c"
+"$SEMINDEX" compiler --database "$variant_db" -- cc -I"$tmpdir" "$tmpdir/variant.c"
+
+if [ "$(sqlite3 "$variant_db" "SELECT COUNT(*) FROM records JOIN files ON files.id = records.file_id WHERE records.symbol = 'shared.pid' AND files.variant = 'general'")" != 1 ]; then
+	fail "reindexing did not replace records in the default variant"
+fi
+if [ "$(sqlite3 "$variant_db" "SELECT COUNT(*) FROM records JOIN files ON files.id = records.file_id WHERE records.symbol = 'shared.pid' AND files.variant = 'debug'")" != 2 ]; then
+	fail "reindexing the default variant damaged another variant"
+fi
+
 old_db=$tmpdir/old.db
 sqlite3 "$old_db" 'CREATE TABLE old_records(value TEXT)'
 if "$SEMINDEX" compiler --database "$old_db" -- cc "$tmpdir/worker-1.c" \

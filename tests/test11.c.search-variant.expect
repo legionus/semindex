@@ -1,0 +1,4 @@
+arm64-defconfig|arm64-defconfig:@SOURCE_DIR@/tests/test11.c|@SOURCE_DIR@/tests/test11.c|Outer.y
+arm64-defconfig|arm64-defconfig:@SOURCE_DIR@/tests/test11.c|@SOURCE_DIR@/tests/test11.c|Outer.y
+general|general:@SOURCE_DIR@/tests/test11.c|@SOURCE_DIR@/tests/test11.c|Outer.y
+general|general:@SOURCE_DIR@/tests/test11.c|@SOURCE_DIR@/tests/test11.c|Outer.y

@@ -27,6 +27,7 @@ static void search_help(void)
 	       "  -p, --path=PATTERN         limit results to matching file paths\n"
 	       "  -f, --format=STRING        set the output format\n"
 	       "  -m, --mode=MODE            limit results to an access mode\n"
+	       "      --variant=PATTERN       limit results to matching variants\n"
 	       "  -r, --record=RECORD        select record type: all, symbol, use\n"
 	       "                             (default: all)\n"
 	       "  -k, --kind=KIND            limit results to a symbol kind\n"
@@ -38,8 +39,9 @@ static void search_help(void)
 	       "MODE is def, one of r, w, m, -, or a three-character access mode.\n"
 	       "The three positions describe address, value, and pointer access.\n"
 	       "\n"
-	       "Format substitutions are: %%f file, %%l line, %%c column, %%C context,\n"
-	       "%%n symbol, %%m access mode, %%k kind, and %%s source line.\n"
+	       "Format substitutions are: %%f file, %%F variant-qualified file,\n"
+	       "%%v variant, %%l line, %%c column, %%C context, %%n symbol,\n"
+	       "%%m access mode, %%k kind, and %%s source line.\n"
 	       "Backslash escapes \\t, \\r, and \\n are supported.\n"
 	       "\n"
 	       "Report bugs to authors.\n"
@@ -158,6 +160,7 @@ int cmd_search(int argc, char **argv)
 {
 	static const struct option long_options[] = {
 		{ "database", required_argument, NULL, 'd' },
+		{ "variant", required_argument, NULL, 1 },
 		{ "path", required_argument, NULL, 'p' },
 		{ "format", required_argument, NULL, 'f' },
 		{ "mode", required_argument, NULL, 'm' },
@@ -175,6 +178,9 @@ int cmd_search(int argc, char **argv)
 	optind = 1;
 	while ((opt = getopt_long(argc, argv, "+d:p:f:m:r:k:h", long_options, NULL)) != -1) {
 		switch (opt) {
+		case 1:
+			opts.variant = optarg;
+			break;
 		case 'd':
 			database = optarg;
 			break;
