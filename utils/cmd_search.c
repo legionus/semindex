@@ -26,6 +26,7 @@ static void search_help(void)
 	       "                             (default: .semindex/semindex.db)\n"
 	       "  -p, --path=PATTERN         limit results to matching file paths\n"
 	       "  -f, --format=STRING        set the output format\n"
+	       "  -m, --mode=MODE            limit results to an access mode\n"
 	       "  -r, --record=RECORD        select record type: all, symbol, use\n"
 	       "                             (default: all)\n"
 	       "  -k, --kind=KIND            limit results to a symbol kind\n"
@@ -33,6 +34,9 @@ static void search_help(void)
 	       "\n"
 	       "KIND is one of: var, field, struct, union, enum, enumerator,\n"
 	       "typedef, function, macro, file.\n"
+	       "\n"
+	       "MODE is def, one of r, w, m, -, or a three-character access mode.\n"
+	       "The three positions describe address, value, and pointer access.\n"
 	       "\n"
 	       "Format substitutions are: %%f file, %%l line, %%c column, %%C context,\n"
 	       "%%n symbol, %%m access mode, %%k kind, and %%s source line.\n"
@@ -84,12 +88,79 @@ static int parse_kind(const char *value, int *kind)
 	return 0;
 }
 
+static int parse_mode(const char *value, index_db_search_options_t *opts)
+{
+	static const unsigned modes[] = {
+		SEMINDEX_MODE_R_AOF,
+		SEMINDEX_MODE_W_AOF,
+		SEMINDEX_MODE_R_AOF | SEMINDEX_MODE_W_AOF,
+		SEMINDEX_MODE_R_VAL,
+		SEMINDEX_MODE_W_VAL,
+		SEMINDEX_MODE_R_VAL | SEMINDEX_MODE_W_VAL,
+		SEMINDEX_MODE_R_PTR,
+		SEMINDEX_MODE_W_PTR,
+		SEMINDEX_MODE_R_PTR | SEMINDEX_MODE_W_PTR,
+	};
+	const char *expanded = value;
+	size_t len = strlen(value);
+	int i;
+
+	if (!strcmp(value, "def")) {
+		opts->has_mode = 1;
+		opts->mode_definition = 1;
+		return 0;
+	}
+	if (len == 1) {
+		switch (value[0]) {
+		case 'r':
+			expanded = "rrr";
+			break;
+		case 'w':
+			expanded = "ww-";
+			break;
+		case 'm':
+			expanded = "mmm";
+			break;
+		case '-':
+			expanded = "---";
+			break;
+		default:
+			return -1;
+		}
+	} else if (len != 3) {
+		return -1;
+	}
+
+	opts->mode = 0;
+	for (i = 0; i < 3; i++) {
+		switch (expanded[i]) {
+		case 'r':
+			opts->mode |= modes[i * 3];
+			break;
+		case 'w':
+			opts->mode |= modes[i * 3 + 1];
+			break;
+		case 'm':
+			opts->mode |= modes[i * 3 + 2];
+			break;
+		case '-':
+			break;
+		default:
+			return -1;
+		}
+	}
+	opts->has_mode = 1;
+
+	return 0;
+}
+
 int cmd_search(int argc, char **argv)
 {
 	static const struct option long_options[] = {
 		{ "database", required_argument, NULL, 'd' },
 		{ "path", required_argument, NULL, 'p' },
 		{ "format", required_argument, NULL, 'f' },
+		{ "mode", required_argument, NULL, 'm' },
 		{ "record", required_argument, NULL, 'r' },
 		{ "kind", required_argument, NULL, 'k' },
 		{ "help", no_argument, NULL, 'h' },
@@ -102,7 +173,7 @@ int cmd_search(int argc, char **argv)
 	int opt;
 
 	optind = 1;
-	while ((opt = getopt_long(argc, argv, "+d:p:f:r:k:h", long_options, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "+d:p:f:m:r:k:h", long_options, NULL)) != -1) {
 		switch (opt) {
 		case 'd':
 			database = optarg;
@@ -112,6 +183,12 @@ int cmd_search(int argc, char **argv)
 			break;
 		case 'f':
 			opts.format = optarg;
+			break;
+		case 'm':
+			if (parse_mode(optarg, &opts) < 0) {
+				fprintf(stderr, "semindex: invalid mode: %s\n", optarg);
+				return 1;
+			}
 			break;
 		case 'r':
 			if (parse_record(optarg, &opts.record) < 0) {

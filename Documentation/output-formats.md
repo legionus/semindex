@@ -174,6 +174,21 @@ For example:
 semindex search --format='%m %k %n at %f:%l:%c' 'task_struct.pid'
 ```
 
+Search results can be filtered by access mode with `-m MODE` or
+`--mode=MODE`.  `MODE` accepts `def`, a one-character shorthand, or a
+three-character access mode:
+
+* `def`: definitions;
+* `r`: any read access;
+* `w`: address or value write access;
+* `m`: any read or write access;
+* `-`: records without access bits;
+* `rwm` combinations such as `-w-` or `--r`: access in a specific position.
+
+As in `semind`, a result matches when any requested access bit is present.
+Mode filters other than `def` apply only to use records; `def` applies only to
+symbol definitions.
+
 ## Stability
 
 The text formats are currently project interfaces for tests and development,

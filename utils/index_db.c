@@ -473,6 +473,17 @@ static int append_search_filter(sqlite3_str *query, const index_db_search_option
 	if (opts->record != INDEX_DB_RECORD_ALL)
 		sqlite3_str_appendf(query, " AND records.record = %d",
 			opts->record == INDEX_DB_RECORD_SYMBOL ? STORED_RECORD_SYMBOL : STORED_RECORD_USE);
+	if (opts->has_mode) {
+		if (opts->mode_definition) {
+			sqlite3_str_appendf(query, " AND records.record = %d AND records.action != 0",
+				STORED_RECORD_SYMBOL);
+		} else if (!opts->mode) {
+			sqlite3_str_appendf(query, " AND records.record = %d AND records.mode = 0", STORED_RECORD_USE);
+		} else {
+			sqlite3_str_appendf(query, " AND records.record = %d AND (records.mode & %u) != 0",
+				STORED_RECORD_USE, opts->mode);
+		}
+	}
 	if (opts->has_kind)
 		sqlite3_str_appendf(query, " AND records.kind = %d", opts->kind);
 

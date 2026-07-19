@@ -52,6 +52,60 @@ if ! grep -q 'invalid format specification: %x' "$tmpdir/invalid.err"; then
 	fail "invalid search format diagnostic differs"
 fi
 
+if ! "$SEMINDEX" search --database "$db" --format='%m' --mode=def \
+	Outer.y >"$tmpdir/mode-def.out"; then
+	fail "definition mode search failed"
+fi
+if [ "$(cat "$tmpdir/mode-def.out")" != def ]; then
+	cat "$tmpdir/mode-def.out" >&2
+	fail "definition mode search returned unexpected results"
+fi
+
+if ! "$SEMINDEX" search --database "$db" --format='%m' --mode=w \
+	Outer.y >"$tmpdir/mode-write.out"; then
+	fail "write mode search failed"
+fi
+if [ "$(cat "$tmpdir/mode-write.out")" != -w- ]; then
+	cat "$tmpdir/mode-write.out" >&2
+	fail "write mode search returned unexpected results"
+fi
+
+if ! "$SEMINDEX" search --database "$db" --format='%m' --mode=-w- \
+	Outer.y >"$tmpdir/mode-exact.out"; then
+	fail "three-character mode search failed"
+fi
+if ! cmp -s "$tmpdir/mode-write.out" "$tmpdir/mode-exact.out"; then
+	diff -u "$tmpdir/mode-write.out" "$tmpdir/mode-exact.out" >&2 || true
+	fail "three-character mode search returned unexpected results"
+fi
+
+if ! "$SEMINDEX" search --database "$db" --mode=r Outer.y \
+	>"$tmpdir/mode-read.out"; then
+	fail "read mode search failed"
+fi
+if [ -s "$tmpdir/mode-read.out" ]; then
+	cat "$tmpdir/mode-read.out" >&2
+	fail "read mode search returned a write operation"
+fi
+
+if ! "$SEMINDEX" search --database "$db" --mode=- Outer.y \
+	>"$tmpdir/mode-none.out"; then
+	fail "empty mode search failed"
+fi
+if [ -s "$tmpdir/mode-none.out" ]; then
+	cat "$tmpdir/mode-none.out" >&2
+	fail "empty mode search returned symbol records"
+fi
+
+if "$SEMINDEX" search --database "$db" --mode=invalid Outer.y \
+	>"$tmpdir/invalid-mode.out" 2>"$tmpdir/invalid-mode.err"; then
+	fail "invalid search mode succeeded"
+fi
+if ! grep -q 'invalid mode: invalid' "$tmpdir/invalid-mode.err"; then
+	cat "$tmpdir/invalid-mode.err" >&2
+	fail "invalid search mode diagnostic differs"
+fi
+
 if [ "$(grep -c 'Outer.y' "$tmpdir/custom.out")" != 2 ]; then
 	cat "$tmpdir/search.out" >&2
 	fail "exact field search returned incomplete results"

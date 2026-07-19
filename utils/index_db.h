@@ -17,8 +17,11 @@ typedef struct {
 	const char *path;
 	const char *format;
 	index_db_record_t record;
+	unsigned mode;
 	int kind;
 	int has_kind;
+	int has_mode;
+	int mode_definition;
 } index_db_search_options_t;
 
 int index_db_store(const char *path, semindex_t *s, const char *main_file, int include_local);
