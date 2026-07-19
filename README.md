@@ -25,6 +25,8 @@ Implemented so far:
   * `ADDR`
   * `CALL`
 * C API exported from a C++ implementation, allowing the rest of the project to remain in C.
+* persistent SQLite symbol database;
+* indexed search by qualified symbol name;
 
 ## Architecture
 
@@ -68,6 +70,7 @@ The project requires:
 
 * LLVM/Clang 21 or newer
 * CMake
+* SQLite 3.35 or newer
 * a compilation database (`compile_commands.json`)
 
 Typical build:
@@ -92,6 +95,21 @@ The CLI can also index a single compile command directly:
 semindex compiler -- cc -Iinclude -DDEBUG -c path/to/file.c -o file.o
 ```
 
+The compiler command writes index records to `.semindex/semindex.db` and is
+quiet unless `--format` is specified. Compiler arguments are not stored in the
+symbol database. Local symbols and their uses are omitted from the persistent
+index unless `--include-local` is specified.
+
+Search by symbol name, including qualified structure fields:
+
+```sh
+semindex search task_struct.pid
+```
+
+The current database format is intentionally incompatible with earlier
+prototype versions. Remove an old `.semindex/semindex.db` before rebuilding an
+index.
+
 ## Current limitations
 
 This is still a prototype.
@@ -103,7 +121,8 @@ Among the missing features are:
 * indirect call analysis;
 * macro-aware indexing;
 * incremental indexing;
-* persistent symbol database.
+* compile command capture and export;
+* context-sensitive separation of header variants.
 
 ## Motivation
 
