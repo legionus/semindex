@@ -87,6 +87,25 @@ run_kernel_flags_case()
 	fi
 }
 
+run_target_builtin_case()
+{
+	db=$tmpdir/target/.semindex/semindex.db
+	err=$tmpdir/target.err
+
+	if ! "$SEMINDEX" compiler --database "$db" -- cc \
+	     -D__x86_64__ -m64 -m16 "$SOURCE_DIR/tests/compiler-target.c" \
+	     >/dev/null 2>"$err"; then
+		cat "$err" >&2
+		fail "target builtin macro was not sanitized"
+	fi
+	if ! "$SEMINDEX" compiler --database "$db" -- cc \
+	     -D __x86_64__ -m64 -m16 "$SOURCE_DIR/tests/compiler-target.c" \
+	     >/dev/null 2>"$err"; then
+		cat "$err" >&2
+		fail "separate target builtin macro was not sanitized"
+	fi
+}
+
 if [ -z "${SEMINDEX:-}" ] || [ -z "${SOURCE_DIR:-}" ]; then
 	fail "SEMINDEX and SOURCE_DIR must be set"
 fi
@@ -99,3 +118,4 @@ run_include_local_case
 run_format_case default tests/test.c.expect
 run_format_case dissect tests/test.c.dissect.expect
 run_kernel_flags_case
+run_target_builtin_case

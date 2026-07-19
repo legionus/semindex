@@ -80,6 +80,13 @@ static bool isWarningErrorArg(llvm::StringRef arg)
 	return arg == "-Werror" || arg.starts_with("-Werror=");
 }
 
+static bool isX86_64BuiltinDefinition(llvm::StringRef value)
+{
+	llvm::StringRef name = value.split('=').first;
+
+	return name == "__x86_64__" || name == "__x86_64" || name == "__amd64__" || name == "__amd64";
+}
+
 static std::vector<std::string> sanitizeCommandLine(const std::vector<std::string> &input)
 {
 	std::vector<std::string> args;
@@ -93,6 +100,12 @@ static std::vector<std::string> sanitizeCommandLine(const std::vector<std::strin
 		if (isUnsupportedJoinedArg(arg))
 			continue;
 		if (isWarningErrorArg(arg))
+			continue;
+		if (arg == "-D" && i + 1 < input.size() && isX86_64BuiltinDefinition(input[i + 1])) {
+			i++;
+			continue;
+		}
+		if (arg.starts_with("-D") && isX86_64BuiltinDefinition(arg.drop_front(2)))
 			continue;
 		if (unsupportedArgTakesValue(arg)) {
 			i++;

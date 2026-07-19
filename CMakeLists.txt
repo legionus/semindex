@@ -19,6 +19,7 @@ set(SEMINDEX_FORMAT_SOURCES
 	tests/include/test14.h
 	tests/scope/api.h
 	tests/scope/use.c
+	tests/compiler-target.c
 	tests/test.c
 	tests/test1.c
 	tests/test2.c
