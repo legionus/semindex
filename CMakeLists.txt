@@ -35,6 +35,7 @@ set(SEMINDEX_FORMAT_SOURCES
 	tests/test12.c
 	tests/test13.c
 	tests/test14.c
+	tests/test15.c
 	utils/cmd_compiler.c
 	utils/cmd_index.c
 	utils/cmd_search.c
@@ -151,6 +152,7 @@ if(BUILD_TESTING)
 		tests/test12.c
 		tests/test13.c
 		tests/test14.c
+		tests/test15.c
 	)
 		get_filename_component(test_name ${test_source} NAME)
 		add_test(

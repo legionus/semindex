@@ -20,6 +20,8 @@ db=$tmpdir/.semindex/semindex.db
 
 "$SEMINDEX" index --database "$db" --compile-commands "$COMPILE_COMMANDS" \
 	"$SOURCE_DIR/tests/test11.c" >/dev/null
+"$SEMINDEX" index --database "$db" --compile-commands "$COMPILE_COMMANDS" \
+	"$SOURCE_DIR/tests/test15.c" >/dev/null
 
 if ! "$SEMINDEX" search --database "$db" Outer.y >"$tmpdir/search.out"; then
 	fail "exact field search failed"
@@ -104,6 +106,16 @@ fi
 if ! grep -q 'invalid mode: invalid' "$tmpdir/invalid-mode.err"; then
 	cat "$tmpdir/invalid-mode.err" >&2
 	fail "invalid search mode diagnostic differs"
+fi
+
+if ! "$SEMINDEX" search --database "$db" --mode=w \
+	--format='%m|%l|%c|%C|%n' task_struct.pid \
+	>"$tmpdir/macro-write.out"; then
+	fail "macro argument write search failed"
+fi
+if [ "$(cat "$tmpdir/macro-write.out")" != 'm--|13|19|set_pid|task_struct.pid' ]; then
+	cat "$tmpdir/macro-write.out" >&2
+	fail "macro argument write was not indexed"
 fi
 
 if [ "$(grep -c 'Outer.y' "$tmpdir/custom.out")" != 2 ]; then

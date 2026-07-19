@@ -123,41 +123,31 @@ static bool isCallCallee(const Expr *E, ASTContext &ctx)
 
 static semindex_use_kind_t classifyUse(const Expr *E, ASTContext &ctx)
 {
-	const Stmt *parent = nullptr;
+	const Expr *current = E->IgnoreParenImpCasts();
 
-	E = E->IgnoreParenImpCasts();
+	for (;;) {
+		const Stmt *parent = getParentStmt(current, ctx);
 
-	auto parents = ctx.getParents(*E);
-	if (!parents.empty()) {
-		if (const Stmt *S = parents.begin()->get<Stmt>())
-			parent = S;
-	}
+		if (!parent)
+			return SEMINDEX_USE_READ;
 
-	/* &x */
-	if (parent) {
+		/* &x */
 		if (const auto *U = dyn_cast<UnaryOperator>(parent)) {
 			if (U->getOpcode() == UO_AddrOf)
 				return SEMINDEX_USE_ADDR;
-		}
-	}
-
-	/* x = ... */
-	if (parent) {
-		if (const auto *B = dyn_cast<BinaryOperator>(parent)) {
-			if (B->isAssignmentOp() && B->getLHS() == E)
-				return SEMINDEX_USE_WRITE;
-		}
-	}
-
-	/* ++x, x++ */
-	if (parent) {
-		if (const auto *U = dyn_cast<UnaryOperator>(parent)) {
+			/* ++x, x++ */
 			if (U->isIncrementDecrementOp())
 				return SEMINDEX_USE_WRITE;
+		} else if (const auto *B = dyn_cast<BinaryOperator>(parent)) {
+			/* x = ... */
+			if (B->isAssignmentOp() && B->getLHS() == current)
+				return SEMINDEX_USE_WRITE;
 		}
-	}
 
-	return SEMINDEX_USE_READ;
+		if (!isa<ParenExpr>(parent) && !isa<ImplicitCastExpr>(parent))
+			return SEMINDEX_USE_READ;
+		current = cast<Expr>(parent);
+	}
 }
 
 static unsigned accessModeForUse(semindex_use_kind_t kind, const Expr *E, ASTContext &ctx)
@@ -414,6 +404,7 @@ public:
 	bool VisitDeclRefExpr(DeclRefExpr *E)
 	{
 		const ValueDecl *D = E->getDecl();
+		SourceLocation spelling;
 		bool local;
 
 		if (!D)
@@ -426,6 +417,7 @@ public:
 			return true;
 
 		const ValueInfo &info = valueInfo(D);
+		spelling = index.spellingLoc(E->getExprLoc());
 		SemindexUse u;
 		u.kind = classifyUse(E, ctx);
 		u.symbol_kind = info.kind;
@@ -435,10 +427,10 @@ public:
 		u.type = info.type;
 		u.usr = info.usr;
 		u.context = currentFunction;
-		u.loc = index.location(E->getExprLoc());
+		u.loc = index.location(spelling);
 		u.local = local;
 
-		index.addUseInScope(std::move(u), E->getExprLoc());
+		index.addUseInScope(std::move(u), spelling);
 
 		if (!isa<FunctionDecl>(D) && isCallCallee(E, ctx))
 			addValueUse(D, SEMINDEX_USE_CALL, SEMINDEX_MODE_R_PTR, currentFunction, E->getExprLoc(), local);
@@ -654,6 +646,7 @@ private:
 		SourceLocation loc, bool local)
 	{
 		const ValueInfo &info = valueInfo(D);
+		SourceLocation spelling = index.spellingLoc(loc);
 		SemindexUse u;
 		u.kind = kind;
 		u.symbol_kind = info.kind;
@@ -663,10 +656,10 @@ private:
 		u.type = info.type;
 		u.usr = info.usr;
 		u.context = context;
-		u.loc = index.location(loc);
+		u.loc = index.location(spelling);
 		u.local = local;
 
-		index.addUseInScope(std::move(u), loc);
+		index.addUseInScope(std::move(u), spelling);
 	}
 
 	void addAnonymousRecordSymbols(const RecordDecl *D, const std::string &name)
