@@ -73,7 +73,7 @@ run_kernel_flags_case()
 	out=$tmpdir/kernel.out
 	err=$tmpdir/kernel.err
 
-	if ! "$SEMINDEX" compiler --database "$db" -- cc \
+	if ! "$SEMINDEX" compiler --database "$db" -- \
 	     -D__STDC__ -Werror -Wbitwise -Wno-return-void \
 	     -Wimplicit-fallthrough=5 -Werror=designated-init -Werror=date-time \
 	     --arch=x86 --arch arm64 -mpreferred-stack-boundary=3 \

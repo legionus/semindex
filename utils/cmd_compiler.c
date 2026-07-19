@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <getopt.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "index_db.h"
@@ -8,7 +9,7 @@
 
 static void compiler_usage(FILE *f)
 {
-	fprintf(f, "Usage: semindex compiler [OPTION]... -- COMPILER ARG...\n");
+	fprintf(f, "Usage: semindex compiler [OPTION]... -- [COMPILER] ARG...\n");
 }
 
 static void compiler_help(void)
@@ -17,7 +18,8 @@ static void compiler_help(void)
 	printf("\n"
 	       "Index a C source file from an explicit compiler argument vector.\n"
 	       "\n"
-	       "Arguments after '--' are treated as the compiler command line.\n"
+	       "Arguments after '--' are treated as compiler arguments. COMPILER is\n"
+	       "optional and defaults to `cc'.\n"
 	       "Commands with exactly one C source file are indexed.\n"
 	       "\n"
 	       "Options:\n"
@@ -55,6 +57,11 @@ static int has_suffix(const char *str, const char *suffix)
 static int is_c_source(const char *arg)
 {
 	return has_suffix(arg, ".c");
+}
+
+static int compiler_is_omitted(const char *arg)
+{
+	return !arg[0] || arg[0] == '-' || arg[0] == '@' || is_c_source(arg);
 }
 
 static int option_takes_joined_or_next_arg(const char *arg)
@@ -158,6 +165,7 @@ int cmd_compiler(int argc, char **argv)
 	semindex_compile_command_t cmd;
 	int compiler_argc;
 	char **compiler_argv;
+	char **default_argv = NULL;
 	int ret;
 	int print_output = 0;
 	int include_local = 0;
@@ -210,8 +218,20 @@ int cmd_compiler(int argc, char **argv)
 
 	compiler_argc = argc - optind;
 	compiler_argv = argv + optind;
+	if (compiler_is_omitted(compiler_argv[0])) {
+		default_argv = calloc(compiler_argc + 1, sizeof(*default_argv));
+		if (!default_argv) {
+			fprintf(stderr, "semindex: failed to allocate compiler arguments\n");
+			return 1;
+		}
+		default_argv[0] = "cc";
+		memcpy(default_argv + 1, compiler_argv, compiler_argc * sizeof(*compiler_argv));
+		compiler_argv = default_argv;
+		compiler_argc++;
+	}
 	if (find_source_file(compiler_argc, compiler_argv, &source_file) < 0) {
 		fprintf(stderr, "semindex: unsupported compiler command\n");
+		free(default_argv);
 		return 1;
 	}
 
@@ -228,15 +248,18 @@ int cmd_compiler(int argc, char **argv)
 	if (semindex_index_command(s, &cmd) != 0) {
 		fprintf(stderr, "semindex: failed to index compiler command for '%s'\n", source_file);
 		semindex_destroy(s);
+		free(default_argv);
 		return 1;
 	}
 	if (index_db_store(database, s, source_file, variant, include_local) < 0) {
 		semindex_destroy(s);
+		free(default_argv);
 		return 1;
 	}
 
 	ret = print_output ? output_index(format, s) : 0;
 
 	semindex_destroy(s);
+	free(default_argv);
 	return ret ? 1 : 0;
 }

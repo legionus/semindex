@@ -92,13 +92,14 @@ semindex index --format=dissect --compile-commands build/compile_commands.json p
 The CLI can also index a single compile command directly:
 
 ```sh
-semindex compiler -- cc -Iinclude -DDEBUG -c path/to/file.c -o file.o
+semindex compiler -- -Iinclude -DDEBUG -c path/to/file.c -o file.o
 ```
 
 The compiler command writes index records to `.semindex/semindex.db` and is
 quiet unless `--format` is specified. Compiler arguments are not stored in the
 symbol database. Local symbols and their uses are omitted from the persistent
-index unless `--include-local` is specified.
+index unless `--include-local` is specified. A compiler name may be provided
+after `--`; when omitted, `cc` is used as the Clang driver name.
 
 Search by symbol name, including qualified structure fields:
 
