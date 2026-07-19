@@ -17,7 +17,7 @@ static void compiler_help(void)
 	       "Index a C source file from an explicit compiler argument vector.\n"
 	       "\n"
 	       "Arguments after '--' are treated as the compiler command line.\n"
-	       "Only compile commands using '-c' are indexed.\n"
+	       "Commands with exactly one C source file are indexed.\n"
 	       "\n"
 	       "Options:\n"
 	       "  -f, --format=FORMAT        select output format: default, dissect\n"
@@ -91,7 +91,6 @@ static int option_takes_joined_or_next_arg(const char *arg)
 
 static int find_source_file(int argc, char **argv, const char **source_file)
 {
-	int compile_only = 0;
 	int preprocess_only = 0;
 	int assemble_only = 0;
 	int sources = 0;
@@ -100,10 +99,8 @@ static int find_source_file(int argc, char **argv, const char **source_file)
 	for (i = 1; i < argc; i++) {
 		const char *arg = argv[i];
 
-		if (!strcmp(arg, "-c")) {
-			compile_only = 1;
+		if (!strcmp(arg, "-c"))
 			continue;
-		}
 		if (!strcmp(arg, "-E")) {
 			preprocess_only = 1;
 			continue;
@@ -127,7 +124,7 @@ static int find_source_file(int argc, char **argv, const char **source_file)
 		sources++;
 	}
 
-	if (!compile_only || preprocess_only || assemble_only)
+	if (preprocess_only || assemble_only)
 		return -1;
 	if (sources != 1)
 		return -1;

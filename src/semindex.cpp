@@ -61,6 +61,56 @@ static void clearIndex(semindex_t *s)
 	s->files.clear();
 }
 
+static bool isUnsupportedJoinedArg(llvm::StringRef arg)
+{
+	return arg.starts_with("--arch=") || arg.starts_with("-mpreferred-stack-boundary=") ||
+		arg.starts_with("-mindirect-branch=") || arg == "-mindirect-branch-register" ||
+		arg == "-fno-allow-store-data-races" || arg.starts_with("-fzero-init-padding-bits=") ||
+		arg.starts_with("-fdiagnostics-show-context=") || arg.starts_with("-fmin-function-alignment=") ||
+		arg == "-fconserve-stack" || arg.starts_with("-falign-jumps=");
+}
+
+static bool unsupportedArgTakesValue(llvm::StringRef arg)
+{
+	return arg == "--arch";
+}
+
+static bool isWarningErrorArg(llvm::StringRef arg)
+{
+	return arg == "-Werror" || arg.starts_with("-Werror=");
+}
+
+static std::vector<std::string> sanitizeCommandLine(const std::vector<std::string> &input)
+{
+	std::vector<std::string> args;
+
+	args.reserve(input.size() + 5);
+	for (size_t i = 0; i < input.size(); i++) {
+		llvm::StringRef arg(input[i]);
+
+		if (arg == "--")
+			continue;
+		if (isUnsupportedJoinedArg(arg))
+			continue;
+		if (isWarningErrorArg(arg))
+			continue;
+		if (unsupportedArgTakesValue(arg)) {
+			i++;
+			continue;
+		}
+
+		args.emplace_back(arg.str());
+	}
+
+	args.emplace_back("-w");
+	args.emplace_back("-Wno-error");
+	args.emplace_back("-Wno-unknown-warning-option");
+	args.emplace_back("-Wno-error=ignored-optimization-argument");
+	args.emplace_back("-Wno-builtin-macro-redefined");
+
+	return args;
+}
+
 extern "C" {
 
 semindex_t *semindex_create(void)
@@ -94,6 +144,8 @@ int semindex_index_command(semindex_t *s, const semindex_compile_command_t *cmd)
 	CompileCommand compile(cmd->directory ? cmd->directory : ".", cmd->file, args, "");
 	SingleCompilationDatabase db(compile);
 	ClangTool tool(db, { cmd->file });
+	tool.appendArgumentsAdjuster(
+		[](const CommandLineArguments &args, llvm::StringRef) { return sanitizeCommandLine(args); });
 	std::unique_ptr<FrontendActionFactory> factory = createSemindexActionFactory(s);
 	int ret = tool.run(factory.get());
 
