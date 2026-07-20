@@ -34,6 +34,11 @@ for pid in $pids; do
 	fi
 done
 
+commands_db=$tmpdir/.semindex/commands.db
+if [ "$(sqlite3 "$commands_db" "SELECT COUNT(*) FROM commands")" != 8 ]; then
+	fail "parallel command database writers lost records"
+fi
+
 if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM records WHERE symbol = 'shared.pid'")" != 9 ]; then
 	fail "parallel merge lost or duplicated field records"
 fi

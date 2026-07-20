@@ -2,9 +2,9 @@
 
 `semindex compiler` and `semindex index` store symbol records in
 `.semindex/semindex.db` by default. The database contains only source files and
-semantic records. Compiler commands are deliberately not stored at this stage.
-Local symbols and their uses are stored only when indexing with
-`--include-local`.
+semantic records. Compiler commands are stored separately in
+`.semindex/commands.db`. Local symbols and their uses are stored only when
+indexing with `--include-local`.
 
 ## Layout
 

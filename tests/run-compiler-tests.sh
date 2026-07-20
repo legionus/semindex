@@ -12,6 +12,7 @@ fail()
 run_quiet_case()
 {
 	db=$tmpdir/quiet/.semindex/semindex.db
+	commands_db=$tmpdir/quiet/.semindex/commands.db
 	out=$tmpdir/quiet.out
 	err=$tmpdir/quiet.err
 
@@ -32,6 +33,29 @@ run_quiet_case()
 	fi
 	if sqlite3 "$db" "SELECT 1 FROM compile_commands" >/dev/null 2>&1; then
 		fail "compiler command storage is still enabled"
+	fi
+	if [ "$(sqlite3 "$commands_db" "SELECT COUNT(*) FROM commands")" != 1 ]; then
+		fail "compiler command was not stored separately"
+	fi
+	if [ "$(sqlite3 "$commands_db" "SELECT variant FROM commands")" != general ]; then
+		fail "compiler command used an unexpected variant"
+	fi
+	if [ "$(sqlite3 "$commands_db" "SELECT substr(hex(arguments), 1, 6) FROM commands")" != 636300 ]; then
+		fail "compiler arguments are not stored as a NUL-separated blob"
+	fi
+}
+
+run_no_store_command_case()
+{
+	db=$tmpdir/no-command/.semindex/semindex.db
+	commands_db=$tmpdir/no-command/.semindex/commands.db
+
+	if ! "$SEMINDEX" compiler --no-store-command --database "$db" -- \
+	     "$SOURCE_DIR/tests/test.c" >/dev/null; then
+		fail "compiler --no-store-command failed"
+	fi
+	if [ -e "$commands_db" ]; then
+		fail "compiler --no-store-command created a command database"
 	fi
 }
 
@@ -114,6 +138,7 @@ tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT
 
 run_quiet_case
+run_no_store_command_case
 run_include_local_case
 run_format_case default tests/test.c.expect
 run_format_case dissect tests/test.c.dissect.expect

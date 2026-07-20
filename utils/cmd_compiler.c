@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "command_db.h"
 #include "index_db.h"
 #include "semindex_cli.h"
 
@@ -29,8 +30,12 @@ static void compiler_help(void)
 	       "                             (default: project)\n"
 	       "  -d, --database=PATH        path to the semindex database\n"
 	       "                             (default: .semindex/semindex.db)\n"
+	       "      --commands-database=PATH\n"
+	       "                             path to the compiler command database\n"
+	       "                             (default: commands.db beside --database)\n"
 	       "      --variant=NAME          store records in the named variant\n"
 	       "                             (default: general)\n"
+	       "      --no-store-command      do not store the compiler command\n"
 	       "      --include-local         store local symbols and their uses\n"
 	       "  -h, --help                 display this help and exit\n"
 	       "\n"
@@ -62,6 +67,23 @@ static int is_c_source(const char *arg)
 static int compiler_is_omitted(const char *arg)
 {
 	return !arg[0] || arg[0] == '-' || arg[0] == '@' || is_c_source(arg);
+}
+
+static char *commands_database_path(const char *database)
+{
+	const char *slash = strrchr(database, '/');
+	size_t dir_len;
+	char *path;
+
+	if (!slash)
+		return strdup("commands.db");
+	dir_len = slash - database + 1;
+	path = malloc(dir_len + sizeof("commands.db"));
+	if (!path)
+		return NULL;
+	memcpy(path, database, dir_len);
+	memcpy(path + dir_len, "commands.db", sizeof("commands.db"));
+	return path;
 }
 
 static int option_takes_joined_or_next_arg(const char *arg)
@@ -150,6 +172,8 @@ int cmd_compiler(int argc, char **argv)
 	static const struct option long_options[] = {
 		{ "include-local", no_argument, NULL, 1 },
 		{ "variant", required_argument, NULL, 2 },
+		{ "commands-database", required_argument, NULL, 3 },
+		{ "no-store-command", no_argument, NULL, 4 },
 		{ "database", required_argument, NULL, 'd' },
 		{ "format", required_argument, NULL, 'f' },
 		{ "scope", required_argument, NULL, 's' },
@@ -159,6 +183,7 @@ int cmd_compiler(int argc, char **argv)
 	enum output_format format = FORMAT_DEFAULT;
 	semindex_scope_t scope = SEMINDEX_SCOPE_PROJECT;
 	const char *database = ".semindex/semindex.db";
+	const char *commands_database = NULL;
 	const char *variant = "general";
 	const char *source_file = NULL;
 	semindex_t *s;
@@ -166,9 +191,11 @@ int cmd_compiler(int argc, char **argv)
 	int compiler_argc;
 	char **compiler_argv;
 	char **default_argv = NULL;
+	char *default_commands_database = NULL;
 	int ret;
 	int print_output = 0;
 	int include_local = 0;
+	int store_command = 1;
 	int opt;
 
 	optind = 1;
@@ -179,6 +206,12 @@ int cmd_compiler(int argc, char **argv)
 			break;
 		case 2:
 			variant = optarg;
+			break;
+		case 3:
+			commands_database = optarg;
+			break;
+		case 4:
+			store_command = 0;
 			break;
 		case 'd':
 			database = optarg;
@@ -234,6 +267,15 @@ int cmd_compiler(int argc, char **argv)
 		free(default_argv);
 		return 1;
 	}
+	if (store_command && !commands_database) {
+		default_commands_database = commands_database_path(database);
+		if (!default_commands_database) {
+			fprintf(stderr, "semindex: failed to allocate command database path\n");
+			free(default_argv);
+			return 1;
+		}
+		commands_database = default_commands_database;
+	}
 
 	s = semindex_create();
 	semindex_set_scope(s, scope);
@@ -248,11 +290,21 @@ int cmd_compiler(int argc, char **argv)
 	if (semindex_index_command(s, &cmd) != 0) {
 		fprintf(stderr, "semindex: failed to index compiler command for '%s'\n", source_file);
 		semindex_destroy(s);
+		free(default_commands_database);
 		free(default_argv);
 		return 1;
 	}
 	if (index_db_store(database, s, source_file, variant, include_local) < 0) {
 		semindex_destroy(s);
+		free(default_commands_database);
+		free(default_argv);
+		return 1;
+	}
+	if (store_command &&
+		command_db_store(commands_database, variant, cmd.directory, source_file, compiler_argc,
+			(const char *const *)compiler_argv) < 0) {
+		semindex_destroy(s);
+		free(default_commands_database);
 		free(default_argv);
 		return 1;
 	}
@@ -260,6 +312,7 @@ int cmd_compiler(int argc, char **argv)
 	ret = print_output ? output_index(format, s) : 0;
 
 	semindex_destroy(s);
+	free(default_commands_database);
 	free(default_argv);
 	return ret ? 1 : 0;
 }
