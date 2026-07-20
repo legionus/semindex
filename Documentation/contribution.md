@@ -50,6 +50,22 @@ cmake --build build
 For changes that affect indexed source locations, update the corresponding
 `tests/*.expect` and `tests/*.dissect.expect` files in the same patch.
 
+## Performance
+
+Changes to AST traversal, record construction, SQLite storage or queries,
+header handling, compiler command capture, and output buffering require an A/B
+performance comparison.  Follow [performance.md](performance.md) and run the
+quick benchmark against the baseline and candidate builds:
+
+```sh
+scripts/benchmark.sh \
+    --baseline=/path/to/baseline/build/semindex \
+    --candidate=build/semindex
+```
+
+Database and concurrency changes also require a parallel indexing test.  Do
+not accept locked database errors, lost records, or silently skipped files.
+
 ## Patch checklist
 
 Before sending a patch, verify:
@@ -58,4 +74,5 @@ Before sending a patch, verify:
 * `cmake --build build` succeeds;
 * `cmake --build build --target format-check` succeeds;
 * `ctest --test-dir build --output-on-failure` succeeds;
-* generated expectation changes are intentional and reviewed.
+* generated expectation changes are intentional and reviewed;
+* performance-sensitive changes include baseline and candidate measurements.

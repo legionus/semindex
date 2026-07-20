@@ -3,6 +3,7 @@
 semindex requires a C and C++ compiler, CMake, SQLite 3.35 or newer, and the
 LLVM and Clang development files from LLVM 21 or newer.  `clang-format` and the
 `sqlite3` command-line program are needed by the development checks and tests.
+The performance benchmark additionally uses `/usr/bin/time`.
 
 Check the versions selected from `PATH` before configuring the project:
 
@@ -23,7 +24,7 @@ On a Fedora release whose default LLVM is version 21 or newer, install:
 sudo dnf install \
     gcc gcc-c++ cmake \
     llvm-devel clang clang-devel clang-tools-extra \
-    sqlite sqlite-devel
+    sqlite sqlite-devel time
 ```
 
 `clang-tools-extra` provides `clang-format` on Fedora.  If the default LLVM is
@@ -45,7 +46,7 @@ sudo apt update
 sudo apt install \
     build-essential cmake \
     llvm-dev clang libclang-dev libclang-cpp-dev clang-format \
-    sqlite3 libsqlite3-dev
+    sqlite3 libsqlite3-dev time
 ```
 
 After installation, check `llvm-config --version`.  On Ubuntu releases whose
@@ -60,7 +61,7 @@ chmod +x llvm.sh
 sudo ./llvm.sh 21
 sudo apt install \
     llvm-21-dev libclang-21-dev libclang-cpp21-dev clang-format-21 \
-    build-essential cmake sqlite3 libsqlite3-dev
+    build-essential cmake sqlite3 libsqlite3-dev time
 export PATH=/usr/lib/llvm-21/bin:$PATH
 ```
 
