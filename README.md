@@ -68,19 +68,22 @@ The intended capabilities include:
 
 The project requires:
 
-* LLVM/Clang 21 or newer
-* CMake
-* SQLite 3.35 or newer
-* a compilation database (`compile_commands.json`)
+* LLVM/Clang 21 or newer;
+* CMake;
+* SQLite 3.35 or newer.
+
+See [Documentation/building.md](Documentation/building.md) for Fedora and
+Ubuntu package lists, versioned LLVM setup, tests, and troubleshooting.
 
 Typical build:
 
 ```sh
-mkdir build
-cd build
-cmake ..
-make
+cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+cmake --build build -j"$(nproc)"
 ```
+
+A compilation database is required by `semindex index`; it is not required to
+build semindex or to use `semindex compiler`.
 
 The CLI can print either the default prototype output or a Sparse
 `test-dissect`-style view:
