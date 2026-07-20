@@ -103,6 +103,11 @@ static bool isWarningErrorArg(llvm::StringRef arg)
 	return arg == "-Werror" || arg.starts_with("-Werror=");
 }
 
+static bool isPreprocessedAssembly(llvm::StringRef file)
+{
+	return file.ends_with(".S");
+}
+
 static bool isX86_64BuiltinDefinition(llvm::StringRef value)
 {
 	llvm::StringRef name = value.split('=').first;
@@ -195,7 +200,9 @@ int semindex_index_command(semindex_t *s, const semindex_compile_command_t *cmd)
 	ClangTool tool(db, { cmd->file });
 	tool.appendArgumentsAdjuster(
 		[](const CommandLineArguments &args, llvm::StringRef) { return sanitizeCommandLine(args); });
-	std::unique_ptr<FrontendActionFactory> factory = createSemindexActionFactory(s);
+	std::unique_ptr<FrontendActionFactory> factory = isPreprocessedAssembly(cmd->file)
+		? createSemindexPreprocessorActionFactory(s)
+		: createSemindexActionFactory(s);
 	int ret = tool.run(factory.get());
 
 	if (ret == 0)

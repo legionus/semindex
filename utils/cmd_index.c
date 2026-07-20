@@ -16,10 +16,11 @@ static void index_help(void)
 {
 	index_usage(stdout);
 	printf("\n"
-	       "Index a C source file using clang semantic information.\n"
+	       "Index a C or preprocessed assembly source file using clang semantic\n"
+	       "information.\n"
 	       "\n"
 	       "Arguments:\n"
-	       "  SOURCE                     C source file to index\n"
+	       "  SOURCE                     .c or .S source file to index\n"
 	       "\n"
 	       "Options:\n"
 	       "  -f, --format=FORMAT        select output format: default, "

@@ -17,11 +17,12 @@ static void compiler_help(void)
 {
 	compiler_usage(stdout);
 	printf("\n"
-	       "Index a C source file from an explicit compiler argument vector.\n"
+	       "Index a C or preprocessed assembly source file from an explicit\n"
+	       "compiler argument vector.\n"
 	       "\n"
 	       "Arguments after '--' are treated as compiler arguments. COMPILER is\n"
 	       "optional and defaults to `cc'.\n"
-	       "Commands with exactly one C source file are indexed.\n"
+	       "Commands with exactly one .c or .S source file are indexed.\n"
 	       "\n"
 	       "Options:\n"
 	       "  -f, --format=FORMAT        print index using selected format: default,\n"
@@ -59,14 +60,14 @@ static int has_suffix(const char *str, const char *suffix)
 	return !strcmp(str + str_len - suffix_len, suffix);
 }
 
-static int is_c_source(const char *arg)
+static int is_source(const char *arg)
 {
-	return has_suffix(arg, ".c");
+	return has_suffix(arg, ".c") || has_suffix(arg, ".S");
 }
 
 static int compiler_is_omitted(const char *arg)
 {
-	return !arg[0] || arg[0] == '-' || arg[0] == '@' || is_c_source(arg);
+	return !arg[0] || arg[0] == '-' || arg[0] == '@' || is_source(arg);
 }
 
 static int option_takes_joined_or_next_arg(const char *arg)
@@ -135,7 +136,7 @@ static int find_source_file(int argc, char **argv, const char **source_file)
 				i++;
 			continue;
 		}
-		if (!is_c_source(arg))
+		if (!is_source(arg))
 			continue;
 
 		*source_file = arg;

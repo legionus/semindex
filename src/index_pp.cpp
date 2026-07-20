@@ -4,6 +4,9 @@
 #include <clang/Lex/MacroInfo.h>
 #include <clang/Lex/PPCallbacks.h>
 #include <clang/Lex/Preprocessor.h>
+#include <clang/Frontend/CompilerInstance.h>
+#include <clang/Frontend/FrontendActions.h>
+#include <clang/Tooling/Tooling.h>
 
 using namespace clang;
 
@@ -138,9 +141,51 @@ private:
 	SemindexContext index;
 };
 
+class SemindexPreprocessorAction : public PreprocessOnlyAction
+{
+public:
+	explicit SemindexPreprocessorAction(semindex *out) : out(out)
+	{
+	}
+
+protected:
+	void ExecuteAction() override
+	{
+		CompilerInstance &CI = getCompilerInstance();
+		SemindexContext index(out, CI.getSourceManager());
+
+		CI.getPreprocessor().addPPCallbacks(createSemindexPPCallbacks(index));
+		PreprocessOnlyAction::ExecuteAction();
+	}
+
+private:
+	semindex *out;
+};
+
+class SemindexPreprocessorActionFactory : public tooling::FrontendActionFactory
+{
+public:
+	explicit SemindexPreprocessorActionFactory(semindex *out) : out(out)
+	{
+	}
+
+	std::unique_ptr<FrontendAction> create() override
+	{
+		return std::make_unique<SemindexPreprocessorAction>(out);
+	}
+
+private:
+	semindex *out;
+};
+
 } // namespace
 
 std::unique_ptr<PPCallbacks> createSemindexPPCallbacks(SemindexContext index)
 {
 	return std::make_unique<SemindexPPCallbacks>(index);
+}
+
+std::unique_ptr<tooling::FrontendActionFactory> createSemindexPreprocessorActionFactory(semindex *out)
+{
+	return std::make_unique<SemindexPreprocessorActionFactory>(out);
 }

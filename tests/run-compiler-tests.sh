@@ -157,6 +157,40 @@ run_target_builtin_case()
 	fi
 }
 
+run_preprocessed_assembly_case()
+{
+	asm=$tmpdir/compiler-source.S
+	db=$tmpdir/assembly/.semindex/semindex.db
+	commands_db=$tmpdir/assembly/.semindex/commands.db
+	compile_commands=$tmpdir/compile_commands.json
+	index_db=$tmpdir/assembly-index/.semindex/semindex.db
+
+	printf '%s\n' '#define ASM_VALUE 7' '#define ASM_USE ASM_VALUE' \
+		'.long ASM_USE' >"$asm"
+	if ! "$SEMINDEX" compiler --database "$db" -- "$asm"; then
+		fail "preprocessed assembly compiler command failed"
+	fi
+	if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM records WHERE symbol IN ('ASM_VALUE', 'ASM_USE') AND record = 0")" != 2 ]; then
+		fail "preprocessed assembly macros were not indexed"
+	fi
+	if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM records WHERE symbol IN ('ASM_VALUE', 'ASM_USE') AND record = 1")" -lt 2 ]; then
+		fail "preprocessed assembly macro uses were not indexed"
+	fi
+	if [ "$(sqlite3 "$commands_db" "SELECT COUNT(*) FROM commands WHERE file = '$asm'")" != 1 ]; then
+		fail "preprocessed assembly compiler command was not stored"
+	fi
+
+	printf '[{"directory":"%s","file":"%s","arguments":["cc","-c","%s"]}]\n' \
+		"$tmpdir" "$asm" "$asm" >"$compile_commands"
+	if ! "$SEMINDEX" index --database "$index_db" \
+	     --compile-commands "$compile_commands" "$asm" >/dev/null; then
+		fail "preprocessed assembly index command failed"
+	fi
+	if [ "$(sqlite3 "$index_db" "SELECT COUNT(*) FROM records WHERE symbol IN ('ASM_VALUE', 'ASM_USE') AND record = 0")" != 2 ]; then
+		fail "index command did not store preprocessed assembly macros"
+	fi
+}
+
 if [ -z "${SEMINDEX:-}" ] || [ -z "${SOURCE_DIR:-}" ] || \
    [ -z "${COMPILE_COMMANDS:-}" ]; then
 	fail "SEMINDEX, SOURCE_DIR, and COMPILE_COMMANDS must be set"
@@ -173,3 +207,4 @@ run_format_case default tests/test.c.expect
 run_format_case dissect tests/test.c.dissect.expect
 run_kernel_flags_case
 run_target_builtin_case
+run_preprocessed_assembly_case
