@@ -4,6 +4,7 @@
 
 #include <stddef.h>
 
+char *command_db_default_path(const char *index_database);
 int command_db_store(const char *path, const char *variant, const char *directory, const char *file, size_t argc,
 	const char *const *argv);
 

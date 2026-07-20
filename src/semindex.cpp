@@ -59,6 +59,29 @@ static void clearIndex(semindex_t *s)
 	s->symbol_records.clear();
 	s->use_records.clear();
 	s->files.clear();
+	s->command_directory.clear();
+	s->command_file.clear();
+	s->command_arguments.clear();
+	s->command_argv.clear();
+	s->command_record = {};
+}
+
+static void saveCompileCommand(semindex_t *s, const semindex_compile_command_t *cmd)
+{
+	s->command_directory = cmd->directory ? cmd->directory : ".";
+	s->command_file = cmd->file;
+	s->command_arguments.reserve(cmd->argc);
+	for (size_t i = 0; i < cmd->argc; i++)
+		s->command_arguments.emplace_back(cmd->argv[i]);
+
+	s->command_argv.reserve(s->command_arguments.size());
+	for (const auto &arg : s->command_arguments)
+		s->command_argv.push_back(arg.c_str());
+
+	s->command_record.directory = s->command_directory.c_str();
+	s->command_record.file = s->command_file.c_str();
+	s->command_record.argc = s->command_argv.size();
+	s->command_record.argv = s->command_argv.data();
 }
 
 static bool isUnsupportedJoinedArg(llvm::StringRef arg)
@@ -160,6 +183,7 @@ int semindex_index_command(semindex_t *s, const semindex_compile_command_t *cmd)
 		return -1;
 
 	clearIndex(s);
+	saveCompileCommand(s, cmd);
 
 	std::vector<std::string> args;
 	args.reserve(cmd->argc);
@@ -218,6 +242,14 @@ int semindex_index_file(semindex_t *s, const char *compile_commands_json, const 
 	cmd.argv = argv.data();
 
 	return semindex_index_command(s, &cmd);
+}
+
+const semindex_compile_command_t *semindex_get_compile_command(const semindex_t *s)
+{
+	if (!s || !s->command_record.argc)
+		return nullptr;
+
+	return &s->command_record;
 }
 
 size_t semindex_symbol_count(const semindex_t *s)

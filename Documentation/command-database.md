@@ -1,18 +1,19 @@
 # Compiler command database
 
-`semindex compiler` stores the compiler command for each indexed translation
-unit in `commands.db` beside the selected symbol database.  With the default
-paths, the state directory contains:
+`semindex compiler` stores its compiler arguments and `semindex index` stores
+the command selected from `compile_commands.json`.  Both write to `commands.db`
+beside the selected symbol database.  With the default paths, the state
+directory contains:
 
 ```text
 .semindex/semindex.db
 .semindex/commands.db
 ```
 
-Use `--commands-database=PATH` to select another command database or
-`--no-store-command` to disable command storage.  Commands are keyed by index
-variant and canonical source path, so indexing the same source again replaces
-its command only within that variant.
+Both indexing commands accept `--commands-database=PATH` to select another
+command database and `--no-store-command` to disable command storage.  Commands
+are keyed by index variant and canonical source path, so indexing the same
+source again replaces its command only within that variant.
 
 The database is deliberately separate from `semindex.db`.  Large compiler
 argument vectors therefore do not enlarge the symbol lookup database or alter
@@ -30,6 +31,6 @@ Arguments are kept as one opaque value instead of being normalized into string
 and argument tables.  This makes each update a single UPSERT and avoids joins
 and per-argument index maintenance on the compiler hot path.
 
-The command database uses WAL mode and `synchronous=OFF`.  Concurrent compiler
+The command database uses WAL mode and `synchronous=OFF`.  Concurrent indexing
 processes prepare their semantic records independently and hold the command
 database write lock only for one row update.

@@ -64,6 +64,11 @@ struct semindex {
 	std::vector<SemindexUse> uses;
 	std::vector<semindex_symbol_t> symbol_records;
 	std::vector<semindex_use_t> use_records;
+	std::string command_directory;
+	std::string command_file;
+	std::vector<std::string> command_arguments;
+	std::vector<const char *> command_argv;
+	semindex_compile_command_t command_record{};
 };
 
 class SemindexContext

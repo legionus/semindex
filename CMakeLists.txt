@@ -196,6 +196,7 @@ if(BUILD_TESTING)
 		COMMAND
 			${CMAKE_COMMAND} -E env
 			SEMINDEX=$<TARGET_FILE:semindex>
+			COMPILE_COMMANDS=${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-compiler-tests.sh
 	)

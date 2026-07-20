@@ -69,23 +69,6 @@ static int compiler_is_omitted(const char *arg)
 	return !arg[0] || arg[0] == '-' || arg[0] == '@' || is_c_source(arg);
 }
 
-static char *commands_database_path(const char *database)
-{
-	const char *slash = strrchr(database, '/');
-	size_t dir_len;
-	char *path;
-
-	if (!slash)
-		return strdup("commands.db");
-	dir_len = slash - database + 1;
-	path = malloc(dir_len + sizeof("commands.db"));
-	if (!path)
-		return NULL;
-	memcpy(path, database, dir_len);
-	memcpy(path + dir_len, "commands.db", sizeof("commands.db"));
-	return path;
-}
-
 static int option_takes_joined_or_next_arg(const char *arg)
 {
 	static const char *opts[] = {
@@ -268,7 +251,7 @@ int cmd_compiler(int argc, char **argv)
 		return 1;
 	}
 	if (store_command && !commands_database) {
-		default_commands_database = commands_database_path(database);
+		default_commands_database = command_db_default_path(database);
 		if (!default_commands_database) {
 			fprintf(stderr, "semindex: failed to allocate command database path\n");
 			free(default_argv);

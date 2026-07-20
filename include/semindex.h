@@ -97,6 +97,8 @@ void semindex_set_include_local(semindex_t *s, int enabled);
 /* indexing */
 int semindex_index_command(semindex_t *s, const semindex_compile_command_t *cmd);
 int semindex_index_file(semindex_t *s, const char *compile_commands_json, const char *source_file);
+/* returned pointers are valid until the next index operation or destroy */
+const semindex_compile_command_t *semindex_get_compile_command(const semindex_t *s);
 
 /* queries */
 size_t semindex_symbol_count(const semindex_t *s);

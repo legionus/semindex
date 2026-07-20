@@ -12,6 +12,23 @@
 
 #define COMMAND_SCHEMA_VERSION 1
 
+char *command_db_default_path(const char *index_database)
+{
+	const char *slash = strrchr(index_database, '/');
+	size_t dir_len;
+	char *path;
+
+	if (!slash)
+		return strdup("commands.db");
+	dir_len = slash - index_database + 1;
+	path = malloc(dir_len + sizeof("commands.db"));
+	if (!path)
+		return NULL;
+	memcpy(path, index_database, dir_len);
+	memcpy(path + dir_len, "commands.db", sizeof("commands.db"));
+	return path;
+}
+
 static int exec_sql(sqlite3 *db, const char *sql)
 {
 	char *errmsg = NULL;

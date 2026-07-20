@@ -59,6 +59,33 @@ run_no_store_command_case()
 	fi
 }
 
+run_index_command_case()
+{
+	db=$tmpdir/index/.semindex/semindex.db
+	commands_db=$tmpdir/index/.semindex/commands.db
+
+	if ! "$SEMINDEX" index --database "$db" --compile-commands "$COMPILE_COMMANDS" \
+	     --variant=index-variant "$SOURCE_DIR/tests/test.c" >/dev/null; then
+		fail "index command failed"
+	fi
+	if [ "$(sqlite3 "$commands_db" "SELECT COUNT(*) FROM commands WHERE variant = 'index-variant'")" != 1 ]; then
+		fail "index did not store its selected compile command"
+	fi
+	if [ "$(sqlite3 "$commands_db" "SELECT instr(hex(arguments), hex('test.c')) FROM commands")" = 0 ]; then
+		fail "index stored an unexpected compile command"
+	fi
+
+	db=$tmpdir/index-no-command/.semindex/semindex.db
+	commands_db=$tmpdir/index-no-command/.semindex/commands.db
+	if ! "$SEMINDEX" index --no-store-command --database "$db" \
+	     --compile-commands "$COMPILE_COMMANDS" "$SOURCE_DIR/tests/test.c" >/dev/null; then
+		fail "index --no-store-command failed"
+	fi
+	if [ -e "$commands_db" ]; then
+		fail "index --no-store-command created a command database"
+	fi
+}
+
 run_include_local_case()
 {
 	db=$tmpdir/local/.semindex/semindex.db
@@ -130,8 +157,9 @@ run_target_builtin_case()
 	fi
 }
 
-if [ -z "${SEMINDEX:-}" ] || [ -z "${SOURCE_DIR:-}" ]; then
-	fail "SEMINDEX and SOURCE_DIR must be set"
+if [ -z "${SEMINDEX:-}" ] || [ -z "${SOURCE_DIR:-}" ] || \
+   [ -z "${COMPILE_COMMANDS:-}" ]; then
+	fail "SEMINDEX, SOURCE_DIR, and COMPILE_COMMANDS must be set"
 fi
 
 tmpdir=$(mktemp -d)
@@ -139,6 +167,7 @@ trap 'rm -rf "$tmpdir"' EXIT
 
 run_quiet_case
 run_no_store_command_case
+run_index_command_case
 run_include_local_case
 run_format_case default tests/test.c.expect
 run_format_case dissect tests/test.c.dissect.expect

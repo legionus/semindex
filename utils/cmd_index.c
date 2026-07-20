@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <getopt.h>
 #include <stdio.h>
+#include <stdlib.h>
 
+#include "command_db.h"
 #include "index_db.h"
 #include "semindex_cli.h"
 
@@ -32,8 +34,12 @@ static void index_help(void)
 	       "                             (default: .)\n"
 	       "  -d, --database=PATH        path to the semindex database\n"
 	       "                             (default: .semindex/semindex.db)\n"
+	       "      --commands-database=PATH\n"
+	       "                             path to the compiler command database\n"
+	       "                             (default: commands.db beside --database)\n"
 	       "      --variant=NAME          store records in the named variant\n"
 	       "                             (default: general)\n"
+	       "      --no-store-command      do not store the selected compile command\n"
 	       "      --include-local         store local symbols and their uses\n"
 	       "  -h, --help                 display this help and exit\n"
 	       "\n"
@@ -46,6 +52,8 @@ int cmd_index(int argc, char **argv)
 	static const struct option long_options[] = {
 		{ "include-local", no_argument, NULL, 1 },
 		{ "variant", required_argument, NULL, 2 },
+		{ "commands-database", required_argument, NULL, 3 },
+		{ "no-store-command", no_argument, NULL, 4 },
 		{ "format", required_argument, NULL, 'f' },
 		{ "scope", required_argument, NULL, 's' },
 		{ "compile-commands", required_argument, NULL, 'c' },
@@ -58,10 +66,14 @@ int cmd_index(int argc, char **argv)
 	const char *source_file = NULL;
 	const char *compile_commands = ".";
 	const char *database = ".semindex/semindex.db";
+	const char *commands_database = NULL;
 	const char *variant = "general";
 	semindex_t *s;
+	const semindex_compile_command_t *cmd;
+	char *default_commands_database = NULL;
 	int ret;
 	int include_local = 0;
+	int store_command = 1;
 	int opt;
 
 	optind = 1;
@@ -72,6 +84,12 @@ int cmd_index(int argc, char **argv)
 			break;
 		case 2:
 			variant = optarg;
+			break;
+		case 3:
+			commands_database = optarg;
+			break;
+		case 4:
+			store_command = 0;
 			break;
 		case 'f':
 			if (parse_format(optarg, &format) < 0) {
@@ -116,6 +134,14 @@ int cmd_index(int argc, char **argv)
 		fprintf(stderr, "semindex: variant name must not be empty\n");
 		return 1;
 	}
+	if (store_command && !commands_database) {
+		default_commands_database = command_db_default_path(database);
+		if (!default_commands_database) {
+			fprintf(stderr, "semindex: failed to allocate command database path\n");
+			return 1;
+		}
+		commands_database = default_commands_database;
+	}
 
 	s = semindex_create();
 	semindex_set_scope(s, scope);
@@ -123,15 +149,27 @@ int cmd_index(int argc, char **argv)
 	if (semindex_index_file(s, compile_commands, source_file) != 0) {
 		fprintf(stderr, "semindex: failed to index '%s' using '%s'\n", source_file, compile_commands);
 		semindex_destroy(s);
+		free(default_commands_database);
 		return 1;
 	}
 	if (index_db_store(database, s, source_file, variant, include_local) < 0) {
 		semindex_destroy(s);
+		free(default_commands_database);
+		return 1;
+	}
+	cmd = semindex_get_compile_command(s);
+	if (store_command &&
+		(!cmd ||
+			command_db_store(commands_database, variant, cmd->directory, cmd->file, cmd->argc, cmd->argv) <
+				0)) {
+		semindex_destroy(s);
+		free(default_commands_database);
 		return 1;
 	}
 
 	ret = output_index(format, s);
 
 	semindex_destroy(s);
+	free(default_commands_database);
 	return ret ? 1 : 0;
 }
