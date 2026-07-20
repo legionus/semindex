@@ -49,6 +49,9 @@ struct SemindexUse {
 	std::string type;
 	std::string usr;
 	std::string context;
+	std::string context_usr;
+	unsigned long long usr_id = 0;
+	unsigned long long context_usr_id = 0;
 	SemindexSourceLocation loc;
 	bool local;
 	unsigned long long order;

@@ -74,12 +74,15 @@ typedef struct {
 typedef struct {
 	semindex_use_kind_t kind;
 	semindex_symbol_kind_t symbol_kind;
-	unsigned mode;	     /* semindex_use_mode_t bitmask */
-	const char *name;    /* target symbol */
-	const char *owner;   /* containing record for fields */
-	const char *type;    /* textual type */
-	const char *usr;     /* target symbol */
-	const char *context; /* containing function */
+	unsigned mode;			   /* semindex_use_mode_t bitmask */
+	const char *name;		   /* target symbol */
+	const char *owner;		   /* containing record for fields */
+	const char *type;		   /* textual type */
+	const char *usr;		   /* target symbol */
+	const char *context;		   /* containing function */
+	const char *context_usr;	   /* containing function USR for call records */
+	unsigned long long usr_id;	   /* hashed target USR for direct calls */
+	unsigned long long context_usr_id; /* hashed containing function USR */
 	const char *file;
 	unsigned line;
 	unsigned column;

@@ -79,8 +79,23 @@ candidate=$(CDPATH= cd -- "$(dirname -- "$candidate")" && pwd)/$(basename -- "$c
 tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT HUP INT TERM
 results=$tmpdir/results.tsv
+callgraph_source=$tmpdir/callgraph-benchmark.c
 
 sources='tests/test.c tests/test6.c tests/test7.c tests/test11.c tests/test14.c tests/test15.c'
+
+: >"$callgraph_source"
+function=0
+while [ "$function" -lt 256 ]; do
+	printf 'static void callee_%d(void) {}\n' "$function" >>"$callgraph_source"
+	function=$((function + 1))
+done
+printf '%s\n' 'void call_all(void)' '{' >>"$callgraph_source"
+function=0
+while [ "$function" -lt 256 ]; do
+	printf '\tcallee_%d();\n' "$function" >>"$callgraph_source"
+	function=$((function + 1))
+done
+printf '%s\n' '}' >>"$callgraph_source"
 
 run_one()
 {
@@ -95,12 +110,20 @@ run_one()
 	: >"$times"
 	pass=1
 	while [ "$pass" -le "$passes" ]; do
-		for source in $sources; do
+		for source in $sources "$callgraph_source"; do
+			case $source in
+			/*)
+				source_path=$source
+				;;
+			*)
+				source_path=$root/$source
+				;;
+			esac
 			/usr/bin/time -a -o "$times" -f '%e\t%U\t%S\t%M' \
 				"$binary" compiler \
 				--database="$state/semindex.db" \
 				--commands-database="$state/commands.db" -- \
-				cc -I"$root/tests/include" "$root/$source" \
+				cc -I"$root/tests/include" "$source_path" \
 				>/dev/null
 		done
 		pass=$((pass + 1))

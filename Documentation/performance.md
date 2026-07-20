@@ -60,6 +60,10 @@ measurement makes five passes over the source set so that timer resolution and
 process startup noise do not dominate the result.  Later passes also exercise
 incremental replacement of previously indexed files.
 
+The source set includes a generated translation unit with 256 direct call
+edges.  This keeps database-size and indexing-time measurements sensitive to
+callgraph storage without committing a large generated fixture.
+
 ```sh
 scripts/benchmark.sh \
     --baseline=/path/to/baseline/build/semindex \

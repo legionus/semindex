@@ -17,6 +17,7 @@ void semindex_help(void)
 	       "Index C source files using clang semantic information.\n"
 	       "\n"
 	       "Commands:\n"
+	       "  callgraph                  query direct caller and callee relationships\n"
 	       "  compiler                   index from an explicit compiler argument vector\n"
 	       "  compile-commands           export stored compiler commands as JSON\n"
 	       "  index                      index a source file using `compile_commands.json'\n"
@@ -91,6 +92,8 @@ int main(int argc, char **argv)
 
 	if (!strcmp(argv[optind], "compiler"))
 		return cmd_compiler(argc - optind, argv + optind);
+	if (!strcmp(argv[optind], "callgraph"))
+		return cmd_callgraph(argc - optind, argv + optind);
 	if (!strcmp(argv[optind], "compile-commands"))
 		return cmd_compile_commands(argc - optind, argv + optind);
 	if (!strcmp(argv[optind], "index"))

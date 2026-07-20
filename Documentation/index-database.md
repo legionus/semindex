@@ -12,11 +12,18 @@ The `records` table stores declarations, definitions, and uses together. Its
 `WITHOUT ROWID` primary key starts with the qualified symbol name, so an exact
 query such as `task_struct.pid` is an indexed lookup rather than a scan.
 
-Names and contexts are stored directly in each record. Types and Clang USRs
-remain available from the in-memory index and output formats, but are not stored
-until their cost and query requirements are understood. This avoids the joins
-and per-record string interning required by the previous normalized prototype.
-A secondary index supports file replacement.
+Names and contexts are stored directly in each record. Types and general symbol
+USRs remain available only from the in-memory index and output formats. Direct
+call records store compact caller and callee IDs derived from their Clang USRs,
+so static functions can be distinguished without repeating both identity
+strings at every call site. IDs are computed before SQLite staging; adding a
+record does not perform an identity lookup. A secondary index supports file
+replacement.
+
+A partial `(context, context_usr_id)` index contains only direct function-call
+records and supports caller-to-callee queries. Callee-to-caller queries use the
+records primary key, which already begins with the callee symbol. No callgraph
+index is added to declarations, definitions, or non-call uses.
 
 Each row in `files` is identified by `(variant, path)`.  Indexing commands use
 the variant `general` by default and accept `--variant=NAME`.  Consequently,

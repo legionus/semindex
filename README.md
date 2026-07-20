@@ -27,6 +27,7 @@ Implemented so far:
 * C API exported from a C++ implementation, allowing the rest of the project to remain in C.
 * persistent SQLite symbol database;
 * indexed search by qualified symbol name;
+* direct caller and callee queries with stable function identities;
 
 ## Architecture
 
@@ -120,6 +121,16 @@ Search by symbol name, including qualified structure fields:
 ```sh
 semindex search task_struct.pid
 ```
+
+Query direct call relationships in either direction:
+
+```sh
+semindex callgraph --callees=worker
+semindex callgraph --callers=schedule
+```
+
+See [Documentation/callgraph.md](Documentation/callgraph.md) for function
+identity, variant filtering, output, and indirect-call limitations.
 
 The current database format is intentionally incompatible with earlier
 prototype versions. Remove an old `.semindex/semindex.db` before rebuilding an

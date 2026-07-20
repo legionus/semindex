@@ -206,6 +206,9 @@ void rebuildRecords(semindex *s)
 		rec.type = use.type.c_str();
 		rec.usr = use.usr.c_str();
 		rec.context = use.context.c_str();
+		rec.context_usr = use.context_usr.c_str();
+		rec.usr_id = use.usr_id;
+		rec.context_usr_id = use.context_usr_id;
 		rec.file = use.loc.file ? use.loc.file->c_str() : "";
 		rec.line = use.loc.line;
 		rec.column = use.loc.column;

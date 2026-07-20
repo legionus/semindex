@@ -10,7 +10,7 @@
 #include "index_db.h"
 #include "output.h"
 
-#define INDEX_SCHEMA_VERSION 5
+#define INDEX_SCHEMA_VERSION 6
 #define STRINGIFY_VALUE(value) #value
 #define STRINGIFY(value) STRINGIFY_VALUE(value)
 
@@ -162,10 +162,14 @@ static int init_schema(sqlite3 *db)
 		"  line INTEGER NOT NULL,"
 		"  column INTEGER NOT NULL,"
 		"  context TEXT NOT NULL,"
+		"  usr_id INTEGER,"
+		"  context_usr_id INTEGER,"
 		"  local INTEGER NOT NULL,"
 		"  PRIMARY KEY(symbol, record, action, kind, mode, file_id, line, column)"
 		") WITHOUT ROWID",
 		"CREATE INDEX records_file_idx ON records(file_id)",
+		"CREATE INDEX records_call_context_idx ON records(context, context_usr_id)"
+		" WHERE record = 1 AND action = 3 AND kind = 7",
 		"PRAGMA user_version = " STRINGIFY(INDEX_SCHEMA_VERSION),
 	};
 	size_t i;
@@ -248,6 +252,8 @@ static int create_staging(sqlite3 *db)
 		"  line INTEGER NOT NULL,"
 		"  column INTEGER NOT NULL,"
 		"  context TEXT NOT NULL,"
+		"  usr_id INTEGER,"
+		"  context_usr_id INTEGER,"
 		"  local INTEGER NOT NULL,"
 		"  PRIMARY KEY(symbol, record, action, kind, mode, path, line, column)"
 		") WITHOUT ROWID");
@@ -262,6 +268,7 @@ static char *qualified_name(const char *owner, const char *name)
 
 static int stage_record(sqlite3 *db, sqlite3_stmt *stmt, int record, int action, int kind, unsigned mode,
 	const char *file, unsigned line, unsigned column, const char *owner, const char *name, const char *context,
+	const char *usr, unsigned long long usr_id, const char *context_usr, unsigned long long context_usr_id,
 	int local)
 {
 	char *symbol = qualified_name(owner, name);
@@ -275,7 +282,12 @@ static int stage_record(sqlite3 *db, sqlite3_stmt *stmt, int record, int action,
 		sqlite3_bind_int(stmt, 3, action) != SQLITE_OK || sqlite3_bind_int(stmt, 4, kind) != SQLITE_OK ||
 		sqlite3_bind_int64(stmt, 5, mode) != SQLITE_OK || bind_text(stmt, 6, file) < 0 ||
 		sqlite3_bind_int64(stmt, 7, line) != SQLITE_OK || sqlite3_bind_int64(stmt, 8, column) != SQLITE_OK ||
-		bind_text(stmt, 9, context) < 0 || sqlite3_bind_int(stmt, 10, local) != SQLITE_OK)
+		bind_text(stmt, 9, context) < 0 ||
+		(usr && usr[0] ? sqlite3_bind_int64(stmt, 10, (sqlite3_int64)usr_id) : sqlite3_bind_null(stmt, 10)) !=
+			SQLITE_OK ||
+		(context_usr && context_usr[0] ? sqlite3_bind_int64(stmt, 11, (sqlite3_int64)context_usr_id)
+					       : sqlite3_bind_null(stmt, 11)) != SQLITE_OK ||
+		sqlite3_bind_int(stmt, 12, local) != SQLITE_OK)
 		goto out;
 	if (sqlite3_step(stmt) != SQLITE_DONE) {
 		fprintf(stderr, "semindex: sqlite: %s\n", sqlite3_errmsg(db));
@@ -292,13 +304,14 @@ static int stage_records(sqlite3 *db, semindex_t *s, int include_local)
 {
 	static const char *sql =
 		"INSERT OR IGNORE INTO staging_records(symbol, record, action, kind, mode, path, line, column, "
-		"context, local) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)";
+		"context, usr_id, context_usr_id, local) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, "
+		"?12)";
 	sqlite3_stmt *stmt = NULL;
 	size_t i;
 	int ret = -1;
 
 	if (prepare(db, sql, &stmt) < 0)
-		return -1;
+		goto out;
 
 	for (i = 0; i < semindex_symbol_count(s); i++) {
 		const semindex_symbol_t *sym = semindex_get_symbol(s, i);
@@ -308,18 +321,21 @@ static int stage_records(sqlite3 *db, semindex_t *s, int include_local)
 		if (sym->local && !include_local)
 			continue;
 		if (stage_record(db, stmt, STORED_RECORD_SYMBOL, sym->definition, sym->kind, 0, sym->file, sym->line,
-			    sym->column, sym->owner, sym->name, sym->context, sym->local) < 0)
+			    sym->column, sym->owner, sym->name, sym->context, NULL, 0, NULL, 0, sym->local) < 0)
 			goto out;
 	}
 	for (i = 0; i < semindex_use_count(s); i++) {
 		const semindex_use_t *use = semindex_get_use(s, i);
+		int direct_call;
 
 		if (!use)
 			goto out;
 		if (use->local && !include_local)
 			continue;
+		direct_call = use->kind == SEMINDEX_USE_CALL && use->symbol_kind == SEMINDEX_SYMBOL_FUNCTION;
 		if (stage_record(db, stmt, STORED_RECORD_USE, use->kind, use->symbol_kind, use->mode, use->file,
-			    use->line, use->column, use->owner, use->name, use->context, use->local) < 0)
+			    use->line, use->column, use->owner, use->name, use->context, direct_call ? use->usr : NULL,
+			    use->usr_id, direct_call ? use->context_usr : NULL, use->context_usr_id, use->local) < 0)
 			goto out;
 	}
 
@@ -415,11 +431,12 @@ static int merge_staging(sqlite3 *db, const char *variant)
 				   "WHERE variant = %Q AND path IN (SELECT path FROM staging_files)",
 		variant);
 	merge[3] = sqlite3_mprintf(
-		"INSERT OR IGNORE INTO records(symbol, record, action, kind, mode, file_id, line, column, "
-		"context, local) "
+		"INSERT OR IGNORE INTO records(symbol, record, action, kind, mode, file_id, line, column, context, "
+		"usr_id, context_usr_id, local) "
 		"SELECT staging_records.symbol, staging_records.record, staging_records.action,"
 		"  staging_records.kind, staging_records.mode, files.id, staging_records.line,"
-		"  staging_records.column, staging_records.context, staging_records.local"
+		"  staging_records.column, staging_records.context, staging_records.usr_id,"
+		"  staging_records.context_usr_id, staging_records.local"
 		" FROM staging_records JOIN files"
 		" ON files.path = staging_records.path AND files.variant = %Q",
 		variant);
@@ -600,6 +617,98 @@ int index_db_search(const char *path, const index_db_search_options_t *opts, FIL
 	if (!sql)
 		goto out;
 	ret = print_search_results(db, sql, opts->format ? opts->format : OUTPUT_SEARCH_DEFAULT_FORMAT, out);
+out:
+	if (query)
+		sqlite3_str_finish(query);
+	sqlite3_free(sql);
+	if (db)
+		sqlite3_close(db);
+	return ret;
+}
+
+static int print_callgraph_results(sqlite3 *db, const char *sql, int show_id, FILE *out)
+{
+	sqlite3_stmt *stmt = NULL;
+	int step;
+	int ret = -1;
+
+	if (prepare(db, sql, &stmt) < 0)
+		return -1;
+	while ((step = sqlite3_step(stmt)) == SQLITE_ROW) {
+		const char *variant = (const char *)sqlite3_column_text(stmt, 0);
+		const char *caller = (const char *)sqlite3_column_text(stmt, 1);
+		unsigned long long caller_id = (unsigned long long)sqlite3_column_int64(stmt, 2);
+		const char *callee = (const char *)sqlite3_column_text(stmt, 3);
+		unsigned long long callee_id = (unsigned long long)sqlite3_column_int64(stmt, 4);
+		const char *file = (const char *)sqlite3_column_text(stmt, 5);
+		int line = sqlite3_column_int(stmt, 6);
+		int column = sqlite3_column_int(stmt, 7);
+
+		if (show_id) {
+			if (fprintf(out, "%s\t%016llx\t%s\t%016llx\t%s:%s:%d:%d\n", caller, caller_id, callee,
+				    callee_id, variant, file, line, column) < 0)
+				goto out;
+		} else if (fprintf(out, "%s -> %s\t%s:%s:%d:%d\n", caller, callee, variant, file, line, column) < 0) {
+			goto out;
+		}
+	}
+	if (step != SQLITE_DONE) {
+		fprintf(stderr, "semindex: sqlite: %s\n", sqlite3_errmsg(db));
+		goto out;
+	}
+
+	ret = ferror(out) ? -1 : 0;
+out:
+	sqlite3_finalize(stmt);
+	return ret;
+}
+
+int index_db_callgraph(const char *path, const index_db_callgraph_options_t *opts, FILE *out)
+{
+	sqlite3_str *query = NULL;
+	sqlite3 *db = NULL;
+	char *sql = NULL;
+	int ret = -1;
+
+	if (!path || !opts || !opts->function || !opts->function[0] || !out)
+		return -1;
+	if (open_reader(path, &db) < 0)
+		goto out;
+
+	query = sqlite3_str_new(db);
+	if (!query)
+		goto out;
+	sqlite3_str_appendf(query,
+		"SELECT files.variant, records.context, records.context_usr_id, records.symbol, records.usr_id, "
+		"files.path, records.line, records.column "
+		"FROM records JOIN files ON files.id = records.file_id "
+		"WHERE records.record = %d AND records.action = %d AND records.kind = %d",
+		STORED_RECORD_USE, SEMINDEX_USE_CALL, SEMINDEX_SYMBOL_FUNCTION);
+	if (opts->direction == INDEX_DB_CALLGRAPH_CALLERS) {
+		sqlite3_str_appendf(query, " AND records.symbol = %Q", opts->function);
+		if (opts->has_id)
+			sqlite3_str_appendf(query, " AND records.usr_id = 0x%016llx", opts->id);
+	} else {
+		sqlite3_str_appendf(query, " AND records.context = %Q", opts->function);
+		if (opts->has_id)
+			sqlite3_str_appendf(query, " AND records.context_usr_id = 0x%016llx", opts->id);
+	}
+	if (opts->path)
+		sqlite3_str_appendf(query, " AND files.path %s %Q", pattern_uses_glob(opts->path) ? "GLOB" : "=",
+			opts->path);
+	if (opts->variant)
+		sqlite3_str_appendf(query, " AND files.variant %s %Q", pattern_uses_glob(opts->variant) ? "GLOB" : "=",
+			opts->variant);
+	sqlite3_str_appendall(query,
+		" ORDER BY files.variant, records.context, records.symbol, files.path, records.line, records.column");
+	if (sqlite3_str_errcode(query) != SQLITE_OK)
+		goto out;
+
+	sql = sqlite3_str_finish(query);
+	query = NULL;
+	if (!sql)
+		goto out;
+	ret = print_callgraph_results(db, sql, opts->show_id, out);
 out:
 	if (query)
 		sqlite3_str_finish(query);

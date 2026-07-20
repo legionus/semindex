@@ -13,6 +13,7 @@
 #include <clang/Tooling/Tooling.h>
 
 #include <llvm/ADT/SmallVector.h>
+#include <llvm/Support/xxhash.h>
 
 #include <memory>
 #include <set>
@@ -259,9 +260,15 @@ public:
 			return true;
 
 		std::string oldFunction = currentFunction;
+		std::string oldFunctionUSR = currentFunctionUSR;
+		unsigned long long oldFunctionUSRId = currentFunctionUSRId;
 		currentFunction = getName(D);
+		currentFunctionUSR = D->doesThisDeclarationHaveABody() ? functionUSR(D) : "";
+		currentFunctionUSRId = currentFunctionUSR.empty() ? 0 : llvm::xxHash64(currentFunctionUSR);
 		bool ret = RecursiveASTVisitor<SemindexVisitor>::TraverseFunctionDecl(D);
 		currentFunction = oldFunction;
+		currentFunctionUSR = oldFunctionUSR;
+		currentFunctionUSRId = oldFunctionUSRId;
 		return ret;
 	}
 
@@ -565,8 +572,11 @@ public:
 		u.name = info.name;
 		u.owner = "";
 		u.type = info.type;
-		u.usr = info.usr;
+		u.usr = functionUSR(FD);
 		u.context = currentFunction;
+		u.context_usr = currentFunctionUSR;
+		u.usr_id = u.usr.empty() ? 0 : llvm::xxHash64(u.usr);
+		u.context_usr_id = currentFunctionUSRId;
 		u.loc = index.location(E->getExprLoc());
 		u.local = false;
 
@@ -601,6 +611,16 @@ private:
 				entry->second.usr = getUSR(D, ctx);
 			}
 		}
+		return entry->second;
+	}
+
+	const std::string &functionUSR(const FunctionDecl *D)
+	{
+		D = D->getCanonicalDecl();
+		auto [entry, inserted] = functionUSRCache.try_emplace(D);
+
+		if (inserted)
+			entry->second = getUSR(D, ctx);
 		return entry->second;
 	}
 
@@ -713,9 +733,12 @@ private:
 	SemindexContext &index;
 	bool details;
 	std::string currentFunction;
+	std::string currentFunctionUSR;
+	unsigned long long currentFunctionUSRId = 0;
 	std::set<std::tuple<const Decl *, unsigned, std::string>> typeUses;
 	std::set<const FunctionDecl *> functionSymbols;
 	std::unordered_map<const ValueDecl *, ValueInfo> valueInfoCache;
+	std::unordered_map<const FunctionDecl *, std::string> functionUSRCache;
 };
 
 /* ============================================================

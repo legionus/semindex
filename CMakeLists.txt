@@ -20,6 +20,8 @@ set(SEMINDEX_FORMAT_SOURCES
 	tests/scope/api.h
 	tests/scope/use.c
 	tests/compiler-target.c
+	tests/callgraph-a.c
+	tests/callgraph-b.c
 	tests/test.c
 	tests/test1.c
 	tests/test2.c
@@ -38,6 +40,7 @@ set(SEMINDEX_FORMAT_SOURCES
 	tests/test15.c
 	utils/cmd_compiler.c
 	utils/cmd_compile_commands.c
+	utils/cmd_callgraph.c
 	utils/cmd_index.c
 	utils/cmd_search.c
 	utils/command_db.c
@@ -126,6 +129,7 @@ target_link_libraries(semindex_parser PRIVATE clang-cpp ${LLVM_LIBS})
 add_executable(semindex
 	utils/cmd_compiler.c
 	utils/cmd_compile_commands.c
+	utils/cmd_callgraph.c
 	utils/cmd_index.c
 	utils/cmd_search.c
 	utils/command_db.c
@@ -225,5 +229,13 @@ if(BUILD_TESTING)
 			SEMINDEX=$<TARGET_FILE:semindex>
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-command-db-tests.sh
+	)
+	add_test(
+		NAME semindex-callgraph
+		COMMAND
+			${CMAKE_COMMAND} -E env
+			SEMINDEX=$<TARGET_FILE:semindex>
+			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-callgraph-tests.sh
 	)
 endif()
