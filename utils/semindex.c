@@ -18,6 +18,7 @@ void semindex_help(void)
 	       "\n"
 	       "Commands:\n"
 	       "  compiler                   index from an explicit compiler argument vector\n"
+	       "  compile-commands           export stored compiler commands as JSON\n"
 	       "  index                      index a source file using `compile_commands.json'\n"
 	       "  search                     search stored symbol and use records\n"
 	       "\n"
@@ -90,6 +91,8 @@ int main(int argc, char **argv)
 
 	if (!strcmp(argv[optind], "compiler"))
 		return cmd_compiler(argc - optind, argv + optind);
+	if (!strcmp(argv[optind], "compile-commands"))
+		return cmd_compile_commands(argc - optind, argv + optind);
 	if (!strcmp(argv[optind], "index"))
 		return cmd_index(argc - optind, argv + optind);
 	if (!strcmp(argv[optind], "search"))

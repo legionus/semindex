@@ -103,6 +103,15 @@ symbols and their uses are omitted from the persistent index unless
 `--include-local` is specified. A compiler name may be provided after `--`;
 when omitted, `cc` is used as the Clang driver name.
 
+Export the commands captured for the default variant as a compilation
+database:
+
+```sh
+semindex compile-commands -o compile_commands.json
+```
+
+Use `--variant=NAME` to export another indexed configuration.
+
 Search by symbol name, including qualified structure fields:
 
 ```sh
@@ -124,7 +133,6 @@ Among the missing features are:
 * indirect call analysis;
 * macro-aware indexing;
 * incremental indexing;
-* compile command capture and export;
 * context-sensitive separation of header variants.
 
 ## Motivation

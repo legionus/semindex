@@ -34,3 +34,19 @@ and per-argument index maintenance on the compiler hot path.
 The command database uses WAL mode and `synchronous=OFF`.  Concurrent indexing
 processes prepare their semantic records independently and hold the command
 database write lock only for one row update.
+
+## Export
+
+Export the default `general` variant to a compilation database with:
+
+```sh
+semindex compile-commands -o compile_commands.json
+```
+
+Use `--variant=NAME` to export another variant and `--database=PATH` when the
+command database is not `.semindex/commands.db`.  Without `--output`, JSON is
+written to standard output.  Entries are ordered by canonical source path and
+contain the standard `directory`, `file`, and `arguments` fields.
+
+The exporter opens only the command database and does so in read-only mode.  It
+does not query or modify the symbol database.
