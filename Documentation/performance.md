@@ -158,6 +158,56 @@ depends on a specific index.
 Record the result count as well as latency.  A faster query that omits matches
 is a correctness failure.
 
+## Internal tracing
+
+The `compiler` and `index` commands accept `--trace=FILE`. Each process appends
+one JSON object per completed phase to `FILE`. A single trace file can be shared
+by all checker processes in a parallel build:
+
+```sh
+make -j12 CC=clang C=2 \
+    CHECK="semindex compiler --no-store-command --trace=/tmp/semindex.jsonl --"
+```
+
+Each JSON Lines record contains the process ID, command, source file, phase,
+monotonic start time, and duration in nanoseconds:
+
+```json
+{"pid":1234,"command":"compiler","source":"kernel/fork.c","phase":"db.merge.begin","start_ns":123456789,"duration_ns":42000}
+```
+
+Top-level phases cover parsing, symbol database storage, command database
+storage, output, cleanup, and total execution. Symbol database storage is
+divided into database setup, private staging, merge lock acquisition, each bulk
+merge query, commit, and close. In particular, `db.merge.begin` measures
+`BEGIN IMMEDIATE`; after schema initialization its duration is predominantly
+writer-lock wait.
+
+Use the repository analyzer to summarize phase totals, writer-lock wait, and
+the slowest translation units:
+
+```sh
+scripts/analyze-trace.sh --limit=20 /tmp/semindex.jsonl
+```
+
+The phase table contains nested intervals, so its rows must not be added
+together. The separate top-level table accounts for the major portions of
+aggregate process time. For custom analysis, `jq` can process the JSON Lines
+records directly:
+
+```sh
+jq -rs '
+    group_by(.phase)[] |
+    {phase: .[0].phase, seconds: (map(.duration_ns) | add / 1000000000)}
+' /tmp/semindex.jsonl
+```
+
+Tracing performs one append for every completed phase and therefore adds some
+measurement overhead. Compare traced runs only with other traced runs and keep
+the trace file outside the symbol database directory when investigating storage
+I/O. Failure to open, write, or close the requested trace file makes the
+indexing command fail rather than silently leaving an incomplete profile.
+
 ## Profiling tools
 
 Use `perf stat` to separate CPU time, instructions, cache behavior, and context

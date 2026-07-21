@@ -6,6 +6,7 @@
 
 #include "command_db.h"
 #include "index_db.h"
+#include "perf_trace.h"
 #include "semindex_cli.h"
 
 static void compiler_usage(FILE *f)
@@ -38,6 +39,7 @@ static void compiler_help(void)
 	       "                             (default: general)\n"
 	       "      --no-store-command      do not store the compiler command\n"
 	       "      --include-local         store local symbols and their uses\n"
+	       "      --trace=FILE            append performance events to FILE\n"
 	       "  -h, --help                 display this help and exit\n"
 	       "\n"
 	       "Report bugs to authors.\n"
@@ -158,6 +160,7 @@ int cmd_compiler(int argc, char **argv)
 		{ "variant", required_argument, NULL, 2 },
 		{ "commands-database", required_argument, NULL, 3 },
 		{ "no-store-command", no_argument, NULL, 4 },
+		{ "trace", required_argument, NULL, 5 },
 		{ "database", required_argument, NULL, 'd' },
 		{ "format", required_argument, NULL, 'f' },
 		{ "scope", required_argument, NULL, 's' },
@@ -170,13 +173,17 @@ int cmd_compiler(int argc, char **argv)
 	const char *commands_database = NULL;
 	const char *variant = "general";
 	const char *source_file = NULL;
-	semindex_t *s;
+	const char *trace_path = NULL;
+	semindex_trace_t *trace = NULL;
+	semindex_trace_time_t phase_start;
+	semindex_trace_time_t total_start = 0;
+	semindex_t *s = NULL;
 	semindex_compile_command_t cmd;
 	int compiler_argc;
 	char **compiler_argv;
 	char **default_argv = NULL;
 	char *default_commands_database = NULL;
-	int ret;
+	int ret = 1;
 	int print_output = 0;
 	int include_local = 0;
 	int store_command = 1;
@@ -196,6 +203,9 @@ int cmd_compiler(int argc, char **argv)
 			break;
 		case 4:
 			store_command = 0;
+			break;
+		case 5:
+			trace_path = optarg;
 			break;
 		case 'd':
 			database = optarg;
@@ -261,6 +271,13 @@ int cmd_compiler(int argc, char **argv)
 		commands_database = default_commands_database;
 	}
 
+	if (trace_path) {
+		trace = semindex_trace_open(trace_path, "compiler", source_file);
+		if (!trace)
+			goto out;
+		total_start = semindex_trace_begin(trace);
+	}
+
 	s = semindex_create();
 	semindex_set_scope(s, scope);
 	semindex_set_details(s, print_output);
@@ -271,32 +288,43 @@ int cmd_compiler(int argc, char **argv)
 	cmd.argc = compiler_argc;
 	cmd.argv = (const char *const *)compiler_argv;
 
+	phase_start = semindex_trace_begin(trace);
 	if (semindex_index_command(s, &cmd) != 0) {
+		semindex_trace_end(trace, "parse", phase_start);
 		fprintf(stderr, "semindex: failed to index compiler command for '%s'\n", source_file);
-		semindex_destroy(s);
-		free(default_commands_database);
-		free(default_argv);
-		return 1;
+		goto out;
 	}
-	if (index_db_store(database, s, source_file, variant, include_local) < 0) {
-		semindex_destroy(s);
-		free(default_commands_database);
-		free(default_argv);
-		return 1;
+	semindex_trace_end(trace, "parse", phase_start);
+	phase_start = semindex_trace_begin(trace);
+	if (index_db_store(database, s, source_file, variant, include_local, trace) < 0) {
+		semindex_trace_end(trace, "symbol_database", phase_start);
+		goto out;
 	}
-	if (store_command &&
-		command_db_store(commands_database, variant, cmd.directory, source_file, compiler_argc,
-			(const char *const *)compiler_argv) < 0) {
-		semindex_destroy(s);
-		free(default_commands_database);
-		free(default_argv);
-		return 1;
+	semindex_trace_end(trace, "symbol_database", phase_start);
+	if (store_command) {
+		phase_start = semindex_trace_begin(trace);
+		if (command_db_store(commands_database, variant, cmd.directory, source_file, compiler_argc,
+			    (const char *const *)compiler_argv) < 0) {
+			semindex_trace_end(trace, "command_database", phase_start);
+			goto out;
+		}
+		semindex_trace_end(trace, "command_database", phase_start);
 	}
 
+	phase_start = semindex_trace_begin(trace);
 	ret = print_output ? output_index(format, s) : 0;
+	semindex_trace_end(trace, "output", phase_start);
+	ret = ret ? 1 : 0;
 
-	semindex_destroy(s);
+out:
+	phase_start = semindex_trace_begin(trace);
+	if (s)
+		semindex_destroy(s);
 	free(default_commands_database);
 	free(default_argv);
-	return ret ? 1 : 0;
+	semindex_trace_end(trace, "cleanup", phase_start);
+	semindex_trace_end(trace, "total", total_start);
+	if (semindex_trace_close(trace) < 0)
+		ret = 1;
+	return ret;
 }

@@ -5,6 +5,7 @@
 
 #include "command_db.h"
 #include "index_db.h"
+#include "perf_trace.h"
 #include "semindex_cli.h"
 
 static void index_usage(FILE *f)
@@ -42,6 +43,7 @@ static void index_help(void)
 	       "                             (default: general)\n"
 	       "      --no-store-command      do not store the selected compile command\n"
 	       "      --include-local         store local symbols and their uses\n"
+	       "      --trace=FILE            append performance events to FILE\n"
 	       "  -h, --help                 display this help and exit\n"
 	       "\n"
 	       "Report bugs to authors.\n"
@@ -55,6 +57,7 @@ int cmd_index(int argc, char **argv)
 		{ "variant", required_argument, NULL, 2 },
 		{ "commands-database", required_argument, NULL, 3 },
 		{ "no-store-command", no_argument, NULL, 4 },
+		{ "trace", required_argument, NULL, 5 },
 		{ "format", required_argument, NULL, 'f' },
 		{ "scope", required_argument, NULL, 's' },
 		{ "compile-commands", required_argument, NULL, 'c' },
@@ -69,10 +72,14 @@ int cmd_index(int argc, char **argv)
 	const char *database = ".semindex/semindex.db";
 	const char *commands_database = NULL;
 	const char *variant = "general";
-	semindex_t *s;
+	const char *trace_path = NULL;
+	semindex_trace_t *trace = NULL;
+	semindex_trace_time_t phase_start;
+	semindex_trace_time_t total_start = 0;
+	semindex_t *s = NULL;
 	const semindex_compile_command_t *cmd;
 	char *default_commands_database = NULL;
-	int ret;
+	int ret = 1;
 	int include_local = 0;
 	int store_command = 1;
 	int opt;
@@ -91,6 +98,9 @@ int cmd_index(int argc, char **argv)
 			break;
 		case 4:
 			store_command = 0;
+			break;
+		case 5:
+			trace_path = optarg;
 			break;
 		case 'f':
 			if (parse_format(optarg, &format) < 0) {
@@ -144,33 +154,54 @@ int cmd_index(int argc, char **argv)
 		commands_database = default_commands_database;
 	}
 
+	if (trace_path) {
+		trace = semindex_trace_open(trace_path, "index", source_file);
+		if (!trace)
+			goto out;
+		total_start = semindex_trace_begin(trace);
+	}
+
 	s = semindex_create();
 	semindex_set_scope(s, scope);
 
+	phase_start = semindex_trace_begin(trace);
 	if (semindex_index_file(s, compile_commands, source_file) != 0) {
+		semindex_trace_end(trace, "parse", phase_start);
 		fprintf(stderr, "semindex: failed to index '%s' using '%s'\n", source_file, compile_commands);
-		semindex_destroy(s);
-		free(default_commands_database);
-		return 1;
+		goto out;
 	}
-	if (index_db_store(database, s, source_file, variant, include_local) < 0) {
-		semindex_destroy(s);
-		free(default_commands_database);
-		return 1;
+	semindex_trace_end(trace, "parse", phase_start);
+	phase_start = semindex_trace_begin(trace);
+	if (index_db_store(database, s, source_file, variant, include_local, trace) < 0) {
+		semindex_trace_end(trace, "symbol_database", phase_start);
+		goto out;
 	}
+	semindex_trace_end(trace, "symbol_database", phase_start);
 	cmd = semindex_get_compile_command(s);
-	if (store_command &&
-		(!cmd ||
+	if (store_command) {
+		phase_start = semindex_trace_begin(trace);
+		if (!cmd ||
 			command_db_store(commands_database, variant, cmd->directory, cmd->file, cmd->argc, cmd->argv) <
-				0)) {
-		semindex_destroy(s);
-		free(default_commands_database);
-		return 1;
+				0) {
+			semindex_trace_end(trace, "command_database", phase_start);
+			goto out;
+		}
+		semindex_trace_end(trace, "command_database", phase_start);
 	}
 
+	phase_start = semindex_trace_begin(trace);
 	ret = output_index(format, s);
+	semindex_trace_end(trace, "output", phase_start);
+	ret = ret ? 1 : 0;
 
-	semindex_destroy(s);
+out:
+	phase_start = semindex_trace_begin(trace);
+	if (s)
+		semindex_destroy(s);
 	free(default_commands_database);
-	return ret ? 1 : 0;
+	semindex_trace_end(trace, "cleanup", phase_start);
+	semindex_trace_end(trace, "total", total_start);
+	if (semindex_trace_close(trace) < 0)
+		ret = 1;
+	return ret;
 }

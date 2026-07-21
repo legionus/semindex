@@ -52,6 +52,8 @@ set(SEMINDEX_FORMAT_SOURCES
 	utils/output_default.c
 	utils/output_dissect.c
 	utils/output_search.c
+	utils/perf_trace.c
+	utils/perf_trace.h
 	utils/semindex.c
 	utils/semindex_cli.h
 )
@@ -138,6 +140,7 @@ add_executable(semindex
 	utils/output_default.c
 	utils/output_dissect.c
 	utils/output_search.c
+	utils/perf_trace.c
 	utils/semindex.c
 )
 
@@ -237,5 +240,14 @@ if(BUILD_TESTING)
 			SEMINDEX=$<TARGET_FILE:semindex>
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-callgraph-tests.sh
+	)
+	add_test(
+		NAME semindex-trace
+		COMMAND
+			${CMAKE_COMMAND} -E env
+			SEMINDEX=$<TARGET_FILE:semindex>
+			COMPILE_COMMANDS=${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
+			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-trace-tests.sh
 	)
 endif()

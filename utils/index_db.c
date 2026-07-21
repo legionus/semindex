@@ -40,6 +40,15 @@ static int exec_sql(sqlite3 *db, const char *sql)
 	return 0;
 }
 
+static int trace_exec_sql(sqlite3 *db, const char *sql, semindex_trace_t *trace, const char *phase)
+{
+	semindex_trace_time_t start = semindex_trace_begin(trace);
+	int ret = exec_sql(db, sql);
+
+	semindex_trace_end(trace, phase, start);
+	return ret;
+}
+
 static int prepare(sqlite3 *db, const char *sql, sqlite3_stmt **stmt)
 {
 	int ret;
@@ -212,20 +221,36 @@ rollback:
 	return -1;
 }
 
-static int open_writer(const char *path, sqlite3 **db)
+static int open_writer(const char *path, sqlite3 **db, semindex_trace_t *trace)
 {
-	if (ensure_parent_directory(path) < 0)
+	semindex_trace_time_t start;
+
+	start = semindex_trace_begin(trace);
+	if (ensure_parent_directory(path) < 0) {
+		semindex_trace_end(trace, "db.mkdir", start);
 		return -1;
+	}
+	semindex_trace_end(trace, "db.mkdir", start);
+	start = semindex_trace_begin(trace);
 	if (sqlite3_open_v2(path, db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL) != SQLITE_OK) {
 		fprintf(stderr, "semindex: failed to open database '%s': %s\n", path,
 			*db ? sqlite3_errmsg(*db) : "unknown error");
+		semindex_trace_end(trace, "db.open", start);
 		return -1;
 	}
+	semindex_trace_end(trace, "db.open", start);
 	if (sqlite3_busy_timeout(*db, INT_MAX) != SQLITE_OK)
 		return -1;
-	if (exec_sql(*db, "PRAGMA journal_mode = WAL") < 0 || exec_sql(*db, "PRAGMA synchronous = OFF") < 0 ||
-		exec_sql(*db, "PRAGMA temp_store = MEMORY") < 0 || init_schema(*db) < 0)
+	if (trace_exec_sql(*db, "PRAGMA journal_mode = WAL", trace, "db.journal_mode") < 0 ||
+		trace_exec_sql(*db, "PRAGMA synchronous = OFF", trace, "db.synchronous") < 0 ||
+		trace_exec_sql(*db, "PRAGMA temp_store = MEMORY", trace, "db.temp_store") < 0)
 		return -1;
+	start = semindex_trace_begin(trace);
+	if (init_schema(*db) < 0) {
+		semindex_trace_end(trace, "db.schema", start);
+		return -1;
+	}
+	semindex_trace_end(trace, "db.schema", start);
 
 	return 0;
 }
@@ -409,8 +434,14 @@ out:
 	return ret;
 }
 
-static int merge_staging(sqlite3 *db, const char *variant)
+static int merge_staging(sqlite3 *db, const char *variant, semindex_trace_t *trace)
 {
+	static const char *phases[] = {
+		"db.merge.files_insert",
+		"db.merge.records_delete",
+		"db.merge.files_update",
+		"db.merge.records_insert",
+	};
 	char *merge[4] = { NULL };
 	size_t i;
 	int ret = -1;
@@ -444,13 +475,13 @@ static int merge_staging(sqlite3 *db, const char *variant)
 		if (!merge[i])
 			goto out;
 	}
-	if (exec_sql(db, "BEGIN IMMEDIATE") < 0)
+	if (trace_exec_sql(db, "BEGIN IMMEDIATE", trace, "db.merge.begin") < 0)
 		goto out;
 	for (i = 0; i < sizeof(merge) / sizeof(merge[0]); i++) {
-		if (exec_sql(db, merge[i]) < 0)
+		if (trace_exec_sql(db, merge[i], trace, phases[i]) < 0)
 			goto rollback;
 	}
-	if (exec_sql(db, "COMMIT") < 0)
+	if (trace_exec_sql(db, "COMMIT", trace, "db.merge.commit") < 0)
 		goto out;
 
 	ret = 0;
@@ -463,28 +494,49 @@ out:
 	return ret;
 }
 
-int index_db_store(const char *path, semindex_t *s, const char *main_file, const char *variant, int include_local)
+int index_db_store(const char *path, semindex_t *s, const char *main_file, const char *variant, int include_local,
+	semindex_trace_t *trace)
 {
 	sqlite3 *db = NULL;
+	semindex_trace_time_t start;
 	int ret = -1;
 
 	if (!path || !s || !variant || !variant[0])
 		return -1;
-	if (open_writer(path, &db) < 0)
+	if (open_writer(path, &db, trace) < 0)
 		goto out;
-	if (create_staging(db) < 0 || exec_sql(db, "BEGIN") < 0)
+	start = semindex_trace_begin(trace);
+	if (create_staging(db) < 0) {
+		semindex_trace_end(trace, "db.staging_schema", start);
 		goto out;
-	if (stage_records(db, s, include_local) < 0 || stage_files(db, main_file) < 0) {
+	}
+	semindex_trace_end(trace, "db.staging_schema", start);
+	if (trace_exec_sql(db, "BEGIN", trace, "db.staging_begin") < 0)
+		goto out;
+	start = semindex_trace_begin(trace);
+	if (stage_records(db, s, include_local) < 0) {
+		semindex_trace_end(trace, "db.stage_records", start);
 		exec_sql(db, "ROLLBACK");
 		goto out;
 	}
-	if (exec_sql(db, "COMMIT") < 0 || merge_staging(db, variant) < 0)
+	semindex_trace_end(trace, "db.stage_records", start);
+	start = semindex_trace_begin(trace);
+	if (stage_files(db, main_file) < 0) {
+		semindex_trace_end(trace, "db.stage_files", start);
+		exec_sql(db, "ROLLBACK");
+		goto out;
+	}
+	semindex_trace_end(trace, "db.stage_files", start);
+	if (trace_exec_sql(db, "COMMIT", trace, "db.staging_commit") < 0 || merge_staging(db, variant, trace) < 0)
 		goto out;
 
 	ret = 0;
 out:
-	if (db)
+	if (db) {
+		start = semindex_trace_begin(trace);
 		sqlite3_close(db);
+		semindex_trace_end(trace, "db.close", start);
+	}
 	return ret;
 }
 

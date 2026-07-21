@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #include "semindex.h"
+#include "perf_trace.h"
 
 typedef enum {
 	INDEX_DB_RECORD_ALL,
@@ -40,7 +41,8 @@ typedef struct {
 	int show_id;
 } index_db_callgraph_options_t;
 
-int index_db_store(const char *path, semindex_t *s, const char *main_file, const char *variant, int include_local);
+int index_db_store(const char *path, semindex_t *s, const char *main_file, const char *variant, int include_local,
+	semindex_trace_t *trace);
 int index_db_search(const char *path, const index_db_search_options_t *opts, FILE *out);
 int index_db_callgraph(const char *path, const index_db_callgraph_options_t *opts, FILE *out);
 
