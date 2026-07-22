@@ -10,6 +10,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(SEMINDEX_FORMAT_SOURCES
 	include/semindex.h
+	include/semindex_database.h
 	src/index_ast.cpp
 	src/index_context.cpp
 	src/index_pp.cpp
@@ -22,6 +23,7 @@ set(SEMINDEX_FORMAT_SOURCES
 	tests/compiler-target.c
 	tests/callgraph-a.c
 	tests/callgraph-b.c
+	tests/database-api.c
 	tests/test.c
 	tests/test1.c
 	tests/test2.c
@@ -47,6 +49,7 @@ set(SEMINDEX_FORMAT_SOURCES
 	utils/command_db.h
 	utils/index_db.c
 	utils/index_db.h
+	utils/index_db_reader.c
 	utils/output.h
 	utils/output_common.c
 	utils/output_default.c
@@ -76,6 +79,14 @@ find_package(SQLite3 3.35 REQUIRED)
 if(NOT TARGET SQLite3::SQLite3 AND TARGET SQLite::SQLite3)
 	add_library(SQLite3::SQLite3 ALIAS SQLite::SQLite3)
 endif()
+
+add_library(semindex_database STATIC
+	utils/index_db_reader.c
+)
+target_include_directories(semindex_database PUBLIC
+	${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_link_libraries(semindex_database PUBLIC SQLite3::SQLite3)
 
 # LLVM paths from llvm-config
 execute_process(
@@ -145,9 +156,14 @@ add_executable(semindex
 )
 
 target_include_directories(semindex PRIVATE include)
-target_link_libraries(semindex PRIVATE semindex_parser SQLite3::SQLite3)
+target_link_libraries(semindex PRIVATE semindex_parser semindex_database SQLite3::SQLite3)
 
 if(BUILD_TESTING)
+	add_executable(semindex_database_api_test
+		tests/database-api.c
+	)
+	target_link_libraries(semindex_database_api_test PRIVATE semindex_database)
+
 	foreach(test_source IN ITEMS
 		tests/test.c
 		tests/test1.c
@@ -224,6 +240,16 @@ if(BUILD_TESTING)
 			${CMAKE_COMMAND} -E env
 			SEMINDEX=$<TARGET_FILE:semindex>
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-database-tests.sh
+	)
+	add_test(
+		NAME semindex-database-api
+		COMMAND
+			${CMAKE_COMMAND} -E env
+			SEMINDEX=$<TARGET_FILE:semindex>
+			DATABASE_API_TEST=$<TARGET_FILE:semindex_database_api_test>
+			COMPILE_COMMANDS=${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
+			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-database-api-tests.sh
 	)
 	add_test(
 		NAME semindex-command-database

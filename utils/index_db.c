@@ -9,6 +9,7 @@
 
 #include "index_db.h"
 #include "output.h"
+#include "semindex_database.h"
 
 #define INDEX_SCHEMA_VERSION 8
 #define STRINGIFY_VALUE(value) #value
@@ -727,79 +728,27 @@ static int pattern_uses_glob(const char *pattern)
 	return pattern && strpbrk(pattern, "*?[]");
 }
 
-static int append_search_filter(sqlite3_str *query, const index_db_search_options_t *opts)
+struct search_output {
+	output_search_t *formatter;
+};
+
+static int print_search_result(void *data, const semindex_db_record_t *record)
 {
-	if (opts->pattern) {
-		const char *op = pattern_uses_glob(opts->pattern) ? "GLOB" : "=";
+	struct search_output *output = data;
+	output_search_record_t result = {
+		.variant = record->variant,
+		.file = record->path,
+		.line = record->line,
+		.column = record->column,
+		.symbol_record = record->record != SEMINDEX_DB_REFERENCE,
+		.definition = record->record == SEMINDEX_DB_DEFINITION,
+		.kind = record->kind,
+		.symbol = record->symbol,
+		.context = record->context,
+		.mode = record->mode,
+	};
 
-		sqlite3_str_appendf(query, " AND records.symbol %s %Q", op, opts->pattern);
-	}
-	if (opts->path)
-		sqlite3_str_appendf(query, " AND files.path GLOB %Q", opts->path);
-	if (opts->variant) {
-		const char *op = pattern_uses_glob(opts->variant) ? "GLOB" : "=";
-
-		sqlite3_str_appendf(query, " AND files.variant %s %Q", op, opts->variant);
-	}
-	if (opts->record != INDEX_DB_RECORD_ALL)
-		sqlite3_str_appendf(query, " AND records.record = %d",
-			opts->record == INDEX_DB_RECORD_SYMBOL ? STORED_RECORD_SYMBOL : STORED_RECORD_USE);
-	if (opts->has_mode) {
-		if (opts->mode_definition) {
-			sqlite3_str_appendf(query, " AND records.record = %d AND records.action != 0",
-				STORED_RECORD_SYMBOL);
-		} else if (!opts->mode) {
-			sqlite3_str_appendf(query, " AND records.record = %d AND records.mode = 0", STORED_RECORD_USE);
-		} else {
-			sqlite3_str_appendf(query, " AND records.record = %d AND (records.mode & %u) != 0",
-				STORED_RECORD_USE, opts->mode);
-		}
-	}
-	if (opts->has_kind)
-		sqlite3_str_appendf(query, " AND records.kind = %d", opts->kind);
-
-	return sqlite3_str_errcode(query) == SQLITE_OK ? 0 : -1;
-}
-
-static int print_search_results(sqlite3 *db, const char *sql, const char *format, FILE *out)
-{
-	output_search_t *search = NULL;
-	sqlite3_stmt *stmt = NULL;
-	int step;
-	int ret = -1;
-
-	search = output_search_create(out, format);
-	if (!search)
-		return -1;
-	if (prepare(db, sql, &stmt) < 0)
-		goto out;
-	while ((step = sqlite3_step(stmt)) == SQLITE_ROW) {
-		output_search_record_t result = {
-			.variant = (const char *)sqlite3_column_text(stmt, 0),
-			.file = (const char *)sqlite3_column_text(stmt, 1),
-			.line = sqlite3_column_int(stmt, 2),
-			.column = sqlite3_column_int(stmt, 3),
-			.symbol_record = sqlite3_column_int(stmt, 4) == STORED_RECORD_SYMBOL,
-			.definition = sqlite3_column_int(stmt, 5),
-			.kind = sqlite3_column_int(stmt, 6),
-			.symbol = (const char *)sqlite3_column_text(stmt, 7),
-			.context = (const char *)sqlite3_column_text(stmt, 8),
-			.mode = sqlite3_column_int64(stmt, 9),
-		};
-
-		if (output_search_write(search, &result) < 0)
-			goto out;
-	}
-	if (step != SQLITE_DONE) {
-		fprintf(stderr, "semindex: sqlite: %s\n", sqlite3_errmsg(db));
-		goto out;
-	}
-
-	ret = ferror(out) ? -1 : 0;
-out:
-	output_search_destroy(search);
-	sqlite3_finalize(stmt);
-	return ret;
+	return output_search_write(output->formatter, &result);
 }
 
 static int open_reader(const char *path, sqlite3 **db)
@@ -820,43 +769,39 @@ int index_db_search(const char *path, const index_db_search_options_t *opts, FIL
 	index_db_search_options_t defaults = {
 		.record = INDEX_DB_RECORD_ALL,
 	};
-	sqlite3_str *query = NULL;
-	sqlite3 *db = NULL;
-	char *sql = NULL;
+	semindex_db_query_options_t query = { 0 };
+	semindex_db_t *db = NULL;
+	struct search_output output = { 0 };
 	int ret = -1;
 
 	if (!path || !out)
 		return -1;
 	if (!opts)
 		opts = &defaults;
-	if (open_reader(path, &db) < 0)
+	if (semindex_db_open(path, &db) < 0)
 		goto out;
-
-	query = sqlite3_str_new(db);
-	if (!query)
+	output.formatter = output_search_create(out, opts->format ? opts->format : OUTPUT_SEARCH_DEFAULT_FORMAT);
+	if (!output.formatter)
 		goto out;
-	sqlite3_str_appendall(query,
-		"SELECT files.variant, files.path, records.line, records.column, records.record, records.action, "
-		"records.kind, records.symbol, records.context, records.mode "
-		"FROM records JOIN files ON files.id = records.file_id WHERE 1");
-	if (append_search_filter(query, opts) < 0)
-		goto out;
-	sqlite3_str_appendall(query,
-		" ORDER BY files.variant, files.path, records.line, records.column, records.record");
-	if (sqlite3_str_errcode(query) != SQLITE_OK)
-		goto out;
-
-	sql = sqlite3_str_finish(query);
-	query = NULL;
-	if (!sql)
-		goto out;
-	ret = print_search_results(db, sql, opts->format ? opts->format : OUTPUT_SEARCH_DEFAULT_FORMAT, out);
+	query.symbol = opts->pattern;
+	query.path = opts->path;
+	query.variant = opts->variant;
+	query.mode = opts->mode;
+	query.kind = opts->kind;
+	query.has_mode = opts->has_mode && !opts->mode_definition;
+	query.has_kind = opts->has_kind;
+	if (opts->mode_definition)
+		query.record = SEMINDEX_DB_RECORD_DEFINITION;
+	else if (opts->record == INDEX_DB_RECORD_SYMBOL)
+		query.record = SEMINDEX_DB_RECORD_SYMBOL;
+	else if (opts->record == INDEX_DB_RECORD_USE)
+		query.record = SEMINDEX_DB_RECORD_REFERENCE;
+	ret = semindex_db_query(db, &query, print_search_result, &output);
+	if (!ret && ferror(out))
+		ret = -1;
 out:
-	if (query)
-		sqlite3_str_finish(query);
-	sqlite3_free(sql);
-	if (db)
-		sqlite3_close(db);
+	output_search_destroy(output.formatter);
+	semindex_db_close(db);
 	return ret;
 }
 

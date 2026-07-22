@@ -17,8 +17,22 @@ USRs remain available only from the in-memory index and output formats. Direct
 call records store compact caller and callee IDs derived from their Clang USRs,
 so static functions can be distinguished without repeating both identity
 strings at every call site. IDs are computed before SQLite staging; adding a
-record does not perform an identity lookup. A secondary index supports file
-replacement.
+record does not perform an identity lookup. A secondary file index supports
+file replacement and narrows source-position lookup to one indexed file.
+
+## Reader API
+
+`libsemindex_database` exposes a read-only C API in
+`include/semindex_database.h`. A caller keeps an opaque database handle open
+and receives matching declarations, definitions, and references through a
+callback. Record strings point into the active SQLite row and remain valid only
+until that callback returns, so large searches do not require a buffered copy
+of the result set.
+
+Name queries accept the same exact and glob patterns as `semindex search`.
+Position queries use one-based source byte coordinates and may select one
+variant or return matches from all variants. The LSP layer is responsible for
+converting its UTF-16 document positions before calling this API.
 
 A partial `(context, context_usr_id)` index contains only direct function-call
 records and supports caller-to-callee queries. Callee-to-caller queries use the
