@@ -13,6 +13,10 @@ set(SEMINDEX_FORMAT_SOURCES
 	include/semindex_database.h
 	src/index_ast.cpp
 	src/index_context.cpp
+	src/lsp_server.cpp
+	src/lsp_server.h
+	src/lsp_transport.cpp
+	src/lsp_transport.h
 	src/index_pp.cpp
 	src/index_pp.h
 	src/semindex.cpp
@@ -59,6 +63,7 @@ set(SEMINDEX_FORMAT_SOURCES
 	utils/perf_trace.h
 	utils/semindex.c
 	utils/semindex_cli.h
+	utils/semindex_lsp.cpp
 )
 
 find_program(CLANG_FORMAT clang-format)
@@ -139,6 +144,20 @@ target_compile_options(semindex_parser PRIVATE ${LLVM_CXXFLAGS})
 target_link_directories(semindex_parser PRIVATE ${LLVM_LIBDIR})
 target_link_libraries(semindex_parser PRIVATE clang-cpp ${LLVM_LIBS})
 
+add_executable(semindex_lsp
+	src/lsp_server.cpp
+	src/lsp_transport.cpp
+	utils/semindex_lsp.cpp
+)
+set_target_properties(semindex_lsp PROPERTIES OUTPUT_NAME semindex-lsp)
+target_include_directories(semindex_lsp PRIVATE
+	${CMAKE_CURRENT_SOURCE_DIR}/src
+	${LLVM_INCLUDEDIR}
+)
+target_compile_options(semindex_lsp PRIVATE ${LLVM_CXXFLAGS})
+target_link_directories(semindex_lsp PRIVATE ${LLVM_LIBDIR})
+target_link_libraries(semindex_lsp PRIVATE ${LLVM_LIBS})
+
 add_executable(semindex
 	utils/cmd_compiler.c
 	utils/cmd_compile_commands.c
@@ -159,6 +178,8 @@ target_include_directories(semindex PRIVATE include)
 target_link_libraries(semindex PRIVATE semindex_parser semindex_database SQLite3::SQLite3)
 
 if(BUILD_TESTING)
+	find_package(Python3 COMPONENTS Interpreter REQUIRED)
+
 	add_executable(semindex_database_api_test
 		tests/database-api.c
 	)
@@ -275,5 +296,11 @@ if(BUILD_TESTING)
 			COMPILE_COMMANDS=${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-trace-tests.sh
+	)
+	add_test(
+		NAME semindex-lsp
+		COMMAND
+			${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-lsp-tests.py
+				$<TARGET_FILE:semindex_lsp>
 	)
 endif()

@@ -83,11 +83,12 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build build -j"$(nproc)"
 ```
 
-The executable is created as `build/semindex` and can be run directly from the
-build tree:
+The command-line indexer and language server are created as `build/semindex`
+and `build/semindex-lsp`. They can be run directly from the build tree:
 
 ```sh
 ./build/semindex --help
+./build/semindex-lsp --help
 ```
 
 CMake also writes `build/compile_commands.json`, which can be used to index the
