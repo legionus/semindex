@@ -7,6 +7,7 @@
 
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <utility>
@@ -30,6 +31,7 @@ static void help()
 		     "                             (default: commands.db beside --database)\n"
 		     "      --variant=NAME         query only the named index variant\n"
 		     "      --include-local        preserve local symbols when reindexing\n"
+		     "      --logfile=FILE         append JSON-RPC requests and responses to FILE\n"
 		     "  -h, --help                 display this help and exit\n"
 		     "\n";
 }
@@ -39,7 +41,9 @@ int main(int argc, char **argv)
 	std::string database_path = ".semindex/semindex.db";
 	std::string commands_database_path;
 	std::string variant;
+	std::string logfile_path;
 	bool include_local = false;
+	bool logfile_requested = false;
 	semindex_db_t *database = nullptr;
 
 	for (int i = 1; i < argc; i++) {
@@ -85,12 +89,30 @@ int main(int argc, char **argv)
 			variant = argument.substr(sizeof("--variant=") - 1);
 			continue;
 		}
+		if (argument == "--logfile") {
+			if (++i == argc) {
+				std::cerr << "semindex-lsp: option requires an argument: " << argument << '\n';
+				return 1;
+			}
+			logfile_path = argv[i];
+			logfile_requested = true;
+			continue;
+		}
+		if (argument.rfind("--logfile=", 0) == 0) {
+			logfile_path = argument.substr(sizeof("--logfile=") - 1);
+			logfile_requested = true;
+			continue;
+		}
 		if (argument == "--include-local") {
 			include_local = true;
 			continue;
 		}
 		std::cerr << "semindex-lsp: unknown option: " << argument << '\n';
 		usage(std::cerr);
+		return 1;
+	}
+	if (logfile_requested && logfile_path.empty()) {
+		std::cerr << "semindex-lsp: empty log file path\n";
 		return 1;
 	}
 	if (commands_database_path.empty()) {
@@ -105,10 +127,18 @@ int main(int argc, char **argv)
 	}
 	database_path = std::filesystem::absolute(database_path).lexically_normal().string();
 	commands_database_path = std::filesystem::absolute(commands_database_path).lexically_normal().string();
+	std::ofstream logfile;
+	if (!logfile_path.empty()) {
+		logfile.open(logfile_path, std::ios::app);
+		if (!logfile) {
+			std::cerr << "semindex-lsp: failed to open log file: " << logfile_path << '\n';
+			return 1;
+		}
+	}
 	if (semindex_db_open(database_path.c_str(), &database) < 0)
 		return 1;
 
-	LspTransport transport(std::cin, std::cout, std::cerr);
+	LspTransport transport(std::cin, std::cout, std::cerr, logfile.is_open() ? &logfile : nullptr);
 	LspIndexer indexer(database_path, commands_database_path, variant.empty() ? "general" : variant, include_local);
 	LspServer server(transport, database, indexer, std::move(variant));
 	int ret = server.run();

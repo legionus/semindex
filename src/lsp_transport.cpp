@@ -12,9 +12,23 @@
 
 static constexpr size_t MAX_MESSAGE_SIZE = 64 * 1024 * 1024;
 
-LspTransport::LspTransport(std::istream &input, std::ostream &output, std::ostream &errors)
-    : input(input), output(output), errors(errors)
+LspTransport::LspTransport(std::istream &input, std::ostream &output, std::ostream &errors, std::ostream *log)
+    : input(input), output(output), errors(errors), log(log)
 {
+}
+
+bool LspTransport::logMessage(const char *direction, const std::string &payload)
+{
+	if (!log)
+		return true;
+
+	*log << direction << '\n' << payload << "\n\n";
+	log->flush();
+	if (!*log) {
+		errors << "semindex-lsp: failed to write protocol log\n";
+		return false;
+	}
+	return true;
 }
 
 LspTransport::ReadResult LspTransport::read(std::string &payload)
@@ -64,6 +78,8 @@ LspTransport::ReadResult LspTransport::read(std::string &payload)
 		errors << "semindex-lsp: truncated message body\n";
 		return ReadResult::Error;
 	}
+	if (!logMessage("CLIENT --> SERVER", payload))
+		return ReadResult::Error;
 	return ReadResult::Message;
 }
 
@@ -80,5 +96,5 @@ bool LspTransport::write(const llvm::json::Value &message)
 		errors << "semindex-lsp: failed to write response\n";
 		return false;
 	}
-	return true;
+	return logMessage("SERVER --> CLIENT", payload);
 }

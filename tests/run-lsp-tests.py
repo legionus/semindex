@@ -108,6 +108,7 @@ def main():
         source = directory / "navigation.c"
         database = directory / "semindex.db"
         commands_database = directory / "commands.db"
+        logfile = directory / "semindex-lsp.log"
         source.write_text(
             "struct Nav {\n"
             "\tint field;\n"
@@ -164,6 +165,7 @@ def main():
             f"--database={database}",
             f"--commands-database={commands_database}",
             "--variant=general",
+            f"--logfile={logfile}",
         ]
         uri = source.resolve().as_uri()
         root_uri = directory.resolve().as_uri()
@@ -319,6 +321,29 @@ def main():
             "code"
         ) != -32600:
             fail("exit request was accepted")
+
+        protocol_log = logfile.read_text(encoding="utf-8")
+        if protocol_log.count("CLIENT --> SERVER\n") != 14:
+            fail("protocol log has an unexpected request count")
+        if protocol_log.count("SERVER --> CLIENT\n") != len(responses):
+            fail("protocol log has an unexpected response count")
+        if '"method":"textDocument/definition"' not in protocol_log or (
+            '"id":5' not in protocol_log
+        ):
+            fail("protocol log is missing an incoming request")
+        if '"id":2,"jsonrpc":"2.0","result":null' not in protocol_log:
+            fail("protocol log is missing an outgoing response")
+
+        process = subprocess.run(
+            [sys.argv[1], "--logfile="],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        if process.returncode == 0 or (
+            b"empty log file path" not in process.stderr
+        ):
+            fail("empty protocol log path was accepted", process)
 
         process, responses = run_server(sys.argv[1], options, [
             {"jsonrpc": "2.0", "method": "exit"},

@@ -15,7 +15,7 @@ public:
 		Error,
 	};
 
-	LspTransport(std::istream &input, std::ostream &output, std::ostream &errors);
+	LspTransport(std::istream &input, std::ostream &output, std::ostream &errors, std::ostream *log = nullptr);
 
 	ReadResult read(std::string &payload);
 	bool write(const llvm::json::Value &message);
@@ -24,4 +24,7 @@ private:
 	std::istream &input;
 	std::ostream &output;
 	std::ostream &errors;
+	std::ostream *log;
+
+	bool logMessage(const char *direction, const std::string &payload);
 };

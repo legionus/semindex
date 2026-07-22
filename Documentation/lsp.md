@@ -26,6 +26,19 @@ The server reads `Content-Length` framed JSON-RPC messages from standard input
 and writes responses to standard output. Diagnostics are written only to
 standard error.
 
+Use `--logfile=FILE` to append protocol traffic to a file without corrupting
+standard output:
+
+```sh
+build/semindex-lsp --logfile=/tmp/semindex-lsp.log
+```
+
+Each request or notification is preceded by `CLIENT --> SERVER`, and each
+response is preceded by `SERVER --> CLIENT`. The raw JSON payload follows the
+marker. The log is flushed after every message so it remains useful when the
+server exits unexpectedly. Protocol logs can contain source text and other
+client data and should therefore be treated as potentially sensitive.
+
 ## Call hierarchy
 
 Call hierarchy items carry the index variant and stable function identity in
