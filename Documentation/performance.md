@@ -67,7 +67,7 @@ storage and repeated-header handling without committing large generated
 fixtures.
 
 ```sh
-scripts/benchmark.sh \
+scripts/benchmark.py \
     --baseline=/path/to/baseline/build/semindex \
     --candidate=build/semindex \
     --iterations=5
@@ -201,7 +201,7 @@ Use the repository analyzer to summarize phase totals, writer-lock wait, and
 the slowest translation units:
 
 ```sh
-scripts/analyze-trace.sh --limit=20 /tmp/semindex.jsonl
+scripts/analyze-trace.py --limit=20 /tmp/semindex.jsonl
 ```
 
 The phase table contains nested intervals, so its rows must not be added

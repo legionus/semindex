@@ -42,7 +42,7 @@ These instructions apply to the entire repository.
   schema or queries, transactions, header handling, compiler command capture,
   and output buffering as performance-sensitive.
 * For a performance-sensitive change, compare the baseline and candidate using
-  `scripts/benchmark.sh` and follow `Documentation/performance.md`.
+  `scripts/benchmark.py` and follow `Documentation/performance.md`.
 * Database or concurrency changes must also be tested with parallel writers.
   A run that reports `database is locked`, loses records, or silently skips a
   translation unit is a failure.

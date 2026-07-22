@@ -60,7 +60,7 @@ for input in "$tmpdir/one.c" "$tmpdir/two.c"; do
 	"$SEMINDEX" compiler --trace="$flow_trace" --no-store-command --database="$tmpdir/flow.db" -- \
 		cc -I"$tmpdir" "$input"
 done
-"$SOURCE_DIR/scripts/analyze-trace.sh" "$flow_trace" >"$tmpdir/flow.out"
+"$SOURCE_DIR/scripts/analyze-trace.py" "$flow_trace" >"$tmpdir/flow.out"
 if ! awk '
 	/^  in-memory records: / { input = $3 }
 	/^  private staging records: / { staged = $4 }
@@ -106,7 +106,7 @@ if [ "$(grep -c '"phase":"db.merge.begin"' "$parallel_trace")" != 8 ]; then
 	fail "parallel trace lost a merge wait event"
 fi
 
-"$SOURCE_DIR/scripts/analyze-trace.sh" --limit=3 "$parallel_trace" >"$tmpdir/analysis.out"
+"$SOURCE_DIR/scripts/analyze-trace.py" --limit=3 "$parallel_trace" >"$tmpdir/analysis.out"
 if ! grep -q '^Processes: 8$' "$tmpdir/analysis.out" ||
 	! grep -q '^fingerprint ' "$tmpdir/analysis.out" ||
 		! grep -q '^db.merge.begin ' "$tmpdir/analysis.out" ||
@@ -118,13 +118,22 @@ if ! grep -q '^Processes: 8$' "$tmpdir/analysis.out" ||
 fi
 
 printf '%s\n' '{broken' >"$tmpdir/malformed.jsonl"
-if "$SOURCE_DIR/scripts/analyze-trace.sh" "$tmpdir/malformed.jsonl" \
+if "$SOURCE_DIR/scripts/analyze-trace.py" "$tmpdir/malformed.jsonl" \
 	>"$tmpdir/malformed.out" 2>"$tmpdir/malformed.err"; then
 	fail "malformed trace was accepted"
 fi
 if ! grep -q 'malformed line 1' "$tmpdir/malformed.err"; then
 	cat "$tmpdir/malformed.err" >&2
 	fail "malformed trace diagnostic differs"
+fi
+
+printf '%s\n' '{"pid":1,"command":"compiler","source":"escaped\"source.c","phase":"total","start_ns":1,"duration_ns":2}' \
+	>"$tmpdir/escaped.jsonl"
+"$SOURCE_DIR/scripts/analyze-trace.py" "$tmpdir/escaped.jsonl" >"$tmpdir/escaped.out"
+if ! grep -q '^Translation units: 1$' "$tmpdir/escaped.out" ||
+	! grep -q 'escaped"source.c$' "$tmpdir/escaped.out"; then
+	cat "$tmpdir/escaped.out" >&2
+	fail "escaped JSON string was not analyzed"
 fi
 
 if "$SEMINDEX" compiler --trace="$tmpdir/missing/trace.jsonl" --no-store-command \

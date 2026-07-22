@@ -58,7 +58,7 @@ performance comparison.  Follow [performance.md](performance.md) and run the
 quick benchmark against the baseline and candidate builds:
 
 ```sh
-scripts/benchmark.sh \
+scripts/benchmark.py \
     --baseline=/path/to/baseline/build/semindex \
     --candidate=build/semindex
 ```
