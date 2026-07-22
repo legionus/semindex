@@ -64,6 +64,7 @@ def main():
         directory = Path(temporary)
         source = directory / "navigation.c"
         database = directory / "semindex.db"
+        commands_database = directory / "commands.db"
         source.write_text(
             "struct Nav {\n"
             "\tint field;\n"
@@ -77,7 +78,8 @@ def main():
         indexed = subprocess.run(
             [
                 sys.argv[2], "compiler", f"--database={database}",
-                "--no-store-command", "--", "cc", source.name,
+                f"--commands-database={commands_database}", "--", "cc",
+                source.name,
             ],
             cwd=directory,
             stdout=subprocess.PIPE,
@@ -87,7 +89,11 @@ def main():
         if indexed.returncode != 0:
             fail("failed to create the LSP test index", indexed)
 
-        options = [f"--database={database}", "--variant=general"]
+        options = [
+            f"--database={database}",
+            f"--commands-database={commands_database}",
+            "--variant=general",
+        ]
         uri = source.resolve().as_uri()
         root_uri = directory.resolve().as_uri()
         reference_line = source.read_text(encoding="utf-8").splitlines()[5]
@@ -157,7 +163,9 @@ def main():
             "positionEncoding"
         ) != "utf-16" or capabilities.get("definitionProvider") is not True or (
             capabilities.get("referencesProvider") is not True
-        ):
+        ) or capabilities.get("textDocumentSync") != {
+            "change": 0, "save": True,
+        }:
             fail("initialize response has unexpected capabilities")
         if responses[2].get("id") != 3 or responses[2].get("error", {}).get(
             "code"
@@ -211,6 +219,79 @@ def main():
         )
         if process.returncode == 0 or process.stdout:
             fail("invalid framing was accepted", process)
+
+        source.write_text(
+            "struct Nav {\n"
+            "\tint renamed;\n"
+            "};\n"
+            "int read_field(struct Nav *p)\n"
+            "{\n"
+            "\treturn /* π */ p->renamed;\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        updated_line = source.read_text(encoding="utf-8").splitlines()[5]
+        updated_character = len(
+            updated_line[:updated_line.index("renamed")].encode("utf-16-le")
+        ) // 2
+        process, responses = run_server(sys.argv[1], options, [
+            {
+                "jsonrpc": "2.0", "id": 10, "method": "initialize",
+                "params": {"rootUri": root_uri},
+            },
+            {"jsonrpc": "2.0", "method": "initialized", "params": {}},
+            {
+                "jsonrpc": "2.0", "method": "textDocument/didSave",
+                "params": {"textDocument": {"uri": uri}},
+            },
+            {
+                "jsonrpc": "2.0", "id": 11,
+                "method": "textDocument/definition",
+                "params": {
+                    "textDocument": {"uri": uri},
+                    "position": {
+                        "line": 5, "character": updated_character + 6,
+                    },
+                },
+            },
+            {
+                "jsonrpc": "2.0", "id": 12,
+                "method": "textDocument/references",
+                "params": {
+                    "textDocument": {"uri": uri},
+                    "position": {
+                        "line": 5, "character": updated_character,
+                    },
+                    "context": {"includeDeclaration": False},
+                },
+            },
+            {"jsonrpc": "2.0", "id": 13, "method": "shutdown"},
+            {"jsonrpc": "2.0", "method": "exit"},
+        ])
+        if process.returncode != 0:
+            fail(f"didSave lifecycle exited with status {process.returncode}", process)
+        if len(responses) != 4:
+            fail(f"didSave lifecycle returned {len(responses)} responses", process)
+        expected_updated_definition = {
+            "uri": uri,
+            "range": {
+                "start": {"line": 1, "character": 5},
+                "end": {"line": 1, "character": 12},
+            },
+        }
+        if responses[1].get("result") != [expected_updated_definition]:
+            fail("didSave did not update the definition")
+        expected_updated_reference = {
+            "uri": uri,
+            "range": {
+                "start": {"line": 5, "character": updated_character},
+                "end": {"line": 5, "character": updated_character + 7},
+            },
+        }
+        if responses[2].get("result") != [expected_updated_reference]:
+            fail("didSave did not update references")
+        if responses[3] != {"id": 13, "jsonrpc": "2.0", "result": None}:
+            fail("didSave shutdown response is malformed")
 
 
 if __name__ == "__main__":

@@ -48,3 +48,9 @@ fi
 if [ "$(sqlite3 :memory: "SELECT json_array_length(CAST(readfile('$tmpdir/debug.json') AS TEXT))")" != 1 ]; then
 	fail "variant compile command export was not filtered"
 fi
+
+plan=$(sqlite3 "$commands_db" "EXPLAIN QUERY PLAN SELECT directory, file, arguments FROM commands WHERE variant = 'general' AND file = '$SOURCE_DIR/tests/test.c'")
+case "$plan" in
+*"USING PRIMARY KEY"*) ;;
+*) fail "exact compiler command lookup does not use the primary key: $plan" ;;
+esac

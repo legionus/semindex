@@ -4,6 +4,7 @@
 #include <llvm/Support/Error.h>
 
 #include <limits>
+#include <iostream>
 #include <set>
 #include <string>
 #include <utility>
@@ -87,8 +88,8 @@ static bool parsePosition(const llvm::json::Object *params, llvm::StringRef &uri
 	return true;
 }
 
-LspServer::LspServer(LspTransport &transport, semindex_db_t *database, std::string variant)
-    : transport(transport), database(database), variant(std::move(variant))
+LspServer::LspServer(LspTransport &transport, semindex_db_t *database, LspIndexer &indexer, std::string variant)
+    : transport(transport), database(database), indexer(indexer), variant(std::move(variant))
 {
 }
 
@@ -185,6 +186,25 @@ bool LspServer::references(const llvm::json::Value &id, const llvm::json::Object
 	return reply(id, std::move(collector.locations));
 }
 
+bool LspServer::didSave(const llvm::json::Object *params)
+{
+	const llvm::json::Object *document = params ? params->getObject("textDocument") : nullptr;
+	std::optional<std::string> file;
+	std::string message;
+
+	if (document) {
+		if (auto uri = document->getString("uri"))
+			file = sources.filePath(*uri);
+	}
+	if (!file) {
+		std::cerr << "semindex-lsp: invalid textDocument/didSave parameters\n";
+		return true;
+	}
+	if (!indexer.update(*file, message))
+		std::cerr << "semindex-lsp: " << message << '\n';
+	return true;
+}
+
 bool LspServer::reply(const llvm::json::Value &id, llvm::json::Value result)
 {
 	return transport.write(llvm::json::Object{
@@ -239,6 +259,11 @@ bool LspServer::dispatch(const llvm::json::Object &message)
 						{ "definitionProvider", true },
 						{ "positionEncoding", "utf-16" },
 						{ "referencesProvider", true },
+						{ "textDocumentSync",
+							llvm::json::Object{
+								{ "change", 0 },
+								{ "save", true },
+							} },
 					} },
 				{ "serverInfo",
 					llvm::json::Object{
@@ -258,6 +283,8 @@ bool LspServer::dispatch(const llvm::json::Object &message)
 		return id ? definition(*id, message.getObject("params")) : true;
 	if (*method == "textDocument/references")
 		return id ? references(*id, message.getObject("params")) : true;
+	if (*method == "textDocument/didSave")
+		return id ? error(id, INVALID_REQUEST, "Invalid Request") : didSave(message.getObject("params"));
 	if (*method == "shutdown") {
 		if (!id)
 			return true;

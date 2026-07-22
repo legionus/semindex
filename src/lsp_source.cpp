@@ -178,6 +178,15 @@ bool LspSourceMapper::setRootUri(llvm::StringRef uri)
 	return true;
 }
 
+std::optional<std::string> LspSourceMapper::filePath(llvm::StringRef uri) const
+{
+	auto path = pathFromUri(uri);
+
+	if (!path || !path->is_absolute())
+		return std::nullopt;
+	return path->string();
+}
+
 std::vector<std::string> LspSourceMapper::databasePaths(llvm::StringRef uri) const
 {
 	std::vector<std::string> result;

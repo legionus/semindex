@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include "command_db.h"
+#include "lsp_indexer.h"
 #include "lsp_server.h"
 #include "lsp_transport.h"
 #include "semindex_database.h"
 
+#include <cstdlib>
+#include <filesystem>
 #include <iostream>
 #include <string>
 #include <utility>
@@ -21,7 +25,11 @@ static void help()
 		     "Options:\n"
 		     "  -d, --database=PATH        path to the semindex database\n"
 		     "                             (default: .semindex/semindex.db)\n"
+		     "      --commands-database=PATH\n"
+		     "                             path to the compiler command database\n"
+		     "                             (default: commands.db beside --database)\n"
 		     "      --variant=NAME         query only the named index variant\n"
+		     "      --include-local        preserve local symbols when reindexing\n"
 		     "  -h, --help                 display this help and exit\n"
 		     "\n";
 }
@@ -29,7 +37,9 @@ static void help()
 int main(int argc, char **argv)
 {
 	std::string database_path = ".semindex/semindex.db";
+	std::string commands_database_path;
 	std::string variant;
+	bool include_local = false;
 	semindex_db_t *database = nullptr;
 
 	for (int i = 1; i < argc; i++) {
@@ -51,6 +61,18 @@ int main(int argc, char **argv)
 			database_path = argument.substr(sizeof("--database=") - 1);
 			continue;
 		}
+		if (argument == "--commands-database") {
+			if (++i == argc) {
+				std::cerr << "semindex-lsp: option requires an argument: " << argument << '\n';
+				return 1;
+			}
+			commands_database_path = argv[i];
+			continue;
+		}
+		if (argument.rfind("--commands-database=", 0) == 0) {
+			commands_database_path = argument.substr(sizeof("--commands-database=") - 1);
+			continue;
+		}
 		if (argument == "--variant") {
 			if (++i == argc) {
 				std::cerr << "semindex-lsp: option requires an argument: " << argument << '\n';
@@ -63,15 +85,32 @@ int main(int argc, char **argv)
 			variant = argument.substr(sizeof("--variant=") - 1);
 			continue;
 		}
+		if (argument == "--include-local") {
+			include_local = true;
+			continue;
+		}
 		std::cerr << "semindex-lsp: unknown option: " << argument << '\n';
 		usage(std::cerr);
 		return 1;
 	}
+	if (commands_database_path.empty()) {
+		char *path = command_db_default_path(database_path.c_str());
+
+		if (!path) {
+			std::cerr << "semindex-lsp: failed to allocate command database path\n";
+			return 1;
+		}
+		commands_database_path = path;
+		free(path);
+	}
+	database_path = std::filesystem::absolute(database_path).lexically_normal().string();
+	commands_database_path = std::filesystem::absolute(commands_database_path).lexically_normal().string();
 	if (semindex_db_open(database_path.c_str(), &database) < 0)
 		return 1;
 
 	LspTransport transport(std::cin, std::cout, std::cerr);
-	LspServer server(transport, database, std::move(variant));
+	LspIndexer indexer(database_path, commands_database_path, variant.empty() ? "general" : variant, include_local);
+	LspServer server(transport, database, indexer, std::move(variant));
 	int ret = server.run();
 	semindex_db_close(database);
 	return ret;

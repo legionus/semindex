@@ -31,6 +31,10 @@ Arguments are kept as one opaque value instead of being normalized into string
 and argument tables.  This makes each update a single UPSERT and avoids joins
 and per-argument index maintenance on the compiler hot path.
 
+The internal read API loads one command by `(variant, canonical file)` through
+the table's primary key. It reconstructs only that command's argument vector;
+language-server save handling does not scan or buffer the command database.
+
 The command database uses WAL mode and `synchronous=OFF`.  Concurrent indexing
 processes prepare their semantic records independently and hold the command
 database write lock only for one row update.

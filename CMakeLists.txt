@@ -13,6 +13,8 @@ set(SEMINDEX_FORMAT_SOURCES
 	include/semindex_database.h
 	src/index_ast.cpp
 	src/index_context.cpp
+	src/lsp_indexer.cpp
+	src/lsp_indexer.h
 	src/lsp_source.cpp
 	src/lsp_source.h
 	src/lsp_server.cpp
@@ -95,6 +97,19 @@ target_include_directories(semindex_database PUBLIC
 )
 target_link_libraries(semindex_database PUBLIC SQLite3::SQLite3)
 
+add_library(semindex_storage STATIC
+	utils/command_db.c
+	utils/index_db.c
+	utils/output_common.c
+	utils/output_search.c
+	utils/perf_trace.c
+)
+target_include_directories(semindex_storage PUBLIC
+	${CMAKE_CURRENT_SOURCE_DIR}/include
+	${CMAKE_CURRENT_SOURCE_DIR}/utils
+)
+target_link_libraries(semindex_storage PUBLIC semindex_database SQLite3::SQLite3)
+
 # LLVM paths from llvm-config
 execute_process(
 	COMMAND llvm-config --includedir
@@ -147,6 +162,7 @@ target_link_directories(semindex_parser PRIVATE ${LLVM_LIBDIR})
 target_link_libraries(semindex_parser PRIVATE clang-cpp ${LLVM_LIBS})
 
 add_executable(semindex_lsp
+	src/lsp_indexer.cpp
 	src/lsp_source.cpp
 	src/lsp_server.cpp
 	src/lsp_transport.cpp
@@ -159,7 +175,7 @@ target_include_directories(semindex_lsp PRIVATE
 )
 target_compile_options(semindex_lsp PRIVATE ${LLVM_CXXFLAGS})
 target_link_directories(semindex_lsp PRIVATE ${LLVM_LIBDIR})
-target_link_libraries(semindex_lsp PRIVATE semindex_database ${LLVM_LIBS})
+target_link_libraries(semindex_lsp PRIVATE semindex_parser semindex_storage ${LLVM_LIBS})
 
 add_executable(semindex
 	utils/cmd_compiler.c
@@ -167,18 +183,13 @@ add_executable(semindex
 	utils/cmd_callgraph.c
 	utils/cmd_index.c
 	utils/cmd_search.c
-	utils/command_db.c
-	utils/index_db.c
-	utils/output_common.c
 	utils/output_default.c
 	utils/output_dissect.c
-	utils/output_search.c
-	utils/perf_trace.c
 	utils/semindex.c
 )
 
 target_include_directories(semindex PRIVATE include)
-target_link_libraries(semindex PRIVATE semindex_parser semindex_database SQLite3::SQLite3)
+target_link_libraries(semindex PRIVATE semindex_parser semindex_storage)
 
 if(BUILD_TESTING)
 	find_package(Python3 COMPONENTS Interpreter REQUIRED)
