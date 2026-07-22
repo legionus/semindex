@@ -1,0 +1,31 @@
+
+FILE: tests/test16.c
+
+   2:8                    def   s Result
+   3:6                    def   m Result.value                     int
+   6:16                   decl   f direct                           struct Result *(const int *)
+   6:8   direct           -r- . s Result
+   7:18                   def   v callback                         struct Result *(*)(const int *)
+   7:8                    -r-   s Result
+   9:14                   def   t callback_t                       void (int)
+  11:6                    def   f accept                           void (callback_t *)
+  11:24  accept           def . v handler                          callback_t *
+  11:13  accept           -r- . t callback_t                       void (int)
+  13:2   accept           --r . v handler                          callback_t *
+  16:6                    def   f invoke                           void (int)
+  16:17  invoke           def . v input                            int
+  18:18  invoke           -w-   m Result.value                     int
+  18:2   invoke           --r   f direct                           struct Result *(const int *)
+  18:10  invoke           m-- . v input                            int
+  19:21  invoke           -w-   m Result.value                     int
+  19:2   invoke           --r   f direct                           struct Result *(const int *)
+  19:13  invoke           m-- . v input                            int
+  20:21  invoke           -w-   m Result.value                     int
+  20:2   invoke           --r   f direct                           struct Result *(const int *)
+  20:13  invoke           m-- . v input                            int
+  21:20  invoke           -w-   m Result.value                     int
+  21:2   invoke           --r   v callback                         struct Result *(*)(const int *)
+  21:12  invoke           m-- . v input                            int
+  22:23  invoke           -w-   m Result.value                     int
+  22:4   invoke           --r   v callback                         struct Result *(*)(const int *)
+  22:15  invoke           m-- . v input                            int

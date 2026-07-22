@@ -38,10 +38,19 @@ static std::string getUSR(const Decl *D, const ASTContext &ctx)
 		return "";
 	return std::string(buf.begin(), buf.end());
 }
+
+static bool isCallWrapper(const Stmt *S)
+{
+	if (isa<ParenExpr>(S) || isa<ImplicitCastExpr>(S))
+		return true;
+
+	const auto *U = dyn_cast<UnaryOperator>(S);
+	return U && (U->getOpcode() == UO_Deref || U->getOpcode() == UO_AddrOf);
+}
+
 static bool isDirectCallCallee(const Expr *E, ASTContext &ctx)
 {
 	const Expr *current = E;
-	const Expr *target = E->IgnoreParenImpCasts();
 
 	for (;;) {
 		auto parents = ctx.getParents(*current);
@@ -53,9 +62,9 @@ static bool isDirectCallCallee(const Expr *E, ASTContext &ctx)
 			return false;
 
 		if (const auto *call = dyn_cast<CallExpr>(parent))
-			return call->getCallee()->IgnoreParenImpCasts() == target;
+			return call->getCallee()->IgnoreParenImpCasts() == current->IgnoreParenImpCasts();
 
-		if (!isa<ParenExpr>(parent) && !isa<ImplicitCastExpr>(parent))
+		if (!isCallWrapper(parent))
 			return false;
 
 		current = cast<Expr>(parent);
@@ -105,7 +114,6 @@ static bool isPointerReadOperand(const Expr *E, ASTContext &ctx)
 static bool isCallCallee(const Expr *E, ASTContext &ctx)
 {
 	const Expr *current = E;
-	const Expr *target = E->IgnoreParenImpCasts();
 
 	for (;;) {
 		const Stmt *parent = getParentStmt(current, ctx);
@@ -113,9 +121,9 @@ static bool isCallCallee(const Expr *E, ASTContext &ctx)
 			return false;
 
 		if (const auto *call = dyn_cast<CallExpr>(parent))
-			return ignoreParenImpCasts(call->getCallee()) == target;
+			return ignoreParenImpCasts(call->getCallee()) == ignoreParenImpCasts(current);
 
-		if (!isa<ParenExpr>(parent) && !isa<ImplicitCastExpr>(parent))
+		if (!isCallWrapper(parent))
 			return false;
 
 		current = cast<Expr>(parent);
@@ -274,7 +282,7 @@ public:
 
 	bool VisitVarDecl(VarDecl *D)
 	{
-		if (isPrototypeParameter(D))
+		if (getName(D).empty() || isNonDefinitionParameter(D))
 			return true;
 		if (!index.includeLocal() && !currentFunction.empty())
 			return true;
@@ -624,14 +632,14 @@ private:
 		return entry->second;
 	}
 
-	static bool isPrototypeParameter(const VarDecl *D)
+	static bool isNonDefinitionParameter(const VarDecl *D)
 	{
 		const auto *P = dyn_cast<ParmVarDecl>(D);
 		if (!P)
 			return false;
 
 		const auto *F = dyn_cast_or_null<FunctionDecl>(P->getDeclContext());
-		return F && !F->doesThisDeclarationHaveABody();
+		return !F || !F->doesThisDeclarationHaveABody();
 	}
 
 	void addTypeUse(const TypeDecl *D, semindex_symbol_kind_t kind, SourceLocation loc, const std::string &type)

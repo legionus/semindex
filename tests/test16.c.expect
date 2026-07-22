@@ -1,0 +1,34 @@
+SYMBOLS:
+tests/test16.c:2:8 defined  struct   Result
+tests/test16.c:3:6 defined  field    value      int
+tests/test16.c:6:16 declared function direct     struct Result *(const int *)
+tests/test16.c:7:18 defined  var      callback   struct Result *(*)(const int *)
+tests/test16.c:9:14 defined  typedef  callback_t void (int)
+tests/test16.c:11:6 defined  function accept     void (callback_t *)
+tests/test16.c:11:24 defined  var      handler    callback_t *
+tests/test16.c:16:6 defined  function invoke     void (int)
+tests/test16.c:16:17 defined  var      input      int
+
+USES:
+tests/test16.c:6:8 READ  c:@S@Result
+tests/test16.c:7:8 READ  c:@S@Result
+tests/test16.c:11:13 READ  c:test16.c@T@callback_t
+tests/test16.c:13:2 READ  c:test16.c@212@F@accept@handler
+tests/test16.c:13:2 CALL  c:test16.c@212@F@accept@handler
+tests/test16.c:18:18 WRITE c:@S@Result@FI@value
+tests/test16.c:18:2 CALL  c:@F@direct
+tests/test16.c:18:10 ADDR  c:test16.c@262@F@invoke@input
+tests/test16.c:19:21 WRITE c:@S@Result@FI@value
+tests/test16.c:19:2 CALL  c:@F@direct
+tests/test16.c:19:13 ADDR  c:test16.c@262@F@invoke@input
+tests/test16.c:20:21 WRITE c:@S@Result@FI@value
+tests/test16.c:20:2 CALL  c:@F@direct
+tests/test16.c:20:13 ADDR  c:test16.c@262@F@invoke@input
+tests/test16.c:21:20 WRITE c:@S@Result@FI@value
+tests/test16.c:21:2 READ  c:@callback
+tests/test16.c:21:2 CALL  c:@callback
+tests/test16.c:21:12 ADDR  c:test16.c@262@F@invoke@input
+tests/test16.c:22:23 WRITE c:@S@Result@FI@value
+tests/test16.c:22:4 READ  c:@callback
+tests/test16.c:22:4 CALL  c:@callback
+tests/test16.c:22:15 ADDR  c:test16.c@262@F@invoke@input

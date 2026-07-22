@@ -1,0 +1,12 @@
+
+FILE: tests/test17.c
+
+   2:8                    def   s OuterArray
+   3:9                    def   s InnerArray
+   4:7                    def   m InnerArray.values                int[2]
+   5:4                    def   m OuterArray.items                 struct InnerArray[2][2]
+   8:19                   def   v arrays                           struct OuterArray
+   8:19                   -w-   v arrays                           struct OuterArray
+   8:8                    -r-   s OuterArray
+   9:3                    -w-   m OuterArray.items                 struct InnerArray[2][2]
+   9:15                   -w-   m InnerArray.values                int[2]
