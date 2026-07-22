@@ -61,8 +61,10 @@ process startup noise do not dominate the result.  Later passes also exercise
 incremental replacement of previously indexed files.
 
 The source set includes a generated translation unit with 256 direct call
-edges.  This keeps database-size and indexing-time measurements sensitive to
-callgraph storage without committing a large generated fixture.
+edges and eight generated translation units with a shared 256-field header.
+This keeps database-size and indexing-time measurements sensitive to callgraph
+storage and repeated-header handling without committing large generated
+fixtures.
 
 ```sh
 scripts/benchmark.sh \
@@ -179,6 +181,9 @@ monotonic start time, and duration in nanoseconds:
 Record staging and insertion events also contain `items_in` and `items_out`.
 These counters show how many in-memory records survive private staging and how
 many merge attempts actually add rows rather than finding existing records.
+The `db.stage_files` event uses the same fields for the number of fingerprinted
+files and the number whose semantic records were reused. The analyzer reports
+these values separately as the file fingerprint cache hit rate.
 
 Top-level phases cover parsing, symbol database storage, command database
 storage, output, cleanup, and total execution. Symbol database storage is

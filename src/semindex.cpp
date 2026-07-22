@@ -58,6 +58,8 @@ static void clearIndex(semindex_t *s)
 	s->uses.clear();
 	s->symbol_records.clear();
 	s->use_records.clear();
+	s->file_fingerprints[0].clear();
+	s->file_fingerprints[1].clear();
 	s->files.clear();
 	s->command_directory.clear();
 	s->command_file.clear();
@@ -283,6 +285,19 @@ const semindex_use_t *semindex_get_use(const semindex_t *s, size_t idx)
 		return nullptr;
 
 	return &s->use_records[idx];
+}
+
+size_t semindex_file_fingerprint_count(const semindex_t *s)
+{
+	return s ? s->file_fingerprints[0].size() : 0;
+}
+
+const semindex_file_fingerprint_t *semindex_get_file_fingerprint(const semindex_t *s, size_t idx, int include_local)
+{
+	if (!s || idx >= s->file_fingerprints[include_local != 0].size())
+		return nullptr;
+
+	return &s->file_fingerprints[include_local != 0][idx];
 }
 
 } /* extern "C" */

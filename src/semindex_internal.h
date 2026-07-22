@@ -67,6 +67,7 @@ struct semindex {
 	std::vector<SemindexUse> uses;
 	std::vector<semindex_symbol_t> symbol_records;
 	std::vector<semindex_use_t> use_records;
+	std::vector<semindex_file_fingerprint_t> file_fingerprints[2];
 	std::string command_directory;
 	std::string command_file;
 	std::vector<std::string> command_arguments;

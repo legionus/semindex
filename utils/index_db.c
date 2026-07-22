@@ -10,7 +10,7 @@
 #include "index_db.h"
 #include "output.h"
 
-#define INDEX_SCHEMA_VERSION 6
+#define INDEX_SCHEMA_VERSION 7
 #define STRINGIFY_VALUE(value) #value
 #define STRINGIFY(value) STRINGIFY_VALUE(value)
 
@@ -179,6 +179,11 @@ static int init_schema(sqlite3 *db)
 		"CREATE INDEX records_file_idx ON records(file_id)",
 		"CREATE INDEX records_call_context_idx ON records(context, context_usr_id)"
 		" WHERE record = 1 AND action = 3 AND kind = 7",
+		"CREATE TABLE file_fingerprints ("
+		"  file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,"
+		"  fingerprint BLOB NOT NULL,"
+		"  PRIMARY KEY(file_id, fingerprint)"
+		") WITHOUT ROWID",
 		"PRAGMA user_version = " STRINGIFY(INDEX_SCHEMA_VERSION),
 	};
 	size_t i;
@@ -263,7 +268,10 @@ static int create_staging(sqlite3 *db)
 		    "  path TEXT PRIMARY KEY,"
 		    "  mtime_ns INTEGER NOT NULL DEFAULT 0,"
 		    "  size INTEGER NOT NULL DEFAULT 0,"
-		    "  is_main INTEGER NOT NULL DEFAULT 0"
+		    "  is_main INTEGER NOT NULL DEFAULT 0,"
+		    "  ordinal INTEGER,"
+		    "  fingerprint BLOB,"
+		    "  cached INTEGER NOT NULL DEFAULT 0"
 		    ") WITHOUT ROWID") < 0)
 		return -1;
 
@@ -326,7 +334,8 @@ out:
 	return ret;
 }
 
-static int stage_records(sqlite3 *db, semindex_t *s, int include_local, uint64_t *items_in, uint64_t *items_out)
+static int stage_records(sqlite3 *db, semindex_t *s, int include_local, const unsigned char *cached,
+	size_t cached_count, uint64_t *items_in, uint64_t *items_out)
 {
 	static const char *sql =
 		"INSERT OR IGNORE INTO staging_records(symbol, record, action, kind, mode, path, line, column, "
@@ -351,6 +360,8 @@ static int stage_records(sqlite3 *db, semindex_t *s, int include_local, uint64_t
 		if (sym->local && !include_local)
 			continue;
 		(*items_in)++;
+		if (sym->file_index < cached_count && cached[sym->file_index])
+			continue;
 		if (stage_record(db, stmt, STORED_RECORD_SYMBOL, sym->definition, sym->kind, 0, sym->file, sym->line,
 			    sym->column, sym->owner, sym->name, sym->context, NULL, 0, NULL, 0, sym->local) < 0)
 			goto out;
@@ -364,6 +375,8 @@ static int stage_records(sqlite3 *db, semindex_t *s, int include_local, uint64_t
 		if (use->local && !include_local)
 			continue;
 		(*items_in)++;
+		if (use->file_index < cached_count && cached[use->file_index])
+			continue;
 		direct_call = use->kind == SEMINDEX_USE_CALL && use->symbol_kind == SEMINDEX_SYMBOL_FUNCTION;
 		if (stage_record(db, stmt, STORED_RECORD_USE, use->kind, use->symbol_kind, use->mode, use->file,
 			    use->line, use->column, use->owner, use->name, use->context, direct_call ? use->usr : NULL,
@@ -383,62 +396,147 @@ static long long stat_mtime_ns(const struct stat *st)
 	return (long long)st->st_mtim.tv_sec * 1000000000LL + st->st_mtim.tv_nsec;
 }
 
-static int stage_files(sqlite3 *db, const char *main_file)
+static int stage_files(sqlite3 *db, semindex_t *s, const char *main_file, const char *variant, int include_local,
+	unsigned char *cached, size_t cached_count, uint64_t *items_in, uint64_t *items_out)
 {
+	static const char *insert_sql =
+		"INSERT INTO staging_files(path, mtime_ns, size, is_main, ordinal, fingerprint)"
+		" VALUES(?1, ?2, ?3, ?4, ?5, ?6) ON CONFLICT(path) DO UPDATE SET"
+		" mtime_ns = excluded.mtime_ns, size = excluded.size, is_main = excluded.is_main,"
+		" ordinal = excluded.ordinal, fingerprint = excluded.fingerprint";
+	sqlite3_stmt *insert = NULL;
 	sqlite3_stmt *select = NULL;
-	sqlite3_stmt *update = NULL;
+	char *cache_sql = NULL;
 	struct stat main_stat;
 	int have_main_stat = main_file && stat(main_file, &main_stat) == 0;
+	uint64_t cache_candidates = 0;
+	size_t i;
 	int step;
 	int ret = -1;
 
-	if (exec_sql(db, "INSERT OR IGNORE INTO staging_files(path) SELECT DISTINCT path FROM staging_records") < 0)
-		return -1;
-	if (main_file) {
-		sqlite3_stmt *insert = NULL;
+	*items_in = 0;
+	*items_out = 0;
 
-		if (prepare(db, "INSERT OR IGNORE INTO staging_files(path, is_main) VALUES(?1, 1)", &insert) < 0)
-			return -1;
-		if (bind_text(insert, 1, main_file) < 0 || sqlite3_step(insert) != SQLITE_DONE) {
-			sqlite3_finalize(insert);
-			return -1;
-		}
-		sqlite3_finalize(insert);
-	}
-
-	if (prepare(db, "SELECT path FROM staging_files", &select) < 0 ||
-		prepare(db, "UPDATE staging_files SET mtime_ns = ?2, size = ?3, is_main = ?4 WHERE path = ?1",
-			&update) < 0)
+	if (prepare(db, insert_sql, &insert) < 0)
 		goto out;
-
-	while ((step = sqlite3_step(select)) == SQLITE_ROW) {
-		const char *path = (const char *)sqlite3_column_text(select, 0);
+	for (i = 0; i < cached_count; i++) {
+		const semindex_file_fingerprint_t *fingerprint = semindex_get_file_fingerprint(s, i, include_local);
 		struct stat st;
 		long long mtime_ns = 0;
 		long long size = 0;
-		int is_main = main_file && !strcmp(path, main_file);
+		int is_main = 0;
 
-		if (stat(path, &st) == 0) {
+		if (!fingerprint)
+			goto out;
+		if (!fingerprint->record_count)
+			continue;
+		if (stat(fingerprint->file, &st) == 0) {
 			mtime_ns = stat_mtime_ns(&st);
 			size = st.st_size;
 			if (have_main_stat && st.st_dev == main_stat.st_dev && st.st_ino == main_stat.st_ino)
 				is_main = 1;
 		}
-
-		sqlite3_reset(update);
-		sqlite3_clear_bindings(update);
-		if (bind_text(update, 1, path) < 0 || sqlite3_bind_int64(update, 2, mtime_ns) != SQLITE_OK ||
-			sqlite3_bind_int64(update, 3, size) != SQLITE_OK ||
-			sqlite3_bind_int(update, 4, is_main) != SQLITE_OK || sqlite3_step(update) != SQLITE_DONE)
+		if (!is_main)
+			cache_candidates++;
+		sqlite3_reset(insert);
+		sqlite3_clear_bindings(insert);
+		if (bind_text(insert, 1, fingerprint->file) < 0 ||
+			sqlite3_bind_int64(insert, 2, mtime_ns) != SQLITE_OK ||
+			sqlite3_bind_int64(insert, 3, size) != SQLITE_OK ||
+			sqlite3_bind_int(insert, 4, is_main) != SQLITE_OK ||
+			sqlite3_bind_int64(insert, 5, i) != SQLITE_OK ||
+			(is_main ? sqlite3_bind_null(insert, 6)
+				 : sqlite3_bind_blob(insert, 6, fingerprint->data, sizeof(fingerprint->data),
+					   SQLITE_STATIC)) != SQLITE_OK ||
+			sqlite3_step(insert) != SQLITE_DONE)
 			goto out;
+	}
+	if (main_file) {
+		sqlite3_stmt *main_insert = NULL;
+		long long mtime_ns = have_main_stat ? stat_mtime_ns(&main_stat) : 0;
+		long long size = have_main_stat ? main_stat.st_size : 0;
+
+		if (prepare(db,
+			    "INSERT INTO staging_files(path, mtime_ns, size, is_main) VALUES(?1, ?2, ?3, 1)"
+			    " ON CONFLICT(path) DO UPDATE SET mtime_ns = excluded.mtime_ns,"
+			    " size = excluded.size, is_main = 1, fingerprint = NULL",
+			    &main_insert) < 0)
+			goto out;
+		if (bind_text(main_insert, 1, main_file) < 0 ||
+			sqlite3_bind_int64(main_insert, 2, mtime_ns) != SQLITE_OK ||
+			sqlite3_bind_int64(main_insert, 3, size) != SQLITE_OK ||
+			sqlite3_step(main_insert) != SQLITE_DONE) {
+			sqlite3_finalize(main_insert);
+			goto out;
+		}
+		sqlite3_finalize(main_insert);
+	}
+
+	*items_in = cache_candidates;
+	if (!cache_candidates) {
+		ret = 0;
+		goto out;
+	}
+
+	cache_sql =
+		sqlite3_mprintf("UPDATE staging_files SET cached = 1 WHERE is_main = 0 AND mtime_ns != 0 AND EXISTS ("
+				" SELECT 1 FROM files JOIN file_fingerprints ON file_fingerprints.file_id = files.id"
+				" WHERE files.variant = %Q AND files.path = staging_files.path"
+				" AND files.mtime_ns = staging_files.mtime_ns AND files.size = staging_files.size"
+				" AND file_fingerprints.fingerprint = staging_files.fingerprint)",
+			variant);
+	if (!cache_sql || exec_sql(db, cache_sql) < 0) {
+		sqlite3_free(cache_sql);
+		cache_sql = NULL;
+		goto out;
+	}
+	sqlite3_free(cache_sql);
+	cache_sql = NULL;
+	sqlite3_finalize(select);
+	select = NULL;
+	if (prepare(db, "SELECT ordinal FROM staging_files WHERE cached = 1", &select) < 0)
+		goto out;
+	while ((step = sqlite3_step(select)) == SQLITE_ROW) {
+		sqlite3_int64 ordinal = sqlite3_column_int64(select, 0);
+
+		if (ordinal < 0 || (uint64_t)ordinal >= cached_count)
+			goto out;
+		cached[ordinal] = 1;
+		(*items_out)++;
 	}
 	if (step != SQLITE_DONE)
 		goto out;
 
 	ret = 0;
 out:
+	sqlite3_free(cache_sql);
+	sqlite3_finalize(insert);
 	sqlite3_finalize(select);
-	sqlite3_finalize(update);
+	return ret;
+}
+
+static int cached_files_valid(sqlite3 *db, const char *variant)
+{
+	static const char *sql = "SELECT 1 FROM staging_files WHERE cached = 1 AND NOT EXISTS ("
+				 " SELECT 1 FROM files JOIN file_fingerprints ON file_fingerprints.file_id = files.id"
+				 " WHERE files.variant = ?1 AND files.path = staging_files.path"
+				 " AND files.mtime_ns = staging_files.mtime_ns AND files.size = staging_files.size"
+				 " AND file_fingerprints.fingerprint = staging_files.fingerprint) LIMIT 1";
+	sqlite3_stmt *stmt = NULL;
+	int step;
+	int ret = -1;
+
+	if (prepare(db, sql, &stmt) < 0 || bind_text(stmt, 1, variant) < 0)
+		goto out;
+	step = sqlite3_step(stmt);
+	if (step == SQLITE_DONE)
+		ret = 1;
+	else if (step == SQLITE_ROW)
+		ret = 0;
+	else
+		fprintf(stderr, "semindex: sqlite: %s\n", sqlite3_errmsg(db));
+out:
+	sqlite3_finalize(stmt);
 	return ret;
 }
 
@@ -447,11 +545,14 @@ static int merge_staging(sqlite3 *db, const char *variant, uint64_t staged_recor
 	static const char *phases[] = {
 		"db.merge.files_insert",
 		"db.merge.records_delete",
+		"db.merge.fingerprints_delete",
 		"db.merge.files_update",
 		"db.merge.records_insert",
+		"db.merge.fingerprints_insert",
 	};
-	char *merge[4] = { NULL };
+	char *merge[6] = { NULL };
 	size_t i;
+	int valid;
 	int ret = -1;
 
 	merge[0] = sqlite3_mprintf("INSERT OR IGNORE INTO files(variant, path, mtime_ns, size) "
@@ -464,12 +565,19 @@ static int merge_staging(sqlite3 *db, const char *variant, uint64_t staged_recor
 				"     OR files.mtime_ns != staging_files.mtime_ns OR files.size != staging_files.size)"
 				")",
 			variant);
-	merge[2] = sqlite3_mprintf("UPDATE files SET"
+	merge[2] =
+		sqlite3_mprintf("DELETE FROM file_fingerprints WHERE file_id IN ("
+				"  SELECT files.id FROM files JOIN staging_files ON staging_files.path = files.path"
+				"  WHERE files.variant = %Q AND (staging_files.is_main"
+				"     OR files.mtime_ns != staging_files.mtime_ns OR files.size != staging_files.size)"
+				")",
+			variant);
+	merge[3] = sqlite3_mprintf("UPDATE files SET"
 				   "  mtime_ns = (SELECT mtime_ns FROM staging_files WHERE path = files.path),"
 				   "  size = (SELECT size FROM staging_files WHERE path = files.path)"
 				   "WHERE variant = %Q AND path IN (SELECT path FROM staging_files)",
 		variant);
-	merge[3] = sqlite3_mprintf(
+	merge[4] = sqlite3_mprintf(
 		"INSERT OR IGNORE INTO records(symbol, record, action, kind, mode, file_id, line, column, context, "
 		"usr_id, context_usr_id, local) "
 		"SELECT staging_records.symbol, staging_records.record, staging_records.action,"
@@ -479,14 +587,24 @@ static int merge_staging(sqlite3 *db, const char *variant, uint64_t staged_recor
 		" FROM staging_records JOIN files"
 		" ON files.path = staging_records.path AND files.variant = %Q",
 		variant);
+	merge[5] = sqlite3_mprintf("INSERT OR IGNORE INTO file_fingerprints(file_id, fingerprint)"
+				   " SELECT files.id, staging_files.fingerprint FROM staging_files JOIN files"
+				   " ON files.path = staging_files.path AND files.variant = %Q"
+				   " WHERE staging_files.fingerprint IS NOT NULL",
+		variant);
 	for (i = 0; i < sizeof(merge) / sizeof(merge[0]); i++) {
 		if (!merge[i])
 			goto out;
 	}
 	if (trace_exec_sql(db, "BEGIN IMMEDIATE", trace, "db.merge.begin") < 0)
 		goto out;
+	valid = cached_files_valid(db, variant);
+	if (valid < 0)
+		goto rollback;
+	if (!valid)
+		goto stale;
 	for (i = 0; i < sizeof(merge) / sizeof(merge[0]); i++) {
-		if (i == 3) {
+		if (i == 4) {
 			semindex_trace_time_t start = semindex_trace_begin(trace);
 			int merge_ret = exec_sql(db, merge[i]);
 			uint64_t inserted = merge_ret < 0 ? 0 : (uint64_t)sqlite3_changes64(db);
@@ -505,6 +623,10 @@ static int merge_staging(sqlite3 *db, const char *variant, uint64_t staged_recor
 	goto out;
 rollback:
 	exec_sql(db, "ROLLBACK");
+	goto out;
+stale:
+	exec_sql(db, "ROLLBACK");
+	ret = 1;
 out:
 	for (i = 0; i < sizeof(merge) / sizeof(merge[0]); i++)
 		sqlite3_free(merge[i]);
@@ -516,12 +638,23 @@ int index_db_store(const char *path, semindex_t *s, const char *main_file, const
 {
 	sqlite3 *db = NULL;
 	semindex_trace_time_t start;
+	unsigned char *cached = NULL;
+	size_t cached_count;
 	uint64_t records_in;
 	uint64_t records_staged;
+	uint64_t files_in;
+	uint64_t files_cached;
+	int merge_ret;
 	int ret = -1;
 
 	if (!path || !s || !variant || !variant[0])
 		return -1;
+	cached_count = semindex_file_fingerprint_count(s);
+	if (cached_count) {
+		cached = calloc(cached_count, sizeof(*cached));
+		if (!cached)
+			return -1;
+	}
 	if (open_writer(path, &db, trace) < 0)
 		goto out;
 	start = semindex_trace_begin(trace);
@@ -533,22 +666,48 @@ int index_db_store(const char *path, semindex_t *s, const char *main_file, const
 	if (trace_exec_sql(db, "BEGIN", trace, "db.staging_begin") < 0)
 		goto out;
 	start = semindex_trace_begin(trace);
-	if (stage_records(db, s, include_local, &records_in, &records_staged) < 0) {
+	if (stage_files(db, s, main_file, variant, include_local, cached, cached_count, &files_in, &files_cached) < 0) {
+		semindex_trace_end_counted(trace, "db.stage_files", start, files_in, files_cached);
+		exec_sql(db, "ROLLBACK");
+		goto out;
+	}
+	semindex_trace_end_counted(trace, "db.stage_files", start, files_in, files_cached);
+	start = semindex_trace_begin(trace);
+	if (stage_records(db, s, include_local, cached, cached_count, &records_in, &records_staged) < 0) {
 		semindex_trace_end_counted(trace, "db.stage_records", start, records_in, records_staged);
 		exec_sql(db, "ROLLBACK");
 		goto out;
 	}
 	semindex_trace_end_counted(trace, "db.stage_records", start, records_in, records_staged);
-	start = semindex_trace_begin(trace);
-	if (stage_files(db, main_file) < 0) {
-		semindex_trace_end(trace, "db.stage_files", start);
-		exec_sql(db, "ROLLBACK");
+	if (trace_exec_sql(db, "COMMIT", trace, "db.staging_commit") < 0)
 		goto out;
+	merge_ret = merge_staging(db, variant, records_staged, trace);
+	if (merge_ret < 0)
+		goto out;
+	if (merge_ret > 0) {
+		uint64_t retry_in;
+		uint64_t retry_staged;
+
+		if (cached_count)
+			memset(cached, 0, cached_count);
+		if (trace_exec_sql(db, "BEGIN", trace, "db.staging_retry_begin") < 0)
+			goto out;
+		if (exec_sql(db, "UPDATE staging_files SET cached = 0") < 0) {
+			exec_sql(db, "ROLLBACK");
+			goto out;
+		}
+		start = semindex_trace_begin(trace);
+		if (stage_records(db, s, include_local, cached, cached_count, &retry_in, &retry_staged) < 0) {
+			semindex_trace_end_counted(trace, "db.stage_records_retry", start, retry_in, retry_staged);
+			exec_sql(db, "ROLLBACK");
+			goto out;
+		}
+		semindex_trace_end_counted(trace, "db.stage_records_retry", start, retry_in, retry_staged);
+		records_staged += retry_staged;
+		if (trace_exec_sql(db, "COMMIT", trace, "db.staging_retry_commit") < 0 ||
+			merge_staging(db, variant, records_staged, trace) != 0)
+			goto out;
 	}
-	semindex_trace_end(trace, "db.stage_files", start);
-	if (trace_exec_sql(db, "COMMIT", trace, "db.staging_commit") < 0 ||
-		merge_staging(db, variant, records_staged, trace) < 0)
-		goto out;
 
 	ret = 0;
 out:
@@ -557,6 +716,7 @@ out:
 		sqlite3_close(db);
 		semindex_trace_end(trace, "db.close", start);
 	}
+	free(cached);
 	return ret;
 }
 

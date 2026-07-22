@@ -167,10 +167,12 @@ END {
 	for (source in sources)
 		source_count++
 	printf "%d\t%d\t%d\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%d\t%.0f" \
-	       "\t%d\t%.0f\t%.0f\t%d\t%.0f\t%.0f\n",
+	       "\t%d\t%.0f\t%.0f\t%d\t%.0f\t%.0f\t%d\t%.0f\t%.0f\n",
 	       events, process_count, source_count, last_end - first_start, total_sum,
 	       parse_sum, symbol_sum, command_sum, output_sum, cleanup_sum, lock_sum,
-	       first_start, lock_count, lock_max, phase_counter_count["db.stage_records"],
+	       first_start, lock_count, lock_max, phase_counter_count["db.stage_files"],
+	       phase_items_in["db.stage_files"], phase_items_out["db.stage_files"],
+	       phase_counter_count["db.stage_records"],
 	       phase_items_in["db.stage_records"], phase_items_out["db.stage_records"],
 	       phase_counter_count["db.merge.records_insert"], phase_items_in["db.merge.records_insert"],
 	       phase_items_out["db.merge.records_insert"] > summary
@@ -185,7 +187,8 @@ fi
 
 tab=$(printf '\t')
 IFS="$tab" read -r events processes sources span total parse symbol command output cleanup \
-	lock first_start lock_count lock_max stage_count stage_in stage_out merge_count merge_in merge_out <"$summary"
+	lock first_start lock_count lock_max file_count file_in file_cached stage_count stage_in stage_out \
+	merge_count merge_in merge_out <"$summary"
 
 printf 'Trace: %s\n' "$trace"
 printf 'Events: %s\n' "$events"
@@ -236,6 +239,17 @@ if [ "$stage_count" -gt 0 ] && [ "$merge_count" -gt 0 ]; then
 	}'
 else
 	printf '  unavailable (trace was recorded without counters)\n'
+fi
+
+printf '\nFile fingerprint cache:\n'
+if [ "$file_count" -gt 0 ]; then
+	awk -v files="$file_in" -v cached="$file_cached" 'BEGIN {
+		percent = files ? cached * 100 / files : 0
+		printf "  fingerprinted files: %.0f\n", files
+		printf "  reused files: %.0f (%.2f%%)\n", cached, percent
+	}'
+else
+	printf '  unavailable (trace was recorded without file counters)\n'
 fi
 
 printf '\nPhase totals (nested phases overlap):\n'

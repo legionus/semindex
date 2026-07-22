@@ -4,6 +4,8 @@
 
 #include <stddef.h>
 
+#define SEMINDEX_FILE_FINGERPRINT_SIZE 32
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -63,6 +65,7 @@ typedef struct {
 	const char *usr;     /* stable unique id */
 	const char *context; /* containing function for local symbols */
 	const char *file;
+	size_t file_index;
 	unsigned line;
 	unsigned column;
 	int local;
@@ -84,11 +87,18 @@ typedef struct {
 	unsigned long long usr_id;	   /* hashed target USR for direct calls */
 	unsigned long long context_usr_id; /* hashed containing function USR */
 	const char *file;
+	size_t file_index;
 	unsigned line;
 	unsigned column;
 	int local;
 	unsigned long long order;
 } semindex_use_t;
+
+typedef struct {
+	const char *file;
+	unsigned char data[SEMINDEX_FILE_FINGERPRINT_SIZE];
+	size_t record_count;
+} semindex_file_fingerprint_t;
 
 /* lifecycle */
 semindex_t *semindex_create(void);
@@ -111,6 +121,10 @@ const semindex_symbol_t *semindex_get_symbol(const semindex_t *s, size_t idx);
 size_t semindex_use_count(const semindex_t *s);
 /* returned pointer is valid until the next index operation or destroy */
 const semindex_use_t *semindex_get_use(const semindex_t *s, size_t idx);
+
+size_t semindex_file_fingerprint_count(const semindex_t *s);
+/* returned pointer is valid until the next index operation or destroy */
+const semindex_file_fingerprint_t *semindex_get_file_fingerprint(const semindex_t *s, size_t idx, int include_local);
 
 #ifdef __cplusplus
 }

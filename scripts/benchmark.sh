@@ -80,6 +80,8 @@ tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT HUP INT TERM
 results=$tmpdir/results.tsv
 callgraph_source=$tmpdir/callgraph-benchmark.c
+shared_header=$tmpdir/shared-benchmark.h
+shared_sources=
 
 sources='tests/test.c tests/test6.c tests/test7.c tests/test11.c tests/test14.c tests/test15.c'
 
@@ -97,6 +99,23 @@ while [ "$function" -lt 256 ]; do
 done
 printf '%s\n' '}' >>"$callgraph_source"
 
+printf '%s\n' 'struct benchmark_shared {' >"$shared_header"
+field=0
+while [ "$field" -lt 256 ]; do
+	printf '\tint field_%d;\n' "$field" >>"$shared_header"
+	field=$((field + 1))
+done
+printf '%s\n' '};' >>"$shared_header"
+
+worker=0
+while [ "$worker" -lt 8 ]; do
+	shared_source=$tmpdir/shared-benchmark-$worker.c
+	printf '%s\n' '#include "shared-benchmark.h"' \
+		"int read_shared_$worker(struct benchmark_shared *p) { return p->field_$worker; }" >"$shared_source"
+	shared_sources="$shared_sources $shared_source"
+	worker=$((worker + 1))
+done
+
 run_one()
 {
 	label=$1
@@ -110,7 +129,7 @@ run_one()
 	: >"$times"
 	pass=1
 	while [ "$pass" -le "$passes" ]; do
-		for source in $sources "$callgraph_source"; do
+		for source in $sources "$callgraph_source" $shared_sources; do
 			case $source in
 			/*)
 				source_path=$source

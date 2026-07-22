@@ -59,10 +59,17 @@ for input in "$tmpdir/one.c" "$tmpdir/two.c"; do
 		cc -I"$tmpdir" "$input"
 done
 "$SOURCE_DIR/scripts/analyze-trace.sh" "$flow_trace" >"$tmpdir/flow.out"
-if ! awk '/^  ignored existing records: / && $4 > 0 { found = 1 } END { exit !found }' \
-	"$tmpdir/flow.out"; then
+if ! awk '
+	/^  in-memory records: / { input = $3 }
+	/^  private staging records: / { staged = $4 }
+	END { exit !(staged < input) }
+' "$tmpdir/flow.out"; then
 	cat "$tmpdir/flow.out" >&2
-	fail "record counters did not report the shared header records"
+	fail "record counters did not report the cached shared header"
+fi
+if ! awk '/^  reused files: / && $3 > 0 { found = 1 } END { exit !found }' "$tmpdir/flow.out"; then
+	cat "$tmpdir/flow.out" >&2
+	fail "file counters did not report a fingerprint cache hit"
 fi
 
 parallel_trace=$tmpdir/parallel.jsonl
@@ -90,8 +97,9 @@ fi
 
 "$SOURCE_DIR/scripts/analyze-trace.sh" --limit=3 "$parallel_trace" >"$tmpdir/analysis.out"
 if ! grep -q '^Processes: 8$' "$tmpdir/analysis.out" ||
-	! grep -q '^db.merge.begin ' "$tmpdir/analysis.out" ||
-	! grep -q '^Record flow:$' "$tmpdir/analysis.out" ||
+		! grep -q '^db.merge.begin ' "$tmpdir/analysis.out" ||
+		! grep -q '^Record flow:$' "$tmpdir/analysis.out" ||
+		! grep -q '^File fingerprint cache:$' "$tmpdir/analysis.out" ||
 	! grep -q '^Slowest translation units:$' "$tmpdir/analysis.out"; then
 	cat "$tmpdir/analysis.out" >&2
 	fail "trace analysis omitted expected results"

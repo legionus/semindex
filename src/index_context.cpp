@@ -4,6 +4,84 @@
 #include <clang/AST/AST.h>
 #include <clang/Basic/SourceManager.h>
 
+#include <llvm/ADT/ArrayRef.h>
+#include <llvm/ADT/StringRef.h>
+#include <llvm/Support/SHA256.h>
+
+#include <cstdint>
+#include <cstring>
+#include <unordered_map>
+#include <vector>
+
+struct FileFingerprintState {
+	llvm::SHA256 hash[2];
+	size_t records[2] = { 0, 0 };
+	bool has_local = false;
+};
+
+static void hashInteger(llvm::SHA256 &hash, uint64_t value)
+{
+	uint8_t bytes[8];
+
+	for (size_t i = 0; i < sizeof(bytes); i++) {
+		bytes[i] = value & 0xff;
+		value >>= 8;
+	}
+	hash.update(llvm::ArrayRef<uint8_t>(bytes));
+}
+
+static void hashString(llvm::SHA256 &hash, const char *value)
+{
+	llvm::StringRef str(value ? value : "");
+
+	hashInteger(hash, str.size());
+	hash.update(str);
+}
+
+static void hashRecord(llvm::SHA256 &hash, int record, int action, int kind, uint64_t mode, const char *owner,
+	const char *name, unsigned line, unsigned column, const char *context, uint64_t usr_id, uint64_t context_usr_id,
+	int local)
+{
+	hashInteger(hash, record);
+	hashInteger(hash, action);
+	hashInteger(hash, kind);
+	hashInteger(hash, mode);
+	hashString(hash, owner);
+	hashString(hash, name);
+	hashInteger(hash, line);
+	hashInteger(hash, column);
+	hashString(hash, context);
+	hashInteger(hash, usr_id);
+	hashInteger(hash, context_usr_id);
+	hashInteger(hash, local);
+}
+
+static void updateFingerprints(FileFingerprintState &state, int local, int record, int action, int kind, uint64_t mode,
+	const char *owner, const char *name, unsigned line, unsigned column, const char *context, uint64_t usr_id,
+	uint64_t context_usr_id)
+{
+	if (local) {
+		if (!state.has_local) {
+			state.hash[1] = state.hash[0];
+			state.records[1] = state.records[0];
+			state.has_local = true;
+		}
+		hashRecord(state.hash[1], record, action, kind, mode, owner, name, line, column, context, usr_id,
+			context_usr_id, local);
+		state.records[1]++;
+		return;
+	}
+
+	hashRecord(state.hash[0], record, action, kind, mode, owner, name, line, column, context, usr_id,
+		context_usr_id, local);
+	state.records[0]++;
+	if (state.has_local) {
+		hashRecord(state.hash[1], record, action, kind, mode, owner, name, line, column, context, usr_id,
+			context_usr_id, local);
+		state.records[1]++;
+	}
+}
+
 static std::string locToFile(const clang::ASTContext &ctx, clang::SourceLocation loc, unsigned &line, unsigned &col)
 {
 	const clang::SourceManager &sm = ctx.getSourceManager();
@@ -170,6 +248,13 @@ void SemindexContext::addUse(SemindexUse &&u)
 
 void rebuildRecords(semindex *s)
 {
+	std::unordered_map<const std::string *, size_t> file_index;
+	std::vector<FileFingerprintState> fingerprints(s->files.size());
+	size_t index = 0;
+
+	for (const auto &file : s->files)
+		file_index[&file] = index++;
+
 	s->symbol_records.clear();
 	s->symbol_records.reserve(s->symbols.size());
 
@@ -183,6 +268,7 @@ void rebuildRecords(semindex *s)
 		rec.usr = sym.usr.c_str();
 		rec.context = sym.context.c_str();
 		rec.file = sym.loc.file ? sym.loc.file->c_str() : "";
+		rec.file_index = sym.loc.file ? file_index.at(sym.loc.file) : fingerprints.size();
 		rec.line = sym.loc.line;
 		rec.column = sym.loc.column;
 		rec.local = sym.local;
@@ -190,6 +276,9 @@ void rebuildRecords(semindex *s)
 		rec.order = sym.order;
 
 		s->symbol_records.push_back(rec);
+		if (rec.file_index < fingerprints.size())
+			updateFingerprints(fingerprints[rec.file_index], rec.local, 0, rec.definition, rec.kind, 0,
+				rec.owner, rec.name, rec.line, rec.column, rec.context, 0, 0);
 	}
 
 	s->use_records.clear();
@@ -210,11 +299,41 @@ void rebuildRecords(semindex *s)
 		rec.usr_id = use.usr_id;
 		rec.context_usr_id = use.context_usr_id;
 		rec.file = use.loc.file ? use.loc.file->c_str() : "";
+		rec.file_index = use.loc.file ? file_index.at(use.loc.file) : fingerprints.size();
 		rec.line = use.loc.line;
 		rec.column = use.loc.column;
 		rec.local = use.local;
 		rec.order = use.order;
 
 		s->use_records.push_back(rec);
+		bool direct_call = rec.kind == SEMINDEX_USE_CALL && rec.symbol_kind == SEMINDEX_SYMBOL_FUNCTION;
+
+		if (rec.file_index < fingerprints.size())
+			updateFingerprints(fingerprints[rec.file_index], rec.local, 1, rec.kind, rec.symbol_kind,
+				rec.mode, rec.owner, rec.name, rec.line, rec.column, rec.context,
+				direct_call ? rec.usr_id : 0, direct_call ? rec.context_usr_id : 0);
+	}
+
+	s->file_fingerprints[0].clear();
+	s->file_fingerprints[1].clear();
+	s->file_fingerprints[0].reserve(s->files.size());
+	s->file_fingerprints[1].reserve(s->files.size());
+	index = 0;
+	for (const auto &file : s->files) {
+		semindex_file_fingerprint_t nonlocal;
+		semindex_file_fingerprint_t all;
+		auto nonlocal_digest = fingerprints[index].hash[0].final();
+		auto all_digest = fingerprints[index].has_local ? fingerprints[index].hash[1].final() : nonlocal_digest;
+
+		nonlocal.file = file.c_str();
+		std::memcpy(nonlocal.data, nonlocal_digest.data(), sizeof(nonlocal.data));
+		nonlocal.record_count = fingerprints[index].records[0];
+		all.file = file.c_str();
+		std::memcpy(all.data, all_digest.data(), sizeof(all.data));
+		all.record_count =
+			fingerprints[index].has_local ? fingerprints[index].records[1] : fingerprints[index].records[0];
+		s->file_fingerprints[0].push_back(nonlocal);
+		s->file_fingerprints[1].push_back(all);
+		index++;
 	}
 }

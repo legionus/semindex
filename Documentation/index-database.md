@@ -46,6 +46,19 @@ duplicating identical records. When a physical file's modification time or size
 changes, its old records in the current variant are removed before merging the
 new records.
 
+For each file, the indexer computes a SHA-256 fingerprint from the semantic
+records that would be stored in the database. Multiple fingerprints may belong
+to one `(variant, path)` because preprocessing the same header under different
+macro contexts can produce different records. If an unchanged included file
+already has the same fingerprint, its records are omitted from private staging
+and from the shared database merge. The main source file is never reused this
+way because indexing it replaces its previous records.
+
+A cache hit is checked again while holding the database writer lock. If another
+writer invalidated it after private staging began, the process stages the full
+record set and retries the merge. `INSERT OR IGNORE` remains the final guard for
+writers that discover the same fingerprint concurrently.
+
 The WAL database uses `synchronous=OFF`. An application or indexing-process
 failure remains transaction-safe, but an operating-system crash can require
 rebuilding the index. This is an intentional tradeoff for a reproducible cache.
