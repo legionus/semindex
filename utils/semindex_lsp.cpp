@@ -30,7 +30,7 @@ static void help()
 		     "                             path to the compiler command database\n"
 		     "                             (default: commands.db beside --database)\n"
 		     "      --variant=NAME         query only the named index variant\n"
-		     "      --include-local        preserve local symbols when reindexing\n"
+		     "      --no-include-local     omit local symbols when reindexing\n"
 		     "      --logfile=FILE         append JSON-RPC requests and responses to FILE\n"
 		     "  -h, --help                 display this help and exit\n"
 		     "\n";
@@ -42,7 +42,7 @@ int main(int argc, char **argv)
 	std::string commands_database_path;
 	std::string variant;
 	std::string logfile_path;
-	bool include_local = false;
+	bool include_local = true;
 	bool logfile_requested = false;
 	semindex_db_t *database = nullptr;
 
@@ -103,8 +103,8 @@ int main(int argc, char **argv)
 			logfile_requested = true;
 			continue;
 		}
-		if (argument == "--include-local") {
-			include_local = true;
+		if (argument == "--no-include-local") {
+			include_local = false;
 			continue;
 		}
 		std::cerr << "semindex-lsp: unknown option: " << argument << '\n';

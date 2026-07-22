@@ -38,7 +38,7 @@ static void compiler_help(void)
 	       "      --variant=NAME          store records in the named variant\n"
 	       "                             (default: general)\n"
 	       "      --no-store-command      do not store the compiler command\n"
-	       "      --include-local         store local symbols and their uses\n"
+	       "      --no-include-local      do not index local symbols or their uses\n"
 	       "      --trace=FILE            append performance events to FILE\n"
 	       "  -h, --help                 display this help and exit\n"
 	       "\n"
@@ -156,7 +156,7 @@ static int find_source_file(int argc, char **argv, const char **source_file)
 int cmd_compiler(int argc, char **argv)
 {
 	static const struct option long_options[] = {
-		{ "include-local", no_argument, NULL, 1 },
+		{ "no-include-local", no_argument, NULL, 1 },
 		{ "variant", required_argument, NULL, 2 },
 		{ "commands-database", required_argument, NULL, 3 },
 		{ "no-store-command", no_argument, NULL, 4 },
@@ -185,7 +185,7 @@ int cmd_compiler(int argc, char **argv)
 	char *default_commands_database = NULL;
 	int ret = 1;
 	int print_output = 0;
-	int include_local = 0;
+	int include_local = 1;
 	int store_command = 1;
 	int opt;
 
@@ -193,7 +193,7 @@ int cmd_compiler(int argc, char **argv)
 	while ((opt = getopt_long(argc, argv, "+d:f:s:h", long_options, NULL)) != -1) {
 		switch (opt) {
 		case 1:
-			include_local = 1;
+			include_local = 0;
 			break;
 		case 2:
 			variant = optarg;
@@ -281,7 +281,7 @@ int cmd_compiler(int argc, char **argv)
 	s = semindex_create();
 	semindex_set_scope(s, scope);
 	semindex_set_details(s, print_output);
-	semindex_set_include_local(s, print_output || include_local);
+	semindex_set_include_local(s, include_local);
 
 	cmd.directory = ".";
 	cmd.file = source_file;

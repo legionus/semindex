@@ -539,6 +539,42 @@ def main():
         if responses[3] != {"id": 13, "jsonrpc": "2.0", "result": None}:
             fail("didSave shutdown response is malformed")
 
+        with sqlite3.connect(database) as connection:
+            local_records = connection.execute(
+                "SELECT count(*) FROM records JOIN files "
+                "ON files.id = records.file_id WHERE files.path = ? "
+                "AND records.local != 0",
+                (source.name,),
+            ).fetchone()[0]
+        if not local_records:
+            fail("LSP omitted local records by default")
+
+        process, responses = run_server(
+            sys.argv[1], [*options, "--no-include-local"], [
+                {
+                    "jsonrpc": "2.0", "id": 50, "method": "initialize",
+                    "params": {"rootUri": root_uri},
+                },
+                {
+                    "jsonrpc": "2.0", "method": "textDocument/didSave",
+                    "params": {"textDocument": {"uri": uri}},
+                },
+                {"jsonrpc": "2.0", "id": 51, "method": "shutdown"},
+                {"jsonrpc": "2.0", "method": "exit"},
+            ],
+        )
+        if process.returncode != 0 or len(responses) != 2:
+            fail("LSP --no-include-local lifecycle failed", process)
+        with sqlite3.connect(database) as connection:
+            local_records = connection.execute(
+                "SELECT count(*) FROM records JOIN files "
+                "ON files.id = records.file_id WHERE files.path = ? "
+                "AND records.local != 0",
+                (source.name,),
+            ).fetchone()[0]
+        if local_records:
+            fail("LSP --no-include-local retained local records")
+
 
 if __name__ == "__main__":
     main()

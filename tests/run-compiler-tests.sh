@@ -28,8 +28,8 @@ run_quiet_case()
 	if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM records")" -lt 1 ]; then
 		fail "compiler did not store index records"
 	fi
-	if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM records WHERE local != 0")" != 0 ]; then
-		fail "compiler stored local records by default"
+	if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM records WHERE local != 0")" -lt 1 ]; then
+		fail "compiler omitted local records by default"
 	fi
 	if sqlite3 "$db" "SELECT 1 FROM compile_commands" >/dev/null 2>&1; then
 		fail "compiler command storage is still enabled"
@@ -74,6 +74,18 @@ run_index_command_case()
 	if [ "$(sqlite3 "$commands_db" "SELECT instr(hex(arguments), hex('test.c')) FROM commands")" = 0 ]; then
 		fail "index stored an unexpected compile command"
 	fi
+	if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM records WHERE local != 0")" -lt 1 ]; then
+		fail "index omitted local records by default"
+	fi
+
+	db=$tmpdir/index-no-local/.semindex/semindex.db
+	if ! "$SEMINDEX" index --no-include-local --no-store-command --database "$db" \
+	     --compile-commands "$COMPILE_COMMANDS" "$SOURCE_DIR/tests/test.c" >/dev/null; then
+		fail "index --no-include-local failed"
+	fi
+	if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM records WHERE local != 0")" != 0 ]; then
+		fail "index --no-include-local stored local records"
+	fi
 
 	db=$tmpdir/index-no-command/.semindex/semindex.db
 	commands_db=$tmpdir/index-no-command/.semindex/commands.db
@@ -86,16 +98,16 @@ run_index_command_case()
 	fi
 }
 
-run_include_local_case()
+run_no_include_local_case()
 {
-	db=$tmpdir/local/.semindex/semindex.db
+	db=$tmpdir/no-local/.semindex/semindex.db
 
-	if ! "$SEMINDEX" compiler --include-local --database "$db" -- \
+	if ! "$SEMINDEX" compiler --no-include-local --database "$db" -- \
 	     cc -I"$SOURCE_DIR/tests/include" "$SOURCE_DIR/tests/test.c"; then
-		fail "compiler --include-local failed"
+		fail "compiler --no-include-local failed"
 	fi
-	if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM records WHERE local != 0")" -lt 1 ]; then
-		fail "compiler --include-local did not store local records"
+	if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM records WHERE local != 0")" != 0 ]; then
+		fail "compiler --no-include-local stored local records"
 	fi
 }
 
@@ -202,7 +214,7 @@ trap 'rm -rf "$tmpdir"' EXIT
 run_quiet_case
 run_no_store_command_case
 run_index_command_case
-run_include_local_case
+run_no_include_local_case
 run_format_case default tests/test.c.expect
 run_format_case dissect tests/test.c.dissect.expect
 run_kernel_flags_case

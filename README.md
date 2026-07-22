@@ -102,10 +102,9 @@ semindex compiler -- -Iinclude -DDEBUG -c path/to/file.c -o file.o
 The indexing commands write index records to `.semindex/semindex.db` and
 `compiler` is quiet unless `--format` is specified. Their selected compiler
 arguments are stored separately in `.semindex/commands.db`; use
-`--no-store-command` to disable this. Local
-symbols and their uses are omitted from the persistent index unless
-`--include-local` is specified. A compiler name may be provided after `--`;
-when omitted, `cc` is used as the Clang driver name.
+`--no-store-command` to disable this. Local symbols and their uses are included
+by default; use `--no-include-local` to omit them. A compiler name may be
+provided after `--`; when omitted, `cc` is used as the Clang driver name.
 
 Export the commands captured for the default variant as a compilation
 database:

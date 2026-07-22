@@ -64,5 +64,5 @@ The compiler command database defaults to `commands.db` beside the symbol
 database. Select another path with `--commands-database=PATH`. When no variant
 is selected, saves update the `general` variant while navigation continues to
 query all variants. Use `--variant=NAME` to update and query another variant.
-Use `--include-local` when the existing index was created with local symbols;
-otherwise save updates omit them.
+Save updates preserve local symbols by default. Use `--no-include-local` when
+the existing index intentionally omits them.

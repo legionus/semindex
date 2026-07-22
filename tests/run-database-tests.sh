@@ -110,8 +110,8 @@ printf '%s\n' 'static inline int local_header(void)' '{' 'int hidden = 1;' 'retu
 	>"$tmpdir/local.h"
 printf '%s\n' '#include "local.h"' 'int call_local_a(void) { return local_header(); }' >"$tmpdir/local-a.c"
 printf '%s\n' '#include "local.h"' 'int call_local_b(void) { return local_header(); }' >"$tmpdir/local-b.c"
-"$SEMINDEX" compiler --database "$local_db" -- cc -I"$tmpdir" "$tmpdir/local-a.c"
-"$SEMINDEX" compiler --include-local --database "$local_db" -- cc -I"$tmpdir" "$tmpdir/local-b.c"
+"$SEMINDEX" compiler --no-include-local --database "$local_db" -- cc -I"$tmpdir" "$tmpdir/local-a.c"
+"$SEMINDEX" compiler --database "$local_db" -- cc -I"$tmpdir" "$tmpdir/local-b.c"
 if [ "$(sqlite3 "$local_db" "SELECT COUNT(*) FROM records WHERE symbol = 'hidden' AND local = 1")" = 0 ]; then
 	fail "a non-local fingerprint hid local header records"
 fi
