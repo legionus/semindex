@@ -10,7 +10,7 @@
 #include "index_db.h"
 #include "output.h"
 
-#define INDEX_SCHEMA_VERSION 7
+#define INDEX_SCHEMA_VERSION 8
 #define STRINGIFY_VALUE(value) #value
 #define STRINGIFY(value) STRINGIFY_VALUE(value)
 

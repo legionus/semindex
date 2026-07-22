@@ -172,6 +172,13 @@ int cmd_index(int argc, char **argv)
 	}
 	semindex_trace_end(trace, "parse", phase_start);
 	phase_start = semindex_trace_begin(trace);
+	if (semindex_build_file_fingerprints(s) < 0) {
+		semindex_trace_end(trace, "fingerprint", phase_start);
+		fprintf(stderr, "semindex: failed to fingerprint '%s'\n", source_file);
+		goto out;
+	}
+	semindex_trace_end(trace, "fingerprint", phase_start);
+	phase_start = semindex_trace_begin(trace);
 	if (index_db_store(database, s, source_file, variant, include_local, trace) < 0) {
 		semindex_trace_end(trace, "symbol_database", phase_start);
 		goto out;

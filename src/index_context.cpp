@@ -6,7 +6,7 @@
 
 #include <llvm/ADT/ArrayRef.h>
 #include <llvm/ADT/StringRef.h>
-#include <llvm/Support/SHA256.h>
+#include <llvm/Support/BLAKE3.h>
 
 #include <cstdint>
 #include <cstring>
@@ -14,12 +14,12 @@
 #include <vector>
 
 struct FileFingerprintState {
-	llvm::SHA256 hash[2];
+	llvm::BLAKE3 hash[2];
 	size_t records[2] = { 0, 0 };
 	bool has_local = false;
 };
 
-static void hashInteger(llvm::SHA256 &hash, uint64_t value)
+static void hashInteger(llvm::BLAKE3 &hash, uint64_t value)
 {
 	uint8_t bytes[8];
 
@@ -30,7 +30,7 @@ static void hashInteger(llvm::SHA256 &hash, uint64_t value)
 	hash.update(llvm::ArrayRef<uint8_t>(bytes));
 }
 
-static void hashString(llvm::SHA256 &hash, const char *value)
+static void hashString(llvm::BLAKE3 &hash, const char *value)
 {
 	llvm::StringRef str(value ? value : "");
 
@@ -38,7 +38,7 @@ static void hashString(llvm::SHA256 &hash, const char *value)
 	hash.update(str);
 }
 
-static void hashRecord(llvm::SHA256 &hash, int record, int action, int kind, uint64_t mode, const char *owner,
+static void hashRecord(llvm::BLAKE3 &hash, int record, int action, int kind, uint64_t mode, const char *owner,
 	const char *name, unsigned line, unsigned column, const char *context, uint64_t usr_id, uint64_t context_usr_id,
 	int local)
 {
@@ -249,7 +249,6 @@ void SemindexContext::addUse(SemindexUse &&u)
 void rebuildRecords(semindex *s)
 {
 	std::unordered_map<const std::string *, size_t> file_index;
-	std::vector<FileFingerprintState> fingerprints(s->files.size());
 	size_t index = 0;
 
 	for (const auto &file : s->files)
@@ -268,7 +267,7 @@ void rebuildRecords(semindex *s)
 		rec.usr = sym.usr.c_str();
 		rec.context = sym.context.c_str();
 		rec.file = sym.loc.file ? sym.loc.file->c_str() : "";
-		rec.file_index = sym.loc.file ? file_index.at(sym.loc.file) : fingerprints.size();
+		rec.file_index = sym.loc.file ? file_index.at(sym.loc.file) : s->files.size();
 		rec.line = sym.loc.line;
 		rec.column = sym.loc.column;
 		rec.local = sym.local;
@@ -276,9 +275,6 @@ void rebuildRecords(semindex *s)
 		rec.order = sym.order;
 
 		s->symbol_records.push_back(rec);
-		if (rec.file_index < fingerprints.size())
-			updateFingerprints(fingerprints[rec.file_index], rec.local, 0, rec.definition, rec.kind, 0,
-				rec.owner, rec.name, rec.line, rec.column, rec.context, 0, 0);
 	}
 
 	s->use_records.clear();
@@ -299,13 +295,27 @@ void rebuildRecords(semindex *s)
 		rec.usr_id = use.usr_id;
 		rec.context_usr_id = use.context_usr_id;
 		rec.file = use.loc.file ? use.loc.file->c_str() : "";
-		rec.file_index = use.loc.file ? file_index.at(use.loc.file) : fingerprints.size();
+		rec.file_index = use.loc.file ? file_index.at(use.loc.file) : s->files.size();
 		rec.line = use.loc.line;
 		rec.column = use.loc.column;
 		rec.local = use.local;
 		rec.order = use.order;
 
 		s->use_records.push_back(rec);
+	}
+}
+
+void rebuildFingerprints(semindex *s)
+{
+	std::vector<FileFingerprintState> fingerprints(s->files.size());
+	size_t index = 0;
+
+	for (const auto &rec : s->symbol_records) {
+		if (rec.file_index < fingerprints.size())
+			updateFingerprints(fingerprints[rec.file_index], rec.local, 0, rec.definition, rec.kind, 0,
+				rec.owner, rec.name, rec.line, rec.column, rec.context, 0, 0);
+	}
+	for (const auto &rec : s->use_records) {
 		bool direct_call = rec.kind == SEMINDEX_USE_CALL && rec.symbol_kind == SEMINDEX_SYMBOL_FUNCTION;
 
 		if (rec.file_index < fingerprints.size())

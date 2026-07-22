@@ -139,6 +139,8 @@ function extract(line, start_marker, end_marker, start, tail, end)
 		printf "%.0f\t%s\t%s\t%s\n", duration, pid, command, source > slow
 	} else if (phase == "parse") {
 		parse_sum += duration
+	} else if (phase == "fingerprint") {
+		fingerprint_sum += duration
 	} else if (phase == "symbol_database") {
 		symbol_sum += duration
 	} else if (phase == "command_database") {
@@ -166,10 +168,10 @@ END {
 		process_count++
 	for (source in sources)
 		source_count++
-	printf "%d\t%d\t%d\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%d\t%.0f" \
+	printf "%d\t%d\t%d\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%d\t%.0f" \
 	       "\t%d\t%.0f\t%.0f\t%d\t%.0f\t%.0f\t%d\t%.0f\t%.0f\n",
 	       events, process_count, source_count, last_end - first_start, total_sum,
-	       parse_sum, symbol_sum, command_sum, output_sum, cleanup_sum, lock_sum,
+	       parse_sum, fingerprint_sum, symbol_sum, command_sum, output_sum, cleanup_sum, lock_sum,
 	       first_start, lock_count, lock_max, phase_counter_count["db.stage_files"],
 	       phase_items_in["db.stage_files"], phase_items_out["db.stage_files"],
 	       phase_counter_count["db.stage_records"],
@@ -186,7 +188,7 @@ END {
 fi
 
 tab=$(printf '\t')
-IFS="$tab" read -r events processes sources span total parse symbol command output cleanup \
+IFS="$tab" read -r events processes sources span total parse fingerprint symbol command output cleanup \
 	lock first_start lock_count lock_max file_count file_in file_cached stage_count stage_in stage_out \
 	merge_count merge_in merge_out <"$summary"
 
@@ -201,14 +203,15 @@ awk -v span="$span" -v total="$total" 'BEGIN {
 
 printf '\nTop-level process time (aggregated across processes):\n'
 printf '%-20s %12s %10s\n' 'PHASE' 'TOTAL (s)' 'OF TOTAL'
-awk -v total="$total" -v parse="$parse" -v symbol="$symbol" -v command="$command" \
+awk -v total="$total" -v parse="$parse" -v fingerprint="$fingerprint" -v symbol="$symbol" -v command="$command" \
 	-v output="$output" -v cleanup="$cleanup" 'BEGIN {
 	name[1] = "parse"; value[1] = parse
-	name[2] = "symbol_database"; value[2] = symbol
-	name[3] = "command_database"; value[3] = command
-	name[4] = "output"; value[4] = output
-	name[5] = "cleanup"; value[5] = cleanup
-	for (i = 1; i <= 5; i++) {
+	name[2] = "fingerprint"; value[2] = fingerprint
+	name[3] = "symbol_database"; value[3] = symbol
+	name[4] = "command_database"; value[4] = command
+	name[5] = "output"; value[5] = output
+	name[6] = "cleanup"; value[6] = cleanup
+	for (i = 1; i <= 6; i++) {
 		percent = total ? value[i] * 100 / total : 0
 		printf "%-20s %12.3f %9.2f%%\n", name[i], value[i] / 1000000000, percent
 	}

@@ -35,7 +35,8 @@ trace=$tmpdir/trace.jsonl
 	--compile-commands="$COMPILE_COMMANDS" "$source" >/dev/null
 
 valid_trace "$trace" || fail "trace contains an incomplete or malformed line"
-for phase in parse db.stage_records db.merge.begin db.merge.records_insert symbol_database command_database total; do
+for phase in parse fingerprint db.stage_records db.merge.begin db.merge.records_insert symbol_database \
+	command_database total; do
 	if [ "$(grep -c "\"phase\":\"$phase\"" "$trace")" != 2 ]; then
 		fail "trace does not contain two $phase events"
 	fi
@@ -97,6 +98,7 @@ fi
 
 "$SOURCE_DIR/scripts/analyze-trace.sh" --limit=3 "$parallel_trace" >"$tmpdir/analysis.out"
 if ! grep -q '^Processes: 8$' "$tmpdir/analysis.out" ||
+	! grep -q '^fingerprint ' "$tmpdir/analysis.out" ||
 		! grep -q '^db.merge.begin ' "$tmpdir/analysis.out" ||
 		! grep -q '^Record flow:$' "$tmpdir/analysis.out" ||
 		! grep -q '^File fingerprint cache:$' "$tmpdir/analysis.out" ||

@@ -185,10 +185,11 @@ The `db.stage_files` event uses the same fields for the number of fingerprinted
 files and the number whose semantic records were reused. The analyzer reports
 these values separately as the file fingerprint cache hit rate.
 
-Top-level phases cover parsing, symbol database storage, command database
-storage, output, cleanup, and total execution. Symbol database storage is
-divided into database setup, private staging, merge lock acquisition, each bulk
-merge query, commit, and close. In particular, `db.merge.begin` measures
+Top-level phases cover Clang parsing and record construction, semantic
+fingerprinting, symbol database storage, command database storage, output,
+cleanup, and total execution. Symbol database storage is divided into database
+setup, private staging, merge lock acquisition, each bulk merge query, commit,
+and close. In particular, `db.merge.begin` measures
 `BEGIN IMMEDIATE`; after schema initialization its duration is predominantly
 writer-lock wait.
 

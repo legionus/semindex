@@ -102,6 +102,7 @@ private:
 };
 
 void rebuildRecords(semindex *s);
+void rebuildFingerprints(semindex *s);
 
 std::unique_ptr<clang::tooling::FrontendActionFactory> createSemindexActionFactory(semindex *out);
 std::unique_ptr<clang::tooling::FrontendActionFactory> createSemindexPreprocessorActionFactory(semindex *out);

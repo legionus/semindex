@@ -46,7 +46,7 @@ duplicating identical records. When a physical file's modification time or size
 changes, its old records in the current variant are removed before merging the
 new records.
 
-For each file, the indexer computes a SHA-256 fingerprint from the semantic
+For each file, the indexer computes a BLAKE3 fingerprint from the semantic
 records that would be stored in the database. Multiple fingerprints may belong
 to one `(variant, path)` because preprocessing the same header under different
 macro contexts can produce different records. If an unchanged included file

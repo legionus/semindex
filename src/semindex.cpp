@@ -261,6 +261,15 @@ const semindex_compile_command_t *semindex_get_compile_command(const semindex_t 
 	return &s->command_record;
 }
 
+int semindex_build_file_fingerprints(semindex_t *s)
+{
+	if (!s)
+		return -1;
+
+	rebuildFingerprints(s);
+	return 0;
+}
+
 size_t semindex_symbol_count(const semindex_t *s)
 {
 	return s ? s->symbols.size() : 0;
