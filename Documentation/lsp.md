@@ -7,8 +7,10 @@ corrupted by normal `semindex` command output.
 The server handles JSON-RPC framing, parse and method errors, and the
 `initialize`, `initialized`, `shutdown`, and `exit` lifecycle. It reports
 UTF-16 as its position encoding and supports `textDocument/definition` and
-`textDocument/references` against the stored index. Call hierarchy clients can
-use `textDocument/prepareCallHierarchy`, `callHierarchy/incomingCalls`, and
+`textDocument/references` against the stored index. The
+`textDocument/documentHighlight` request classifies occurrences in the current
+file as text, read, or write highlights. Call hierarchy clients can use
+`textDocument/prepareCallHierarchy`, `callHierarchy/incomingCalls`, and
 `callHierarchy/outgoingCalls`.
 
 Start the server directly from an editor or an LSP client:

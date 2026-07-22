@@ -117,6 +117,14 @@ def main():
             "int read_field(struct Nav *p)\n"
             "{\n"
             "\treturn /* π */ p->field;\n"
+            "}\n"
+            "void write_field(struct Nav *p)\n"
+            "{\n"
+            "\tp->field = 1;\n"
+            "}\n"
+            "void address_field(struct Nav *p)\n"
+            "{\n"
+            "\t(void)&p->field;\n"
             "}\n",
             encoding="utf-8",
         )
@@ -255,6 +263,16 @@ def main():
                     },
                 },
                 {
+                    "jsonrpc": "2.0", "id": 8,
+                    "method": "textDocument/documentHighlight",
+                    "params": {
+                        "textDocument": {"uri": uri},
+                        "position": {
+                            "line": 5, "character": reference_character,
+                        },
+                    },
+                },
+                {
                     "jsonrpc": "2.0", "id": 20,
                     "method": "textDocument/prepareCallHierarchy",
                     "params": {
@@ -280,7 +298,7 @@ def main():
         )
         if process.returncode != 0:
             fail(f"normal lifecycle exited with status {process.returncode}", process)
-        if len(responses) != 12:
+        if len(responses) != 13:
             fail(f"normal lifecycle returned {len(responses)} responses", process)
         if responses[0].get("error", {}).get("code") != -32700:
             fail("malformed JSON did not produce a parse error")
@@ -290,9 +308,11 @@ def main():
             "positionEncoding"
         ) != "utf-16" or capabilities.get("definitionProvider") is not True or (
             capabilities.get("referencesProvider") is not True
+        ) or capabilities.get("documentHighlightProvider") is not True or (
+            capabilities.get("callHierarchyProvider") is not True
         ) or capabilities.get("textDocumentSync") != {
             "change": 0, "save": True,
-        } or capabilities.get("callHierarchyProvider") is not True:
+        }:
             fail("initialize response has unexpected capabilities")
         if responses[2].get("id") != 3 or responses[2].get("error", {}).get(
             "code"
@@ -316,11 +336,39 @@ def main():
                 "end": {"line": 5, "character": reference_character + 5},
             },
         }
-        if responses[4].get("result") != [expected_reference]:
+        expected_write_reference = {
+            "uri": uri,
+            "range": source_range(9, 4, len("field")),
+        }
+        expected_address_reference = {
+            "uri": uri,
+            "range": source_range(13, 11, len("field")),
+        }
+        expected_references = [
+            expected_reference,
+            expected_write_reference,
+            expected_address_reference,
+        ]
+        if responses[4].get("result") != expected_references:
             fail("references returned unexpected locations")
-        if responses[5].get("result") != [expected_reference, expected_definition]:
+        if responses[5].get("result") != [
+            *expected_references, expected_definition,
+        ]:
             fail("references did not include the declaration")
-        if responses[6].get("result") != [caller_a]:
+        expected_highlights = [
+            {"range": source_range(1, 5, len("field")), "kind": 1},
+            {
+                "range": source_range(
+                    5, reference_character, len("field")
+                ),
+                "kind": 2,
+            },
+            {"range": source_range(9, 4, len("field")), "kind": 3},
+            {"range": source_range(13, 11, len("field")), "kind": 1},
+        ]
+        if responses[6].get("result") != expected_highlights:
+            fail(f"document highlights differ: {responses[6].get('result')}")
+        if responses[7].get("result") != [caller_a]:
             fail("prepareCallHierarchy returned an unexpected item")
         expected_outgoing = [
             {
@@ -339,21 +387,21 @@ def main():
                 ],
             },
         ]
-        if responses[7].get("result") != expected_outgoing:
-            fail(f"outgoing calls differ: {responses[7].get('result')}")
+        if responses[8].get("result") != expected_outgoing:
+            fail(f"outgoing calls differ: {responses[8].get('result')}")
         expected_incoming = [{
             "from": caller_a,
             "fromRanges": [source_range(14, 1, len("helper"))],
         }]
-        if responses[8].get("result") != expected_incoming:
-            fail(f"incoming calls differ: {responses[8].get('result')}")
-        if responses[9].get("id") != "missing" or responses[9].get(
+        if responses[9].get("result") != expected_incoming:
+            fail(f"incoming calls differ: {responses[9].get('result')}")
+        if responses[10].get("id") != "missing" or responses[10].get(
             "error", {}
         ).get("code") != -32601:
             fail("unknown request did not produce MethodNotFound")
-        if responses[10] != {"id": 2, "jsonrpc": "2.0", "result": None}:
+        if responses[11] != {"id": 2, "jsonrpc": "2.0", "result": None}:
             fail("shutdown response is malformed")
-        if responses[11].get("id") != 4 or responses[11].get("error", {}).get(
+        if responses[12].get("id") != 4 or responses[12].get("error", {}).get(
             "code"
         ) != -32600:
             fail("exit request was accepted")
@@ -367,7 +415,7 @@ def main():
             fail(f"protocol log timestamp is invalid: {error}")
         if marker != "CLIENT --> SERVER":
             fail("protocol log starts with an unexpected marker")
-        if protocol_log.count("CLIENT --> SERVER\n") != 14:
+        if protocol_log.count("CLIENT --> SERVER\n") != 15:
             fail("protocol log has an unexpected request count")
         if protocol_log.count("SERVER --> CLIENT\n") != len(responses):
             fail("protocol log has an unexpected response count")
@@ -416,9 +464,9 @@ def main():
         ])
         if process.returncode != 0:
             fail("workspaceFolders lifecycle failed", process)
-        if len(responses) != 3 or responses[1].get("result") != [
-            expected_reference
-        ]:
+        if len(responses) != 3 or responses[1].get(
+            "result"
+        ) != expected_references:
             fail("workspaceFolders root did not resolve relative index paths")
 
         macro_uri = macro_source.resolve().as_uri()

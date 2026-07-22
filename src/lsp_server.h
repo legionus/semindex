@@ -27,6 +27,7 @@ private:
 
 	bool dispatch(const llvm::json::Object &message);
 	bool definition(const llvm::json::Value &id, const llvm::json::Object *params);
+	bool documentHighlight(const llvm::json::Value &id, const llvm::json::Object *params);
 	bool didSave(const llvm::json::Object *params);
 	bool references(const llvm::json::Value &id, const llvm::json::Object *params);
 	bool hierarchyReply(const llvm::json::Value &id, LspCallHierarchy::Status status, llvm::json::Value result);

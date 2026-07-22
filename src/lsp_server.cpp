@@ -5,6 +5,7 @@
 
 #include <limits>
 #include <iostream>
+#include <map>
 #include <set>
 #include <string>
 #include <utility>
@@ -16,6 +17,9 @@ static constexpr int METHOD_NOT_FOUND = -32601;
 static constexpr int INVALID_PARAMS = -32602;
 static constexpr int INTERNAL_ERROR = -32603;
 static constexpr int SERVER_NOT_INITIALIZED = -32002;
+static constexpr int DOCUMENT_HIGHLIGHT_TEXT = 1;
+static constexpr int DOCUMENT_HIGHLIGHT_READ = 2;
+static constexpr int DOCUMENT_HIGHLIGHT_WRITE = 3;
 
 struct CursorRecord {
 	std::string variant;
@@ -36,6 +40,18 @@ struct LocationCollector {
 struct CursorCollector {
 	std::vector<CursorRecord> records;
 	std::set<std::string> keys;
+};
+
+struct HighlightRecord {
+	llvm::json::Value range;
+	int kind;
+};
+
+struct HighlightCollector {
+	const LspSourceMapper &sources;
+	std::vector<HighlightRecord> highlights;
+	std::map<std::string, size_t> indices;
+	LspSourceMapper::Cache source_cache;
 };
 
 static int collectCursorRecord(void *data, const semindex_db_record_t *record)
@@ -64,6 +80,33 @@ static int collectLocation(void *data, const semindex_db_record_t *record)
 	collector.records++;
 	if (collector.keys.insert(std::move(key)).second)
 		collector.locations.push_back(collector.sources.location(*record, collector.source_cache));
+	return 0;
+}
+
+static int highlightKind(const semindex_db_record_t &record)
+{
+	if (record.record != SEMINDEX_DB_REFERENCE)
+		return DOCUMENT_HIGHLIGHT_TEXT;
+	if (record.action == SEMINDEX_USE_READ)
+		return DOCUMENT_HIGHLIGHT_READ;
+	if (record.action == SEMINDEX_USE_WRITE)
+		return DOCUMENT_HIGHLIGHT_WRITE;
+	return DOCUMENT_HIGHLIGHT_TEXT;
+}
+
+static int collectHighlight(void *data, const semindex_db_record_t *record)
+{
+	auto &collector = *static_cast<HighlightCollector *>(data);
+	std::string key =
+		std::string(record->path) + ':' + std::to_string(record->line) + ':' + std::to_string(record->column);
+	int kind = highlightKind(*record);
+	auto [entry, inserted] = collector.indices.emplace(std::move(key), collector.highlights.size());
+
+	if (inserted) {
+		collector.highlights.push_back({ collector.sources.range(*record, collector.source_cache), kind });
+	} else if (kind > collector.highlights[entry->second].kind) {
+		collector.highlights[entry->second].kind = kind;
+	}
 	return 0;
 }
 
@@ -210,6 +253,43 @@ bool LspServer::references(const llvm::json::Value &id, const llvm::json::Object
 	return reply(id, std::move(collector.locations));
 }
 
+bool LspServer::documentHighlight(const llvm::json::Value &id, const llvm::json::Object *params)
+{
+	llvm::StringRef uri;
+	unsigned line;
+	unsigned character;
+
+	if (!parsePosition(params, uri, line, character))
+		return error(&id, INVALID_PARAMS, "Invalid params");
+	std::vector<CursorRecord> cursors;
+	if (symbolsAt(database, variant, sources, uri, line, character, cursors) < 0)
+		return error(&id, INTERNAL_ERROR, "Database query failed");
+
+	HighlightCollector collector{ sources };
+	for (const auto &cursor : cursors) {
+		semindex_db_query_options_t options = {};
+		options.symbol = cursor.symbol.c_str();
+		options.path = cursor.path.c_str();
+		options.variant = cursor.variant.c_str();
+		options.context = cursor.local ? cursor.context.c_str() : nullptr;
+		options.record = SEMINDEX_DB_RECORD_ALL;
+		options.has_local = 1;
+		options.local = cursor.local;
+		if (semindex_db_query(database, &options, collectHighlight, &collector) < 0)
+			return error(&id, INTERNAL_ERROR, "Database query failed");
+	}
+
+	llvm::json::Array result;
+	result.reserve(collector.highlights.size());
+	for (auto &highlight : collector.highlights) {
+		result.push_back(llvm::json::Object{
+			{ "range", std::move(highlight.range) },
+			{ "kind", highlight.kind },
+		});
+	}
+	return reply(id, std::move(result));
+}
+
 bool LspServer::didSave(const llvm::json::Object *params)
 {
 	const llvm::json::Object *document = params ? params->getObject("textDocument") : nullptr;
@@ -288,6 +368,7 @@ bool LspServer::dispatch(const llvm::json::Object &message)
 					llvm::json::Object{
 						{ "callHierarchyProvider", true },
 						{ "definitionProvider", true },
+						{ "documentHighlightProvider", true },
 						{ "positionEncoding", "utf-16" },
 						{ "referencesProvider", true },
 						{ "textDocumentSync",
@@ -312,6 +393,8 @@ bool LspServer::dispatch(const llvm::json::Object &message)
 		return id ? error(id, INVALID_REQUEST, "Invalid Request") : true;
 	if (*method == "textDocument/definition")
 		return id ? definition(*id, message.getObject("params")) : true;
+	if (*method == "textDocument/documentHighlight")
+		return id ? documentHighlight(*id, message.getObject("params")) : true;
 	if (*method == "textDocument/references")
 		return id ? references(*id, message.getObject("params")) : true;
 	if (*method == "textDocument/prepareCallHierarchy") {
