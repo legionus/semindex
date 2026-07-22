@@ -20,7 +20,8 @@ build/semindex-lsp --database=.semindex/semindex.db
 By default the server queries all variants in the database. Use
 `--variant=NAME` when an editor session should use only one configuration.
 Relative paths stored in the index are resolved against the workspace
-`rootUri` supplied by the client.
+`rootUri` supplied by the client. If `rootUri` is absent or null, the first
+valid URI in `workspaceFolders` is used instead.
 
 The server reads `Content-Length` framed JSON-RPC messages from standard input
 and writes responses to standard output. Diagnostics are written only to
@@ -33,11 +34,13 @@ standard output:
 build/semindex-lsp --logfile=/tmp/semindex-lsp.log
 ```
 
-Each request or notification is preceded by `CLIENT --> SERVER`, and each
-response is preceded by `SERVER --> CLIENT`. The raw JSON payload follows the
-marker. The log is flushed after every message so it remains useful when the
-server exits unexpectedly. Protocol logs can contain source text and other
-client data and should therefore be treated as potentially sensitive.
+Each request or notification is preceded by a UTC timestamp and
+`CLIENT --> SERVER`, and each response is preceded by a timestamp and
+`SERVER --> CLIENT`. Timestamps have microsecond precision, so request latency
+can be measured directly from the log. The raw JSON payload follows the marker.
+The log is flushed after every message so it remains useful when the server
+exits unexpectedly. Protocol logs can contain source text and other client data
+and should therefore be treated as potentially sensitive.
 
 ## Call hierarchy
 

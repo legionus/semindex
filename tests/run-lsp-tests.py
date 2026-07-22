@@ -6,6 +6,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+from datetime import datetime
 from pathlib import Path
 
 
@@ -132,6 +133,41 @@ def main():
         )
         if indexed.returncode != 0:
             fail("failed to create the LSP test index", indexed)
+
+        macro_source = directory / "macro-call.c"
+        macro_source.write_text(
+            "int target(int);\n"
+            "#define CALL_TARGET(value) target(value)\n"
+            "int invoke(int value) { return CALL_TARGET(value); }\n",
+            encoding="utf-8",
+        )
+        indexed = subprocess.run(
+            [
+                sys.argv[2], "compiler", f"--database={database}",
+                "--no-store-command", "--", "cc", macro_source.name,
+            ],
+            cwd=directory,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        if indexed.returncode != 0:
+            fail("failed to create the macro call index", indexed)
+
+        with sqlite3.connect(database) as connection:
+            plan = connection.execute(
+                "EXPLAIN QUERY PLAN SELECT files.variant, files.path, "
+                "records.line, records.column FROM files CROSS JOIN records "
+                "ON records.file_id = files.id WHERE files.path = ? "
+                "AND records.line = ? AND records.column <= ? "
+                "ORDER BY records.column DESC, records.record",
+                (macro_source.name, 2, 32),
+            ).fetchall()
+        plan_details = "\n".join(row[3] for row in plan)
+        if "SCAN records" in plan_details or (
+            "records_file_idx (file_id=?)" not in plan_details
+        ):
+            fail(f"cursor lookup does not use the file index:\n{plan_details}")
 
         callgraph_a = Path(__file__).resolve().parent / "callgraph-a.c"
         callgraph_b = Path(__file__).resolve().parent / "callgraph-b.c"
@@ -299,7 +335,7 @@ def main():
                 "to": leaf,
                 "fromRanges": [
                     source_range(15, 1, len("leaf")),
-                    source_range(16, 1, len("leaf")),
+                    source_range(16, 8, len("leaf")),
                 ],
             },
         ]
@@ -323,6 +359,14 @@ def main():
             fail("exit request was accepted")
 
         protocol_log = logfile.read_text(encoding="utf-8")
+        first_marker = protocol_log.splitlines()[0]
+        timestamp, marker = first_marker.split(" ", 1)
+        try:
+            datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
+        except ValueError as error:
+            fail(f"protocol log timestamp is invalid: {error}")
+        if marker != "CLIENT --> SERVER":
+            fail("protocol log starts with an unexpected marker")
         if protocol_log.count("CLIENT --> SERVER\n") != 14:
             fail("protocol log has an unexpected request count")
         if protocol_log.count("SERVER --> CLIENT\n") != len(responses):
@@ -344,6 +388,67 @@ def main():
             b"empty log file path" not in process.stderr
         ):
             fail("empty protocol log path was accepted", process)
+
+        process, responses = run_server(sys.argv[1], options, [
+            {
+                "jsonrpc": "2.0", "id": 30, "method": "initialize",
+                "params": {
+                    "rootUri": None,
+                    "workspaceFolders": [{
+                        "uri": root_uri,
+                        "name": directory.name,
+                    }],
+                },
+            },
+            {
+                "jsonrpc": "2.0", "id": 31,
+                "method": "textDocument/references",
+                "params": {
+                    "textDocument": {"uri": uri},
+                    "position": {
+                        "line": 5, "character": reference_character,
+                    },
+                    "context": {"includeDeclaration": False},
+                },
+            },
+            {"jsonrpc": "2.0", "id": 32, "method": "shutdown"},
+            {"jsonrpc": "2.0", "method": "exit"},
+        ])
+        if process.returncode != 0:
+            fail("workspaceFolders lifecycle failed", process)
+        if len(responses) != 3 or responses[1].get("result") != [
+            expected_reference
+        ]:
+            fail("workspaceFolders root did not resolve relative index paths")
+
+        macro_uri = macro_source.resolve().as_uri()
+        process, responses = run_server(sys.argv[1], options, [
+            {
+                "jsonrpc": "2.0", "id": 40, "method": "initialize",
+                "params": {"rootUri": root_uri},
+            },
+            {
+                "jsonrpc": "2.0", "id": 41,
+                "method": "textDocument/references",
+                "params": {
+                    "textDocument": {"uri": macro_uri},
+                    "position": {"line": 1, "character": 30},
+                    "context": {"includeDeclaration": False},
+                },
+            },
+            {"jsonrpc": "2.0", "id": 42, "method": "shutdown"},
+            {"jsonrpc": "2.0", "method": "exit"},
+        ])
+        expected_macro_reference = {
+            "uri": macro_uri,
+            "range": source_range(1, 27, len("target")),
+        }
+        if process.returncode != 0:
+            fail("macro call lifecycle failed", process)
+        if len(responses) != 3 or responses[1].get("result") != [
+            expected_macro_reference
+        ]:
+            fail("macro body call did not resolve at its spelling location")
 
         process, responses = run_server(sys.argv[1], options, [
             {"jsonrpc": "2.0", "method": "exit"},

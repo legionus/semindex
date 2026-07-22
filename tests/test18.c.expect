@@ -1,0 +1,10 @@
+SYMBOLS:
+tests/test18.c:4:9 defined  macro    CALL_TARGET
+tests/test18.c:2:5 declared function target     int (int)
+tests/test18.c:6:5 defined  function invoke     int (int)
+tests/test18.c:6:16 defined  var      value      int
+
+USES:
+tests/test18.c:8:9 READ  macro:CALL_TARGET
+tests/test18.c:4:28 CALL  c:@F@target
+tests/test18.c:8:21 READ  c:test18.c@116@F@invoke@value

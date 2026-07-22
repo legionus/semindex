@@ -358,14 +358,14 @@ int semindex_db_find_at(semindex_db_t *db, const char *path, const char *variant
 		"SELECT files.variant, files.path, records.line, records.column, records.record, records.action, "
 		"records.kind, records.symbol, records.context, records.mode, records.usr_id, "
 		"records.context_usr_id, records.local "
-		"FROM files JOIN records ON records.file_id = files.id "
+		"FROM files CROSS JOIN records ON records.file_id = files.id "
 		"WHERE files.path = ?1 AND files.variant = ?2 AND records.line = ?3 AND records.column <= ?4 "
 		"ORDER BY records.column DESC, records.record";
 	static const char *all_variants =
 		"SELECT files.variant, files.path, records.line, records.column, records.record, records.action, "
 		"records.kind, records.symbol, records.context, records.mode, records.usr_id, "
 		"records.context_usr_id, records.local "
-		"FROM files JOIN records ON records.file_id = files.id "
+		"FROM files CROSS JOIN records ON records.file_id = files.id "
 		"WHERE files.path = ?1 AND records.line = ?2 AND records.column <= ?3 "
 		"ORDER BY records.column DESC, records.record";
 	sqlite3_stmt *stmt = NULL;

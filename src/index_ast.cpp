@@ -569,9 +569,11 @@ public:
 	bool VisitCallExpr(CallExpr *E)
 	{
 		const FunctionDecl *FD = E->getDirectCallee();
+		SourceLocation spelling;
 		if (!FD)
 			return true; /* indirect call: fp() */
 
+		spelling = index.spellingLoc(E->getExprLoc());
 		const ValueInfo &info = valueInfo(FD);
 		SemindexUse u;
 		u.kind = SEMINDEX_USE_CALL;
@@ -585,10 +587,10 @@ public:
 		u.context_usr = currentFunctionUSR;
 		u.usr_id = u.usr.empty() ? 0 : llvm::xxHash64(u.usr);
 		u.context_usr_id = currentFunctionUSRId;
-		u.loc = index.location(E->getExprLoc());
+		u.loc = index.location(spelling);
 		u.local = false;
 
-		index.addUseInScope(std::move(u), E->getExprLoc());
+		index.addUseInScope(std::move(u), spelling);
 		return true;
 	}
 

@@ -1,0 +1,10 @@
+
+FILE: tests/test18.c
+
+   4:9                    def   d CALL_TARGET
+   8:9                    -r-   d CALL_TARGET
+   2:5                    decl   f target                           int (int)
+   6:5                    def   f invoke                           int (int)
+   6:16  invoke           def . v value                            int
+   4:28  invoke           --r   f target                           int (int)
+   8:21  invoke           -r- . v value                            int

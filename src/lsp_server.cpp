@@ -88,6 +88,29 @@ static bool parsePosition(const llvm::json::Object *params, llvm::StringRef &uri
 	return true;
 }
 
+static void setWorkspaceRoot(LspSourceMapper &sources, const llvm::json::Object *params)
+{
+	if (!params)
+		return;
+	if (auto root_uri = params->getString("rootUri")) {
+		if (sources.setRootUri(*root_uri))
+			return;
+	}
+
+	const llvm::json::Array *folders = params->getArray("workspaceFolders");
+	if (!folders)
+		return;
+	for (const llvm::json::Value &folder : *folders) {
+		const llvm::json::Object *object = folder.getAsObject();
+		if (!object)
+			continue;
+		if (auto uri = object->getString("uri")) {
+			if (sources.setRootUri(*uri))
+				return;
+		}
+	}
+}
+
 LspServer::LspServer(LspTransport &transport, semindex_db_t *database, LspIndexer &indexer, std::string variant)
     : transport(transport), database(database), indexer(indexer), variant(std::move(variant)),
       call_hierarchy(database, sources, this->variant)
@@ -257,10 +280,7 @@ bool LspServer::dispatch(const llvm::json::Object &message)
 	if (*method == "initialize") {
 		if (!id || state != State::Uninitialized)
 			return error(id, INVALID_REQUEST, "Invalid Request");
-		if (const llvm::json::Object *params = message.getObject("params")) {
-			if (auto root_uri = params->getString("rootUri"))
-				sources.setRootUri(*root_uri);
-		}
+		setWorkspaceRoot(sources, message.getObject("params"));
 		state = State::Running;
 		return reply(*id,
 			llvm::json::Object{

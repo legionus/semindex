@@ -2,4 +2,4 @@ caller -> caller	general:@SOURCE_DIR@/tests/callgraph-a.c:18:2
 caller -> helper	general:@SOURCE_DIR@/tests/callgraph-a.c:15:2
 caller -> helper	general:@SOURCE_DIR@/tests/callgraph-b.c:9:2
 caller -> leaf	general:@SOURCE_DIR@/tests/callgraph-a.c:16:2
-caller -> leaf	general:@SOURCE_DIR@/tests/callgraph-a.c:17:2
+caller -> leaf	general:@SOURCE_DIR@/tests/callgraph-a.c:17:9
