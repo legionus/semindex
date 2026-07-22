@@ -116,7 +116,8 @@ semindex_trace_time_t semindex_trace_begin(semindex_trace_t *trace)
 	return now;
 }
 
-void semindex_trace_end(semindex_trace_t *trace, const char *phase, semindex_trace_time_t start)
+static void trace_end(semindex_trace_t *trace, const char *phase, semindex_trace_time_t start, int counted,
+	uint64_t items_in, uint64_t items_out)
 {
 	char *escaped_phase = NULL;
 	char *line = NULL;
@@ -133,22 +134,39 @@ void semindex_trace_end(semindex_trace_t *trace, const char *phase, semindex_tra
 	escaped_phase = json_escape(phase ? phase : "");
 	if (!escaped_phase)
 		goto no_memory;
-	len = snprintf(NULL, 0,
-		"{\"pid\":%ld,\"command\":\"%s\",\"source\":\"%s\",\"phase\":\"%s\","
-		"\"start_ns\":%llu,\"duration_ns\":%llu}\n",
-		(long)getpid(), trace->command, trace->source, escaped_phase, (unsigned long long)start,
-		(unsigned long long)(end - start));
+	if (counted) {
+		len = snprintf(NULL, 0,
+			"{\"pid\":%ld,\"command\":\"%s\",\"source\":\"%s\",\"phase\":\"%s\","
+			"\"start_ns\":%llu,\"duration_ns\":%llu,\"items_in\":%llu,\"items_out\":%llu}\n",
+			(long)getpid(), trace->command, trace->source, escaped_phase, (unsigned long long)start,
+			(unsigned long long)(end - start), (unsigned long long)items_in, (unsigned long long)items_out);
+	} else {
+		len = snprintf(NULL, 0,
+			"{\"pid\":%ld,\"command\":\"%s\",\"source\":\"%s\",\"phase\":\"%s\","
+			"\"start_ns\":%llu,\"duration_ns\":%llu}\n",
+			(long)getpid(), trace->command, trace->source, escaped_phase, (unsigned long long)start,
+			(unsigned long long)(end - start));
+	}
 	if (len < 0)
 		goto format_error;
 	line = malloc((size_t)len + 1);
 	if (!line)
 		goto no_memory;
-	if (snprintf(line, (size_t)len + 1,
-		    "{\"pid\":%ld,\"command\":\"%s\",\"source\":\"%s\",\"phase\":\"%s\","
-		    "\"start_ns\":%llu,\"duration_ns\":%llu}\n",
-		    (long)getpid(), trace->command, trace->source, escaped_phase, (unsigned long long)start,
-		    (unsigned long long)(end - start)) != len)
+	if (counted) {
+		if (snprintf(line, (size_t)len + 1,
+			    "{\"pid\":%ld,\"command\":\"%s\",\"source\":\"%s\",\"phase\":\"%s\","
+			    "\"start_ns\":%llu,\"duration_ns\":%llu,\"items_in\":%llu,\"items_out\":%llu}\n",
+			    (long)getpid(), trace->command, trace->source, escaped_phase, (unsigned long long)start,
+			    (unsigned long long)(end - start), (unsigned long long)items_in,
+			    (unsigned long long)items_out) != len)
+			goto format_error;
+	} else if (snprintf(line, (size_t)len + 1,
+			   "{\"pid\":%ld,\"command\":\"%s\",\"source\":\"%s\",\"phase\":\"%s\","
+			   "\"start_ns\":%llu,\"duration_ns\":%llu}\n",
+			   (long)getpid(), trace->command, trace->source, escaped_phase, (unsigned long long)start,
+			   (unsigned long long)(end - start)) != len) {
 		goto format_error;
+	}
 	do {
 		written = write(trace->fd, line, len);
 	} while (written < 0 && errno == EINTR);
@@ -171,6 +189,17 @@ format_error:
 out:
 	free(line);
 	free(escaped_phase);
+}
+
+void semindex_trace_end(semindex_trace_t *trace, const char *phase, semindex_trace_time_t start)
+{
+	trace_end(trace, phase, start, 0, 0, 0);
+}
+
+void semindex_trace_end_counted(semindex_trace_t *trace, const char *phase, semindex_trace_time_t start,
+	uint64_t items_in, uint64_t items_out)
+{
+	trace_end(trace, phase, start, 1, items_in, items_out);
 }
 
 int semindex_trace_close(semindex_trace_t *trace)

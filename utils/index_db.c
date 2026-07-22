@@ -232,7 +232,8 @@ static int open_writer(const char *path, sqlite3 **db, semindex_trace_t *trace)
 	}
 	semindex_trace_end(trace, "db.mkdir", start);
 	start = semindex_trace_begin(trace);
-	if (sqlite3_open_v2(path, db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL) != SQLITE_OK) {
+	if (sqlite3_open_v2(path, db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX, NULL) !=
+		SQLITE_OK) {
 		fprintf(stderr, "semindex: failed to open database '%s': %s\n", path,
 			*db ? sqlite3_errmsg(*db) : "unknown error");
 		semindex_trace_end(trace, "db.open", start);
@@ -325,15 +326,19 @@ out:
 	return ret;
 }
 
-static int stage_records(sqlite3 *db, semindex_t *s, int include_local)
+static int stage_records(sqlite3 *db, semindex_t *s, int include_local, uint64_t *items_in, uint64_t *items_out)
 {
 	static const char *sql =
 		"INSERT OR IGNORE INTO staging_records(symbol, record, action, kind, mode, path, line, column, "
 		"context, usr_id, context_usr_id, local) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, "
 		"?12)";
 	sqlite3_stmt *stmt = NULL;
+	sqlite3_int64 changes_before = sqlite3_total_changes64(db);
 	size_t i;
 	int ret = -1;
+
+	*items_in = 0;
+	*items_out = 0;
 
 	if (prepare(db, sql, &stmt) < 0)
 		goto out;
@@ -345,6 +350,7 @@ static int stage_records(sqlite3 *db, semindex_t *s, int include_local)
 			goto out;
 		if (sym->local && !include_local)
 			continue;
+		(*items_in)++;
 		if (stage_record(db, stmt, STORED_RECORD_SYMBOL, sym->definition, sym->kind, 0, sym->file, sym->line,
 			    sym->column, sym->owner, sym->name, sym->context, NULL, 0, NULL, 0, sym->local) < 0)
 			goto out;
@@ -357,6 +363,7 @@ static int stage_records(sqlite3 *db, semindex_t *s, int include_local)
 			goto out;
 		if (use->local && !include_local)
 			continue;
+		(*items_in)++;
 		direct_call = use->kind == SEMINDEX_USE_CALL && use->symbol_kind == SEMINDEX_SYMBOL_FUNCTION;
 		if (stage_record(db, stmt, STORED_RECORD_USE, use->kind, use->symbol_kind, use->mode, use->file,
 			    use->line, use->column, use->owner, use->name, use->context, direct_call ? use->usr : NULL,
@@ -366,6 +373,7 @@ static int stage_records(sqlite3 *db, semindex_t *s, int include_local)
 
 	ret = 0;
 out:
+	*items_out = (uint64_t)(sqlite3_total_changes64(db) - changes_before);
 	sqlite3_finalize(stmt);
 	return ret;
 }
@@ -434,7 +442,7 @@ out:
 	return ret;
 }
 
-static int merge_staging(sqlite3 *db, const char *variant, semindex_trace_t *trace)
+static int merge_staging(sqlite3 *db, const char *variant, uint64_t staged_records, semindex_trace_t *trace)
 {
 	static const char *phases[] = {
 		"db.merge.files_insert",
@@ -478,8 +486,17 @@ static int merge_staging(sqlite3 *db, const char *variant, semindex_trace_t *tra
 	if (trace_exec_sql(db, "BEGIN IMMEDIATE", trace, "db.merge.begin") < 0)
 		goto out;
 	for (i = 0; i < sizeof(merge) / sizeof(merge[0]); i++) {
-		if (trace_exec_sql(db, merge[i], trace, phases[i]) < 0)
+		if (i == 3) {
+			semindex_trace_time_t start = semindex_trace_begin(trace);
+			int merge_ret = exec_sql(db, merge[i]);
+			uint64_t inserted = merge_ret < 0 ? 0 : (uint64_t)sqlite3_changes64(db);
+
+			semindex_trace_end_counted(trace, phases[i], start, staged_records, inserted);
+			if (merge_ret < 0)
+				goto rollback;
+		} else if (trace_exec_sql(db, merge[i], trace, phases[i]) < 0) {
 			goto rollback;
+		}
 	}
 	if (trace_exec_sql(db, "COMMIT", trace, "db.merge.commit") < 0)
 		goto out;
@@ -499,6 +516,8 @@ int index_db_store(const char *path, semindex_t *s, const char *main_file, const
 {
 	sqlite3 *db = NULL;
 	semindex_trace_time_t start;
+	uint64_t records_in;
+	uint64_t records_staged;
 	int ret = -1;
 
 	if (!path || !s || !variant || !variant[0])
@@ -514,12 +533,12 @@ int index_db_store(const char *path, semindex_t *s, const char *main_file, const
 	if (trace_exec_sql(db, "BEGIN", trace, "db.staging_begin") < 0)
 		goto out;
 	start = semindex_trace_begin(trace);
-	if (stage_records(db, s, include_local) < 0) {
-		semindex_trace_end(trace, "db.stage_records", start);
+	if (stage_records(db, s, include_local, &records_in, &records_staged) < 0) {
+		semindex_trace_end_counted(trace, "db.stage_records", start, records_in, records_staged);
 		exec_sql(db, "ROLLBACK");
 		goto out;
 	}
-	semindex_trace_end(trace, "db.stage_records", start);
+	semindex_trace_end_counted(trace, "db.stage_records", start, records_in, records_staged);
 	start = semindex_trace_begin(trace);
 	if (stage_files(db, main_file) < 0) {
 		semindex_trace_end(trace, "db.stage_files", start);
@@ -527,7 +546,8 @@ int index_db_store(const char *path, semindex_t *s, const char *main_file, const
 		goto out;
 	}
 	semindex_trace_end(trace, "db.stage_files", start);
-	if (trace_exec_sql(db, "COMMIT", trace, "db.staging_commit") < 0 || merge_staging(db, variant, trace) < 0)
+	if (trace_exec_sql(db, "COMMIT", trace, "db.staging_commit") < 0 ||
+		merge_staging(db, variant, records_staged, trace) < 0)
 		goto out;
 
 	ret = 0;

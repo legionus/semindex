@@ -87,17 +87,32 @@ function extract(line, start_marker, end_marker, start, tail, end)
 	source = extract($0, ",\"source\":\"", "\",\"phase\":\"")
 	phase = extract($0, ",\"phase\":\"", "\",\"start_ns\":")
 	start = extract($0, ",\"start_ns\":", ",\"duration_ns\":")
-	duration = extract($0, ",\"duration_ns\":", "}")
-	expected = "{\"pid\":" pid ",\"command\":\"" command "\",\"source\":\"" source \
-		   "\",\"phase\":\"" phase "\",\"start_ns\":" start ",\"duration_ns\":" duration "}"
+	counted = index($0, ",\"items_in\":") != 0
+	items_in = 0
+	items_out = 0
+	if (counted) {
+		duration = extract($0, ",\"duration_ns\":", ",\"items_in\":")
+		items_in = extract($0, ",\"items_in\":", ",\"items_out\":")
+		items_out = extract($0, ",\"items_out\":", "}")
+		expected = "{\"pid\":" pid ",\"command\":\"" command "\",\"source\":\"" source \
+			   "\",\"phase\":\"" phase "\",\"start_ns\":" start ",\"duration_ns\":" duration \
+			   ",\"items_in\":" items_in ",\"items_out\":" items_out "}"
+	} else {
+		duration = extract($0, ",\"duration_ns\":", "}")
+		expected = "{\"pid\":" pid ",\"command\":\"" command "\",\"source\":\"" source \
+			   "\",\"phase\":\"" phase "\",\"start_ns\":" start ",\"duration_ns\":" duration "}"
+	}
 
 	if (pid !~ /^[0-9]+$/ || command == "" || source == "" || phase == "" ||
-	    start !~ /^[0-9]+$/ || duration !~ /^[0-9]+$/ || $0 != expected) {
+	    start !~ /^[0-9]+$/ || duration !~ /^[0-9]+$/ ||
+	    (counted && (items_in !~ /^[0-9]+$/ || items_out !~ /^[0-9]+$/)) || $0 != expected) {
 		malformed("unexpected JSONL record")
 		next
 	}
 	start += 0
 	duration += 0
+	items_in += 0
+	items_out += 0
 
 	events++
 	processes[pid] = 1
@@ -106,6 +121,11 @@ function extract(line, start_marker, end_marker, start, tail, end)
 	phase_sum[phase] += duration
 	if (duration > phase_max[phase])
 		phase_max[phase] = duration
+	if (counted) {
+		phase_counter_count[phase]++
+		phase_items_in[phase] += items_in
+		phase_items_out[phase] += items_out
+	}
 	if (!have_start || start < first_start) {
 		first_start = start
 		have_start = 1
@@ -146,10 +166,14 @@ END {
 		process_count++
 	for (source in sources)
 		source_count++
-	printf "%d\t%d\t%d\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%d\t%.0f\n",
+	printf "%d\t%d\t%d\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%d\t%.0f" \
+	       "\t%d\t%.0f\t%.0f\t%d\t%.0f\t%.0f\n",
 	       events, process_count, source_count, last_end - first_start, total_sum,
 	       parse_sum, symbol_sum, command_sum, output_sum, cleanup_sum, lock_sum,
-	       first_start, lock_count, lock_max > summary
+	       first_start, lock_count, lock_max, phase_counter_count["db.stage_records"],
+	       phase_items_in["db.stage_records"], phase_items_out["db.stage_records"],
+	       phase_counter_count["db.merge.records_insert"], phase_items_in["db.merge.records_insert"],
+	       phase_items_out["db.merge.records_insert"] > summary
 	for (phase in phase_count)
 		printf "%.0f\t%s\t%d\t%.0f\t%.0f\n", phase_sum[phase], phase,
 		       phase_count[phase], phase_sum[phase] / phase_count[phase],
@@ -161,7 +185,7 @@ fi
 
 tab=$(printf '\t')
 IFS="$tab" read -r events processes sources span total parse symbol command output cleanup \
-	lock first_start lock_count lock_max <"$summary"
+	lock first_start lock_count lock_max stage_count stage_in stage_out merge_count merge_in merge_out <"$summary"
 
 printf 'Trace: %s\n' "$trace"
 printf 'Events: %s\n' "$events"
@@ -197,6 +221,22 @@ awk -v lock="$lock" -v count="$lock_count" -v max="$lock_max" -v symbol="$symbol
 	printf "  maximum: %.3f ms\n", max / 1000000
 	printf "  share of symbol_database: %.2f%%\n", share
 }'
+
+printf '\nRecord flow:\n'
+if [ "$stage_count" -gt 0 ] && [ "$merge_count" -gt 0 ]; then
+	awk -v stage_in="$stage_in" -v stage_out="$stage_out" -v merge_in="$merge_in" \
+		-v merge_out="$merge_out" 'BEGIN {
+		staged_percent = stage_in ? stage_out * 100 / stage_in : 0
+		inserted_percent = merge_in ? merge_out * 100 / merge_in : 0
+		printf "  in-memory records: %.0f\n", stage_in
+		printf "  private staging records: %.0f (%.2f%% of input)\n", stage_out, staged_percent
+		printf "  main database attempts: %.0f\n", merge_in
+		printf "  inserted records: %.0f (%.2f%% of attempts)\n", merge_out, inserted_percent
+		printf "  ignored existing records: %.0f\n", merge_in - merge_out
+	}'
+else
+	printf '  unavailable (trace was recorded without counters)\n'
+fi
 
 printf '\nPhase totals (nested phases overlap):\n'
 printf '%-32s %8s %12s %12s %12s\n' 'PHASE' 'COUNT' 'TOTAL (s)' 'AVERAGE (ms)' 'MAXIMUM (ms)'

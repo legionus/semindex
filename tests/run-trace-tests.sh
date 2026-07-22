@@ -12,7 +12,7 @@ fail()
 valid_trace()
 {
 	awk '
-		!/^{"pid":[0-9]+,"command":"(compiler|index)","source":"[^"]+","phase":"[^"]+","start_ns":[0-9]+,"duration_ns":[0-9]+}$/ {
+		!/^{"pid":[0-9]+,"command":"(compiler|index)","source":"[^"]+","phase":"[^"]+","start_ns":[0-9]+,"duration_ns":[0-9]+(,"items_in":[0-9]+,"items_out":[0-9]+)?}$/ {
 			invalid = 1
 		}
 		END { exit invalid || NR == 0 }
@@ -43,6 +43,27 @@ done
 if ! grep -q '"command":"compiler"' "$trace" || ! grep -q '"command":"index"' "$trace"; then
 	fail "trace omitted an indexing command"
 fi
+if [ "$(grep -c '"phase":"db.stage_records".*"items_in":[0-9][0-9]*,"items_out":[0-9][0-9]*' "$trace")" != 2 ] ||
+	[ "$(grep -c '"phase":"db.merge.records_insert".*"items_in":[0-9][0-9]*,"items_out":[0-9][0-9]*' "$trace")" != 2 ]; then
+	fail "record counters were not traced"
+fi
+
+printf '%s\n' 'struct traced_shared { int value; };' >"$tmpdir/shared.h"
+printf '%s\n' '#include "shared.h"' \
+	'int read_one(struct traced_shared *p) { return p->value; }' >"$tmpdir/one.c"
+printf '%s\n' '#include "shared.h"' \
+	'int read_two(struct traced_shared *p) { return p->value; }' >"$tmpdir/two.c"
+flow_trace=$tmpdir/flow.jsonl
+for input in "$tmpdir/one.c" "$tmpdir/two.c"; do
+	"$SEMINDEX" compiler --trace="$flow_trace" --no-store-command --database="$tmpdir/flow.db" -- \
+		cc -I"$tmpdir" "$input"
+done
+"$SOURCE_DIR/scripts/analyze-trace.sh" "$flow_trace" >"$tmpdir/flow.out"
+if ! awk '/^  ignored existing records: / && $4 > 0 { found = 1 } END { exit !found }' \
+	"$tmpdir/flow.out"; then
+	cat "$tmpdir/flow.out" >&2
+	fail "record counters did not report the shared header records"
+fi
 
 parallel_trace=$tmpdir/parallel.jsonl
 pids=
@@ -70,6 +91,7 @@ fi
 "$SOURCE_DIR/scripts/analyze-trace.sh" --limit=3 "$parallel_trace" >"$tmpdir/analysis.out"
 if ! grep -q '^Processes: 8$' "$tmpdir/analysis.out" ||
 	! grep -q '^db.merge.begin ' "$tmpdir/analysis.out" ||
+	! grep -q '^Record flow:$' "$tmpdir/analysis.out" ||
 	! grep -q '^Slowest translation units:$' "$tmpdir/analysis.out"; then
 	cat "$tmpdir/analysis.out" >&2
 	fail "trace analysis omitted expected results"

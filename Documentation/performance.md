@@ -176,6 +176,10 @@ monotonic start time, and duration in nanoseconds:
 {"pid":1234,"command":"compiler","source":"kernel/fork.c","phase":"db.merge.begin","start_ns":123456789,"duration_ns":42000}
 ```
 
+Record staging and insertion events also contain `items_in` and `items_out`.
+These counters show how many in-memory records survive private staging and how
+many merge attempts actually add rows rather than finding existing records.
+
 Top-level phases cover parsing, symbol database storage, command database
 storage, output, cleanup, and total execution. Symbol database storage is
 divided into database setup, private staging, merge lock acquisition, each bulk
