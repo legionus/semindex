@@ -89,7 +89,8 @@ static bool parsePosition(const llvm::json::Object *params, llvm::StringRef &uri
 }
 
 LspServer::LspServer(LspTransport &transport, semindex_db_t *database, LspIndexer &indexer, std::string variant)
-    : transport(transport), database(database), indexer(indexer), variant(std::move(variant))
+    : transport(transport), database(database), indexer(indexer), variant(std::move(variant)),
+      call_hierarchy(database, sources, this->variant)
 {
 }
 
@@ -205,6 +206,15 @@ bool LspServer::didSave(const llvm::json::Object *params)
 	return true;
 }
 
+bool LspServer::hierarchyReply(const llvm::json::Value &id, LspCallHierarchy::Status status, llvm::json::Value result)
+{
+	if (status == LspCallHierarchy::Status::InvalidParams)
+		return error(&id, INVALID_PARAMS, "Invalid params");
+	if (status == LspCallHierarchy::Status::DatabaseError)
+		return error(&id, INTERNAL_ERROR, "Database query failed");
+	return reply(id, std::move(result));
+}
+
 bool LspServer::reply(const llvm::json::Value &id, llvm::json::Value result)
 {
 	return transport.write(llvm::json::Object{
@@ -256,6 +266,7 @@ bool LspServer::dispatch(const llvm::json::Object &message)
 			llvm::json::Object{
 				{ "capabilities",
 					llvm::json::Object{
+						{ "callHierarchyProvider", true },
 						{ "definitionProvider", true },
 						{ "positionEncoding", "utf-16" },
 						{ "referencesProvider", true },
@@ -283,6 +294,27 @@ bool LspServer::dispatch(const llvm::json::Object &message)
 		return id ? definition(*id, message.getObject("params")) : true;
 	if (*method == "textDocument/references")
 		return id ? references(*id, message.getObject("params")) : true;
+	if (*method == "textDocument/prepareCallHierarchy") {
+		if (!id)
+			return true;
+		llvm::json::Value result(nullptr);
+		return hierarchyReply(*id, call_hierarchy.prepare(message.getObject("params"), result),
+			std::move(result));
+	}
+	if (*method == "callHierarchy/incomingCalls") {
+		if (!id)
+			return true;
+		llvm::json::Value result(nullptr);
+		return hierarchyReply(*id, call_hierarchy.incoming(message.getObject("params"), result),
+			std::move(result));
+	}
+	if (*method == "callHierarchy/outgoingCalls") {
+		if (!id)
+			return true;
+		llvm::json::Value result(nullptr);
+		return hierarchyReply(*id, call_hierarchy.outgoing(message.getObject("params"), result),
+			std::move(result));
+	}
 	if (*method == "textDocument/didSave")
 		return id ? error(id, INVALID_REQUEST, "Invalid Request") : didSave(message.getObject("params"));
 	if (*method == "shutdown") {

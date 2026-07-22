@@ -71,8 +71,11 @@ if [ "$(wc -l <"$tmpdir/variant.out")" != 4 ] || grep -qv "debug:$source_a:" "$t
 	fail "variant filter returned unexpected results"
 fi
 
-if [ "$(sqlite3 "$db" 'SELECT count(*) FROM records WHERE action != 3 AND (usr_id IS NOT NULL OR context_usr_id IS NOT NULL)')" != 0 ]; then
-	fail "function IDs were stored for non-call records"
+if [ "$(sqlite3 "$db" 'SELECT count(*) FROM records WHERE record = 0 AND kind = 7 AND usr_id IS NULL')" != 0 ]; then
+	fail "function symbol record lacks a stable identity"
+fi
+if [ "$(sqlite3 "$db" 'SELECT count(*) FROM records WHERE record = 0 AND (kind != 7 AND usr_id IS NOT NULL OR context_usr_id IS NOT NULL)')" != 0 ]; then
+	fail "function IDs were stored for unrelated symbol records"
 fi
 if [ "$(sqlite3 "$db" 'SELECT count(*) FROM records WHERE action = 3 AND kind = 7 AND (usr_id IS NULL OR context_usr_id IS NULL)')" != 0 ]; then
 	fail "direct call record lacks a stable function identity"
@@ -90,6 +93,16 @@ plan=$(sqlite3 "$db" "EXPLAIN QUERY PLAN SELECT context FROM records WHERE recor
 if ! printf '%s\n' "$plan" | grep -q 'USING PRIMARY KEY (symbol=?'; then
 	printf '%s\n' "$plan" >&2
 	fail "caller lookup does not use the records primary key"
+fi
+plan=$(sqlite3 "$db" "EXPLAIN QUERY PLAN SELECT file_id FROM records WHERE symbol = 'caller' AND record = 0 AND kind = 7 AND usr_id = 0x$caller_id")
+if ! printf '%s\n' "$plan" | grep -q 'USING PRIMARY KEY (symbol=? AND record=?'; then
+	printf '%s\n' "$plan" >&2
+	fail "function identity lookup does not use the records primary key"
+fi
+plan=$(sqlite3 "$db" "EXPLAIN QUERY PLAN WITH requested(variant, symbol, usr_id) AS (VALUES ('general', 'caller', 0x$caller_id)) SELECT files.path FROM requested JOIN records ON records.symbol = requested.symbol AND records.usr_id = requested.usr_id JOIN files ON files.id = records.file_id AND files.variant = requested.variant WHERE records.record = 0 AND records.kind = 7")
+if ! printf '%s\n' "$plan" | grep -q 'USING PRIMARY KEY (symbol=?'; then
+	printf '%s\n' "$plan" >&2
+	fail "batched function lookup does not use the records primary key"
 fi
 
 if "$SEMINDEX" callgraph --database="$db" --callers=leaf --callees=caller \

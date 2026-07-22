@@ -548,7 +548,7 @@ public:
 		s.name = info.name;
 		s.owner = "";
 		s.type = info.type;
-		s.usr = info.usr;
+		s.usr = functionUSR(D);
 		s.context = "";
 		s.loc = index.location(D->getLocation());
 		s.local = false;

@@ -7,6 +7,7 @@
 #include <llvm/ADT/ArrayRef.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Support/BLAKE3.h>
+#include <llvm/Support/xxhash.h>
 
 #include <cstdint>
 #include <cstring>
@@ -265,6 +266,7 @@ void rebuildRecords(semindex *s)
 		rec.owner = sym.owner.c_str();
 		rec.type = sym.type.c_str();
 		rec.usr = sym.usr.c_str();
+		rec.usr_id = sym.kind == SEMINDEX_SYMBOL_FUNCTION && !sym.usr.empty() ? llvm::xxHash64(sym.usr) : 0;
 		rec.context = sym.context.c_str();
 		rec.file = sym.loc.file ? sym.loc.file->c_str() : "";
 		rec.file_index = sym.loc.file ? file_index.at(sym.loc.file) : s->files.size();
@@ -311,9 +313,11 @@ void rebuildFingerprints(semindex *s)
 	size_t index = 0;
 
 	for (const auto &rec : s->symbol_records) {
+		bool function = rec.kind == SEMINDEX_SYMBOL_FUNCTION;
+
 		if (rec.file_index < fingerprints.size())
 			updateFingerprints(fingerprints[rec.file_index], rec.local, 0, rec.definition, rec.kind, 0,
-				rec.owner, rec.name, rec.line, rec.column, rec.context, 0, 0);
+				rec.owner, rec.name, rec.line, rec.column, rec.context, function ? rec.usr_id : 0, 0);
 	}
 	for (const auto &rec : s->use_records) {
 		bool direct_call = rec.kind == SEMINDEX_USE_CALL && rec.symbol_kind == SEMINDEX_SYMBOL_FUNCTION;

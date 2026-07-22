@@ -12,6 +12,10 @@ enum stored_record_kind {
 	STORED_RECORD_USE,
 };
 
+_Static_assert(STORED_RECORD_USE == 1, "call query SQL assumes use record value 1");
+_Static_assert(SEMINDEX_USE_CALL == 3, "call query SQL assumes call action value 3");
+_Static_assert(SEMINDEX_SYMBOL_FUNCTION == 7, "call query SQL assumes function kind value 7");
+
 struct semindex_db {
 	sqlite3 *handle;
 };
@@ -189,6 +193,8 @@ int semindex_db_query(semindex_db_t *db, const semindex_db_query_options_t *opts
 	}
 	if (opts->has_kind)
 		sqlite3_str_appendf(query, " AND records.kind = %d", opts->kind);
+	if (opts->has_usr_id)
+		sqlite3_str_appendf(query, " AND records.usr_id = 0x%016llx", opts->usr_id);
 	if (opts->has_local)
 		sqlite3_str_appendf(query, " AND records.local = %d", !!opts->local);
 	sqlite3_str_appendall(query,
@@ -207,6 +213,142 @@ out:
 	sqlite3_free(sql);
 	sqlite3_finalize(stmt);
 	return ret;
+}
+
+int semindex_db_query_calls(semindex_db_t *db, const semindex_db_call_options_t *opts,
+	semindex_db_record_callback_t callback, void *data)
+{
+	static const char *callers =
+		"SELECT files.variant, files.path, records.line, records.column, records.record, records.action, "
+		"records.kind, records.symbol, records.context, records.mode, records.usr_id, "
+		"records.context_usr_id, records.local "
+		"FROM records JOIN files ON files.id = records.file_id "
+		"WHERE records.symbol = ?1 AND records.usr_id = ?2 AND records.record = 1 AND records.action = 3 "
+		"AND records.kind = 7 ORDER BY files.variant, records.context, files.path, records.line, "
+		"records.column";
+	static const char *callers_variant =
+		"SELECT files.variant, files.path, records.line, records.column, records.record, records.action, "
+		"records.kind, records.symbol, records.context, records.mode, records.usr_id, "
+		"records.context_usr_id, records.local "
+		"FROM records JOIN files ON files.id = records.file_id "
+		"WHERE records.symbol = ?1 AND records.usr_id = ?2 AND files.variant = ?3 AND records.record = 1 "
+		"AND records.action = 3 AND records.kind = 7 "
+		"ORDER BY records.context, files.path, records.line, records.column";
+	static const char *callees =
+		"SELECT files.variant, files.path, records.line, records.column, records.record, records.action, "
+		"records.kind, records.symbol, records.context, records.mode, records.usr_id, "
+		"records.context_usr_id, records.local "
+		"FROM records JOIN files ON files.id = records.file_id "
+		"WHERE records.context = ?1 AND records.context_usr_id = ?2 AND records.record = 1 "
+		"AND records.action = 3 AND records.kind = 7 "
+		"ORDER BY files.variant, records.symbol, files.path, records.line, records.column";
+	static const char *callees_variant =
+		"SELECT files.variant, files.path, records.line, records.column, records.record, records.action, "
+		"records.kind, records.symbol, records.context, records.mode, records.usr_id, "
+		"records.context_usr_id, records.local "
+		"FROM records JOIN files ON files.id = records.file_id "
+		"WHERE records.context = ?1 AND records.context_usr_id = ?2 AND files.variant = ?3 "
+		"AND records.record = 1 AND records.action = 3 AND records.kind = 7 "
+		"ORDER BY records.symbol, files.path, records.line, records.column";
+	const char *sql;
+	sqlite3_stmt *stmt = NULL;
+	int ret = -1;
+
+	if (!db || !opts || !opts->function || !opts->function[0] || !callback)
+		return -1;
+	if (opts->direction != SEMINDEX_DB_CALLERS && opts->direction != SEMINDEX_DB_CALLEES)
+		return -1;
+	if (opts->direction == SEMINDEX_DB_CALLERS)
+		sql = opts->variant ? callers_variant : callers;
+	else
+		sql = opts->variant ? callees_variant : callees;
+	if (prepare(db, sql, &stmt) < 0)
+		goto out;
+	if (sqlite3_bind_text(stmt, 1, opts->function, -1, SQLITE_TRANSIENT) != SQLITE_OK ||
+		sqlite3_bind_int64(stmt, 2, (sqlite3_int64)opts->usr_id) != SQLITE_OK ||
+		(opts->variant && sqlite3_bind_text(stmt, 3, opts->variant, -1, SQLITE_TRANSIENT) != SQLITE_OK))
+		goto out;
+	ret = emit_records(db, stmt, callback, data, 0);
+out:
+	sqlite3_finalize(stmt);
+	return ret;
+}
+
+static int query_function_batch(semindex_db_t *db, const semindex_db_function_t *functions, size_t count,
+	semindex_db_record_callback_t callback, void *data)
+{
+	sqlite3_str *query = NULL;
+	sqlite3_stmt *stmt = NULL;
+	char *sql = NULL;
+	size_t i;
+	int ret = -1;
+
+	query = sqlite3_str_new(db->handle);
+	if (!query)
+		goto out;
+	sqlite3_str_appendall(query, "WITH requested(variant, symbol, usr_id) AS (VALUES ");
+	for (i = 0; i < count; i++)
+		sqlite3_str_appendf(query, "%s(?, ?, ?)", i ? ", " : "");
+	sqlite3_str_appendall(query,
+		") SELECT files.variant, files.path, records.line, records.column, records.record, records.action, "
+		"records.kind, records.symbol, records.context, records.mode, records.usr_id, "
+		"records.context_usr_id, records.local FROM requested "
+		"JOIN records ON records.symbol = requested.symbol AND records.usr_id = requested.usr_id "
+		"JOIN files ON files.id = records.file_id AND files.variant = requested.variant "
+		"WHERE records.record = 0 AND records.kind = 7 "
+		"ORDER BY files.variant, records.symbol, records.action DESC, files.path, records.line, "
+		"records.column");
+	if (sqlite3_str_errcode(query) != SQLITE_OK)
+		goto out;
+	sql = sqlite3_str_finish(query);
+	query = NULL;
+	if (!sql || prepare(db, sql, &stmt) < 0)
+		goto out;
+	for (i = 0; i < count; i++) {
+		int column = i * 3 + 1;
+
+		if (sqlite3_bind_text(stmt, column, functions[i].variant, -1, SQLITE_TRANSIENT) != SQLITE_OK ||
+			sqlite3_bind_text(stmt, column + 1, functions[i].symbol, -1, SQLITE_TRANSIENT) != SQLITE_OK ||
+			sqlite3_bind_int64(stmt, column + 2, (sqlite3_int64)functions[i].usr_id) != SQLITE_OK)
+			goto out;
+	}
+	ret = emit_records(db, stmt, callback, data, 0);
+out:
+	if (query)
+		sqlite3_str_finish(query);
+	sqlite3_free(sql);
+	sqlite3_finalize(stmt);
+	return ret;
+}
+
+int semindex_db_query_functions(semindex_db_t *db, const semindex_db_function_t *functions, size_t count,
+	semindex_db_record_callback_t callback, void *data)
+{
+	size_t batch_size;
+	size_t i;
+	size_t offset;
+
+	if (!db || (!functions && count) || !callback)
+		return -1;
+	if (!count)
+		return 0;
+	for (i = 0; i < count; i++) {
+		if (!functions[i].variant || !functions[i].variant[0] || !functions[i].symbol ||
+			!functions[i].symbol[0])
+			return -1;
+	}
+	batch_size = sqlite3_limit(db->handle, SQLITE_LIMIT_VARIABLE_NUMBER, -1) / 3;
+	if (!batch_size)
+		return -1;
+	for (offset = 0; offset < count; offset += batch_size) {
+		size_t remaining = count - offset;
+		size_t current = remaining < batch_size ? remaining : batch_size;
+		int ret = query_function_batch(db, functions + offset, current, callback, data);
+
+		if (ret)
+			return ret;
+	}
+	return 0;
 }
 
 int semindex_db_find_at(semindex_db_t *db, const char *path, const char *variant, unsigned line, unsigned column,

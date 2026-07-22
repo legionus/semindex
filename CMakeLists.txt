@@ -13,6 +13,8 @@ set(SEMINDEX_FORMAT_SOURCES
 	include/semindex_database.h
 	src/index_ast.cpp
 	src/index_context.cpp
+	src/lsp_call_hierarchy.cpp
+	src/lsp_call_hierarchy.h
 	src/lsp_indexer.cpp
 	src/lsp_indexer.h
 	src/lsp_source.cpp
@@ -162,6 +164,7 @@ target_link_directories(semindex_parser PRIVATE ${LLVM_LIBDIR})
 target_link_libraries(semindex_parser PRIVATE clang-cpp ${LLVM_LIBS})
 
 add_executable(semindex_lsp
+	src/lsp_call_hierarchy.cpp
 	src/lsp_indexer.cpp
 	src/lsp_source.cpp
 	src/lsp_server.cpp

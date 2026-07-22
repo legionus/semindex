@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 import json
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -56,6 +57,48 @@ def run_server(binary, options, messages):
     return process, parse_messages(process.stdout)
 
 
+def function_id(database, source, symbol):
+    with sqlite3.connect(database) as connection:
+        row = connection.execute(
+            "SELECT records.usr_id FROM records "
+            "JOIN files ON files.id = records.file_id "
+            "WHERE files.variant = 'general' AND files.path = ? "
+            "AND records.symbol = ? AND records.record = 0 "
+            "AND records.action != 0 AND records.kind = 7",
+            (str(source), symbol),
+        ).fetchone()
+    if not row or row[0] is None:
+        fail(f"missing function ID for {source}:{symbol}")
+    return f"{row[0] & ((1 << 64) - 1):016x}"
+
+
+def hierarchy_item(source, name, line, character, identity):
+    selection = {
+        "start": {"line": line, "character": character},
+        "end": {"line": line, "character": character + len(name)},
+    }
+    return {
+        "name": name,
+        "kind": 12,
+        "detail": str(source),
+        "uri": source.resolve().as_uri(),
+        "range": selection,
+        "selectionRange": selection,
+        "data": {
+            "variant": "general",
+            "symbol": name,
+            "id": identity,
+        },
+    }
+
+
+def source_range(line, character, length):
+    return {
+        "start": {"line": line, "character": character},
+        "end": {"line": line, "character": character + length},
+    }
+
+
 def main():
     if len(sys.argv) != 3:
         fail("usage: run-lsp-tests.py SEMINDEX_LSP SEMINDEX")
@@ -88,6 +131,34 @@ def main():
         )
         if indexed.returncode != 0:
             fail("failed to create the LSP test index", indexed)
+
+        callgraph_a = Path(__file__).resolve().parent / "callgraph-a.c"
+        callgraph_b = Path(__file__).resolve().parent / "callgraph-b.c"
+        for callgraph_source in (callgraph_a, callgraph_b):
+            indexed = subprocess.run(
+                [
+                    sys.argv[2], "compiler", f"--database={database}",
+                    "--no-store-command", "--", "cc", str(callgraph_source),
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            if indexed.returncode != 0:
+                fail(f"failed to index {callgraph_source.name}", indexed)
+
+        caller_a = hierarchy_item(
+            callgraph_a, "caller", 12, 12,
+            function_id(database, callgraph_a, "caller"),
+        )
+        helper_a = hierarchy_item(
+            callgraph_a, "helper", 2, 12,
+            function_id(database, callgraph_a, "helper"),
+        )
+        leaf = hierarchy_item(
+            callgraph_a, "leaf", 6, 5,
+            function_id(database, callgraph_a, "leaf"),
+        )
 
         options = [
             f"--database={database}",
@@ -145,6 +216,24 @@ def main():
                         "context": {"includeDeclaration": True},
                     },
                 },
+                {
+                    "jsonrpc": "2.0", "id": 20,
+                    "method": "textDocument/prepareCallHierarchy",
+                    "params": {
+                        "textDocument": {"uri": callgraph_a.resolve().as_uri()},
+                        "position": {"line": 12, "character": 14},
+                    },
+                },
+                {
+                    "jsonrpc": "2.0", "id": 21,
+                    "method": "callHierarchy/outgoingCalls",
+                    "params": {"item": caller_a},
+                },
+                {
+                    "jsonrpc": "2.0", "id": 22,
+                    "method": "callHierarchy/incomingCalls",
+                    "params": {"item": helper_a},
+                },
                 {"jsonrpc": "2.0", "id": "missing", "method": "unknown"},
                 {"jsonrpc": "2.0", "id": 2, "method": "shutdown"},
                 {"jsonrpc": "2.0", "id": 4, "method": "exit"},
@@ -153,7 +242,7 @@ def main():
         )
         if process.returncode != 0:
             fail(f"normal lifecycle exited with status {process.returncode}", process)
-        if len(responses) != 9:
+        if len(responses) != 12:
             fail(f"normal lifecycle returned {len(responses)} responses", process)
         if responses[0].get("error", {}).get("code") != -32700:
             fail("malformed JSON did not produce a parse error")
@@ -165,7 +254,7 @@ def main():
             capabilities.get("referencesProvider") is not True
         ) or capabilities.get("textDocumentSync") != {
             "change": 0, "save": True,
-        }:
+        } or capabilities.get("callHierarchyProvider") is not True:
             fail("initialize response has unexpected capabilities")
         if responses[2].get("id") != 3 or responses[2].get("error", {}).get(
             "code"
@@ -193,13 +282,40 @@ def main():
             fail("references returned unexpected locations")
         if responses[5].get("result") != [expected_reference, expected_definition]:
             fail("references did not include the declaration")
-        if responses[6].get("id") != "missing" or responses[6].get(
+        if responses[6].get("result") != [caller_a]:
+            fail("prepareCallHierarchy returned an unexpected item")
+        expected_outgoing = [
+            {
+                "to": caller_a,
+                "fromRanges": [source_range(17, 1, len("caller"))],
+            },
+            {
+                "to": helper_a,
+                "fromRanges": [source_range(14, 1, len("helper"))],
+            },
+            {
+                "to": leaf,
+                "fromRanges": [
+                    source_range(15, 1, len("leaf")),
+                    source_range(16, 1, len("leaf")),
+                ],
+            },
+        ]
+        if responses[7].get("result") != expected_outgoing:
+            fail(f"outgoing calls differ: {responses[7].get('result')}")
+        expected_incoming = [{
+            "from": caller_a,
+            "fromRanges": [source_range(14, 1, len("helper"))],
+        }]
+        if responses[8].get("result") != expected_incoming:
+            fail(f"incoming calls differ: {responses[8].get('result')}")
+        if responses[9].get("id") != "missing" or responses[9].get(
             "error", {}
         ).get("code") != -32601:
             fail("unknown request did not produce MethodNotFound")
-        if responses[7] != {"id": 2, "jsonrpc": "2.0", "result": None}:
+        if responses[10] != {"id": 2, "jsonrpc": "2.0", "result": None}:
             fail("shutdown response is malformed")
-        if responses[8].get("id") != 4 or responses[8].get("error", {}).get(
+        if responses[11].get("id") != 4 or responses[11].get("error", {}).get(
             "code"
         ) != -32600:
             fail("exit request was accepted")

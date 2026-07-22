@@ -7,7 +7,9 @@ corrupted by normal `semindex` command output.
 The server handles JSON-RPC framing, parse and method errors, and the
 `initialize`, `initialized`, `shutdown`, and `exit` lifecycle. It reports
 UTF-16 as its position encoding and supports `textDocument/definition` and
-`textDocument/references` against the stored index.
+`textDocument/references` against the stored index. Call hierarchy clients can
+use `textDocument/prepareCallHierarchy`, `callHierarchy/incomingCalls`, and
+`callHierarchy/outgoingCalls`.
 
 Start the server directly from an editor or an LSP client:
 
@@ -23,6 +25,16 @@ Relative paths stored in the index are resolved against the workspace
 The server reads `Content-Length` framed JSON-RPC messages from standard input
 and writes responses to standard output. Diagnostics are written only to
 standard error.
+
+## Call hierarchy
+
+Call hierarchy items carry the index variant and stable function identity in
+their opaque `data` field. This keeps same-named static functions in different
+files separate. Incoming and outgoing results group all callsite ranges for
+each related function.
+
+Only direct calls are represented. Calls through function pointers do not have
+a statically resolved callee and are therefore omitted from the hierarchy.
 
 ## Index updates
 

@@ -18,9 +18,11 @@ tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT
 db=$tmpdir/semindex.db
 source=$SOURCE_DIR/tests/test11.c
+callgraph_source=$SOURCE_DIR/tests/callgraph-a.c
 
 "$SEMINDEX" index --database="$db" --compile-commands="$COMPILE_COMMANDS" "$source" >/dev/null
-"$DATABASE_API_TEST" "$db" "$source"
+"$SEMINDEX" compiler --database="$db" --no-store-command -- cc "$callgraph_source"
+"$DATABASE_API_TEST" "$db" "$source" "$callgraph_source"
 
 position_plan=$(sqlite3 "$db" "EXPLAIN QUERY PLAN
 SELECT records.symbol FROM files JOIN records ON records.file_id = files.id

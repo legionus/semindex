@@ -13,12 +13,12 @@ The `records` table stores declarations, definitions, and uses together. Its
 query such as `task_struct.pid` is an indexed lookup rather than a scan.
 
 Names and contexts are stored directly in each record. Types and general symbol
-USRs remain available only from the in-memory index and output formats. Direct
-call records store compact caller and callee IDs derived from their Clang USRs,
-so static functions can be distinguished without repeating both identity
+USRs remain available only from the in-memory index and output formats.
+Function symbols and direct call records store compact IDs derived from their
+Clang USRs, so static functions can be distinguished without repeating identity
 strings at every call site. IDs are computed before SQLite staging; adding a
-record does not perform an identity lookup. A secondary file index supports
-file replacement and narrows source-position lookup to one indexed file.
+record does not perform an identity lookup. A secondary file index supports file
+replacement and narrows source-position lookup to one indexed file.
 
 ## Reader API
 
@@ -40,7 +40,9 @@ converting its UTF-16 document positions before calling this API.
 A partial `(context, context_usr_id)` index contains only direct function-call
 records and supports caller-to-callee queries. Callee-to-caller queries use the
 records primary key, which already begins with the callee symbol. No callgraph
-index is added to declarations, definitions, or non-call uses.
+index is added to declarations, definitions, or non-call uses. The reader API
+exposes both directions as streamed call records and can filter function symbol
+queries by their stable ID.
 
 Each row in `files` is identified by `(variant, path)`.  Indexing commands use
 the variant `general` by default and accept `--variant=NAME`.  Consequently,

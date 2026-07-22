@@ -59,11 +59,12 @@ typedef struct {
 /* symbol record */
 typedef struct {
 	semindex_symbol_kind_t kind;
-	const char *name;    /* may be NULL or "" for anonymous */
-	const char *owner;   /* containing record for fields */
-	const char *type;    /* textual type */
-	const char *usr;     /* stable unique id */
-	const char *context; /* containing function for local symbols */
+	const char *name;	   /* may be NULL or "" for anonymous */
+	const char *owner;	   /* containing record for fields */
+	const char *type;	   /* textual type */
+	const char *usr;	   /* stable unique id */
+	unsigned long long usr_id; /* hashed function USR */
+	const char *context;	   /* containing function for local symbols */
 	const char *file;
 	size_t file_index;
 	unsigned line;

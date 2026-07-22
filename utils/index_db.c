@@ -11,7 +11,7 @@
 #include "output.h"
 #include "semindex_database.h"
 
-#define INDEX_SCHEMA_VERSION 8
+#define INDEX_SCHEMA_VERSION 9
 #define STRINGIFY_VALUE(value) #value
 #define STRINGIFY(value) STRINGIFY_VALUE(value)
 
@@ -355,6 +355,7 @@ static int stage_records(sqlite3 *db, semindex_t *s, int include_local, const un
 
 	for (i = 0; i < semindex_symbol_count(s); i++) {
 		const semindex_symbol_t *sym = semindex_get_symbol(s, i);
+		int function;
 
 		if (!sym)
 			goto out;
@@ -363,8 +364,10 @@ static int stage_records(sqlite3 *db, semindex_t *s, int include_local, const un
 		(*items_in)++;
 		if (sym->file_index < cached_count && cached[sym->file_index])
 			continue;
+		function = sym->kind == SEMINDEX_SYMBOL_FUNCTION;
 		if (stage_record(db, stmt, STORED_RECORD_SYMBOL, sym->definition, sym->kind, 0, sym->file, sym->line,
-			    sym->column, sym->owner, sym->name, sym->context, NULL, 0, NULL, 0, sym->local) < 0)
+			    sym->column, sym->owner, sym->name, sym->context, function ? sym->usr : NULL,
+			    function ? sym->usr_id : 0, NULL, 0, sym->local) < 0)
 			goto out;
 	}
 	for (i = 0; i < semindex_use_count(s); i++) {

@@ -31,8 +31,10 @@ typedef struct {
 	const char *context;
 	semindex_db_record_filter_t record;
 	unsigned mode;
+	unsigned long long usr_id;
 	semindex_symbol_kind_t kind;
 	int has_mode;
+	int has_usr_id;
 	int has_kind;
 	int has_local;
 	int local;
@@ -54,6 +56,24 @@ typedef struct {
 	int local;
 } semindex_db_record_t;
 
+typedef enum {
+	SEMINDEX_DB_CALLERS,
+	SEMINDEX_DB_CALLEES,
+} semindex_db_call_direction_t;
+
+typedef struct {
+	const char *function;
+	const char *variant;
+	unsigned long long usr_id;
+	semindex_db_call_direction_t direction;
+} semindex_db_call_options_t;
+
+typedef struct {
+	const char *variant;
+	const char *symbol;
+	unsigned long long usr_id;
+} semindex_db_function_t;
+
 /* Record strings remain valid only until the callback returns. */
 typedef int (*semindex_db_record_callback_t)(void *data, const semindex_db_record_t *record);
 
@@ -66,6 +86,12 @@ int semindex_db_query(semindex_db_t *db, const semindex_db_query_options_t *opts
 
 /* Line and column are one-based source byte positions. */
 int semindex_db_find_at(semindex_db_t *db, const char *path, const char *variant, unsigned line, unsigned column,
+	semindex_db_record_callback_t callback, void *data);
+
+int semindex_db_query_calls(semindex_db_t *db, const semindex_db_call_options_t *opts,
+	semindex_db_record_callback_t callback, void *data);
+
+int semindex_db_query_functions(semindex_db_t *db, const semindex_db_function_t *functions, size_t count,
 	semindex_db_record_callback_t callback, void *data);
 
 #ifdef __cplusplus

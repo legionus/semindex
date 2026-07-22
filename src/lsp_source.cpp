@@ -226,7 +226,12 @@ std::filesystem::path LspSourceMapper::resolve(const char *path) const
 	return result.lexically_normal();
 }
 
-llvm::json::Value LspSourceMapper::location(const semindex_db_record_t &record, Cache &cache) const
+std::string LspSourceMapper::uri(const char *path) const
+{
+	return uriFromPath(resolve(path));
+}
+
+llvm::json::Value LspSourceMapper::range(const semindex_db_record_t &record, Cache &cache) const
 {
 	std::filesystem::path path = resolve(record.path);
 	unsigned start = record.column ? record.column - 1 : 0;
@@ -247,11 +252,15 @@ llvm::json::Value LspSourceMapper::location(const semindex_db_record_t &record, 
 	}
 	end = start + utf16Length(leaf);
 	return llvm::json::Object{
-		{ "uri", uriFromPath(path) },
-		{ "range",
-			llvm::json::Object{
-				{ "start", llvm::json::Object{ { "line", line_number }, { "character", start } } },
-				{ "end", llvm::json::Object{ { "line", line_number }, { "character", end } } },
-			} },
+		{ "start", llvm::json::Object{ { "line", line_number }, { "character", start } } },
+		{ "end", llvm::json::Object{ { "line", line_number }, { "character", end } } },
+	};
+}
+
+llvm::json::Value LspSourceMapper::location(const semindex_db_record_t &record, Cache &cache) const
+{
+	return llvm::json::Object{
+		{ "uri", uri(record.path) },
+		{ "range", range(record, cache) },
 	};
 }
