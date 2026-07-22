@@ -28,11 +28,14 @@ typedef struct {
 	const char *symbol;
 	const char *path;
 	const char *variant;
+	const char *context;
 	semindex_db_record_filter_t record;
 	unsigned mode;
 	semindex_symbol_kind_t kind;
 	int has_mode;
 	int has_kind;
+	int has_local;
+	int local;
 } semindex_db_query_options_t;
 
 typedef struct {

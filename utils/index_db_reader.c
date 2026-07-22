@@ -162,6 +162,8 @@ int semindex_db_query(semindex_db_t *db, const semindex_db_query_options_t *opts
 	if (opts->variant)
 		sqlite3_str_appendf(query, " AND files.variant %s %Q", pattern_uses_glob(opts->variant) ? "GLOB" : "=",
 			opts->variant);
+	if (opts->context)
+		sqlite3_str_appendf(query, " AND records.context = %Q", opts->context);
 	switch (opts->record) {
 	case SEMINDEX_DB_RECORD_ALL:
 		break;
@@ -187,6 +189,8 @@ int semindex_db_query(semindex_db_t *db, const semindex_db_query_options_t *opts
 	}
 	if (opts->has_kind)
 		sqlite3_str_appendf(query, " AND records.kind = %d", opts->kind);
+	if (opts->has_local)
+		sqlite3_str_appendf(query, " AND records.local = %d", !!opts->local);
 	sqlite3_str_appendall(query,
 		" ORDER BY files.variant, files.path, records.line, records.column, records.record");
 	if (sqlite3_str_errcode(query) != SQLITE_OK)

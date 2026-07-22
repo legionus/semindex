@@ -35,3 +35,13 @@ if printf '%s\n' "$position_plan" | grep -q 'SCAN records'; then
 	printf '%s\n' "$position_plan" >&2
 	fail "position lookup scans all records"
 fi
+
+symbol_plan=$(sqlite3 "$db" "EXPLAIN QUERY PLAN
+SELECT files.path FROM records JOIN files ON files.id = records.file_id
+WHERE records.symbol = 'Outer.y' AND records.record = 0
+AND records.context = '' AND records.local = 0")
+if ! printf '%s\n' "$symbol_plan" |
+	grep -q 'SEARCH records USING PRIMARY KEY (symbol=? AND record=?)'; then
+	printf '%s\n' "$symbol_plan" >&2
+	fail "filtered symbol lookup does not use the records primary key"
+fi

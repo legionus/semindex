@@ -13,6 +13,8 @@ set(SEMINDEX_FORMAT_SOURCES
 	include/semindex_database.h
 	src/index_ast.cpp
 	src/index_context.cpp
+	src/lsp_source.cpp
+	src/lsp_source.h
 	src/lsp_server.cpp
 	src/lsp_server.h
 	src/lsp_transport.cpp
@@ -145,6 +147,7 @@ target_link_directories(semindex_parser PRIVATE ${LLVM_LIBDIR})
 target_link_libraries(semindex_parser PRIVATE clang-cpp ${LLVM_LIBS})
 
 add_executable(semindex_lsp
+	src/lsp_source.cpp
 	src/lsp_server.cpp
 	src/lsp_transport.cpp
 	utils/semindex_lsp.cpp
@@ -156,7 +159,7 @@ target_include_directories(semindex_lsp PRIVATE
 )
 target_compile_options(semindex_lsp PRIVATE ${LLVM_CXXFLAGS})
 target_link_directories(semindex_lsp PRIVATE ${LLVM_LIBDIR})
-target_link_libraries(semindex_lsp PRIVATE ${LLVM_LIBS})
+target_link_libraries(semindex_lsp PRIVATE semindex_database ${LLVM_LIBS})
 
 add_executable(semindex
 	utils/cmd_compiler.c
@@ -302,5 +305,6 @@ if(BUILD_TESTING)
 		COMMAND
 			${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-lsp-tests.py
 				$<TARGET_FILE:semindex_lsp>
+				$<TARGET_FILE:semindex>
 	)
 endif()

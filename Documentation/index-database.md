@@ -30,6 +30,9 @@ until that callback returns, so large searches do not require a buffered copy
 of the result set.
 
 Name queries accept the same exact and glob patterns as `semindex search`.
+They may also restrict local records by their containing function and local
+status, allowing language-server queries to distinguish same-named local
+variables without adding an index or changing the database layout.
 Position queries use one-based source byte coordinates and may select one
 variant or return matches from all variants. The LSP layer is responsible for
 converting its UTF-16 document positions before calling this API.

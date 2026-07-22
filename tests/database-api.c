@@ -31,7 +31,10 @@ static int run_query(semindex_db_t *db, const char *symbol, semindex_db_record_f
 	semindex_db_query_options_t options = {
 		.symbol = symbol,
 		.variant = "general",
+		.context = "",
 		.record = filter,
+		.has_local = 1,
+		.local = 0,
 	};
 	struct result_state state = {
 		.symbol = symbol,
