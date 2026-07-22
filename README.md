@@ -10,24 +10,24 @@ This repository is an early prototype.
 
 Implemented so far:
 
-* parsing C translation units using Clang LibTooling;
-* indexing of:
-
-  * global and local variables;
-  * structure and union fields;
-  * function definitions;
-* generation of stable symbol identifiers (Clang USR);
-* indexing of symbol uses;
-* basic use classification:
+* parsing C translation units with Clang LibTooling and preprocessing `.S`
+  sources;
+* indexing declarations, definitions, and references for variables, fields,
+  records, enums, enumerators, typedefs, functions, macros, and included files;
+* access classification:
 
   * `READ`
   * `WRITE`
   * `ADDR`
   * `CALL`
-* C API exported from a C++ implementation, allowing the rest of the project to remain in C.
-* persistent SQLite symbol database;
-* indexed search by qualified symbol name;
+* persistent SQLite storage with parallel writers, incremental file
+  replacement, header fingerprints, and named index variants;
+* separate compiler-command capture and `compile_commands.json` export;
+* indexed search by qualified symbol name and access mode;
 * direct caller and callee queries with stable function identities;
+* LSP definition, reference, document-highlight, call-hierarchy, and saved-file
+  update support;
+* a C API exported from the C++ indexing implementation.
 
 ## Architecture
 
@@ -141,12 +141,17 @@ This is still a prototype.
 
 Among the missing features are:
 
-* complete type graph;
-* typedef expansion;
-* indirect call analysis;
-* macro-aware indexing;
-* incremental indexing;
-* context-sensitive separation of header variants.
+* a persistent type graph, including expanded typedef and complete type
+  relationships;
+* indirect-call target resolution and points-to analysis;
+* indexing of code excluded by preprocessing; separate variants must be indexed
+  explicitly to combine different configurations;
+* queryable separation of header preprocessing contexts within one variant;
+  their records are currently merged;
+* assembly labels, directives, and references in `.S` files; only
+  preprocessor-level entities are indexed;
+* LSP support for unsaved buffers, completion, hover, rename, diagnostics, and
+  workspace symbols.
 
 ## Motivation
 
