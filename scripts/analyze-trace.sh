@@ -169,7 +169,7 @@ END {
 	for (source in sources)
 		source_count++
 	printf "%d\t%d\t%d\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%d\t%.0f" \
-	       "\t%d\t%.0f\t%.0f\t%d\t%.0f\t%.0f\t%d\t%.0f\t%.0f\n",
+	       "\t%d\t%.0f\t%.0f\t%d\t%.0f\t%.0f\t%d\t%.0f\t%.0f\t%d\t%.0f\t%.0f\n",
 	       events, process_count, source_count, last_end - first_start, total_sum,
 	       parse_sum, fingerprint_sum, symbol_sum, command_sum, output_sum, cleanup_sum, lock_sum,
 	       first_start, lock_count, lock_max, phase_counter_count["db.stage_files"],
@@ -177,7 +177,10 @@ END {
 	       phase_counter_count["db.stage_records"],
 	       phase_items_in["db.stage_records"], phase_items_out["db.stage_records"],
 	       phase_counter_count["db.merge.records_insert"], phase_items_in["db.merge.records_insert"],
-	       phase_items_out["db.merge.records_insert"] > summary
+	       phase_items_out["db.merge.records_insert"],
+	       phase_counter_count["db.merge.fingerprints_insert"],
+	       phase_items_in["db.merge.fingerprints_insert"],
+	       phase_items_out["db.merge.fingerprints_insert"] > summary
 	for (phase in phase_count)
 		printf "%.0f\t%s\t%d\t%.0f\t%.0f\n", phase_sum[phase], phase,
 		       phase_count[phase], phase_sum[phase] / phase_count[phase],
@@ -190,7 +193,7 @@ fi
 tab=$(printf '\t')
 IFS="$tab" read -r events processes sources span total parse fingerprint symbol command output cleanup \
 	lock first_start lock_count lock_max file_count file_in file_cached stage_count stage_in stage_out \
-	merge_count merge_in merge_out <"$summary"
+	merge_count merge_in merge_out fingerprint_merge_count fingerprint_merge_in fingerprint_merge_out <"$summary"
 
 printf 'Trace: %s\n' "$trace"
 printf 'Events: %s\n' "$events"
@@ -245,14 +248,21 @@ else
 fi
 
 printf '\nFile fingerprint cache:\n'
-if [ "$file_count" -gt 0 ]; then
-	awk -v files="$file_in" -v cached="$file_cached" 'BEGIN {
+if [ "$file_count" -gt 0 ] && [ "$fingerprint_merge_count" -gt 0 ]; then
+	awk -v files="$file_in" -v cached="$file_cached" -v attempts="$fingerprint_merge_in" \
+		-v inserted="$fingerprint_merge_out" 'BEGIN {
 		percent = files ? cached * 100 / files : 0
+		late = attempts - cached - inserted
+		if (late < 0)
+			late = 0
 		printf "  fingerprinted files: %.0f\n", files
 		printf "  reused files: %.0f (%.2f%%)\n", cached, percent
+		printf "  main database attempts: %.0f\n", attempts
+		printf "  inserted fingerprints: %.0f\n", inserted
+		printf "  late concurrent matches: %.0f\n", late
 	}'
 else
-	printf '  unavailable (trace was recorded without file counters)\n'
+	printf '  unavailable (trace was recorded without fingerprint counters)\n'
 fi
 
 printf '\nPhase totals (nested phases overlap):\n'

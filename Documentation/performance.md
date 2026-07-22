@@ -183,7 +183,11 @@ These counters show how many in-memory records survive private staging and how
 many merge attempts actually add rows rather than finding existing records.
 The `db.stage_files` event uses the same fields for the number of fingerprinted
 files and the number whose semantic records were reused. The analyzer reports
-these values separately as the file fingerprint cache hit rate.
+these values separately as the file fingerprint cache hit rate. The
+`db.merge.fingerprints_insert` event reports the number of fingerprints offered
+to the main database and the number actually inserted. After subtracting early
+cache hits, ignored inserts measure fingerprints that concurrent writers added
+while the process was waiting for the writer lock.
 
 Top-level phases cover Clang parsing and record construction, semantic
 fingerprinting, symbol database storage, command database storage, output,

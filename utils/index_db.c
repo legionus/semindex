@@ -540,7 +540,8 @@ out:
 	return ret;
 }
 
-static int merge_staging(sqlite3 *db, const char *variant, uint64_t staged_records, semindex_trace_t *trace)
+static int merge_staging(sqlite3 *db, const char *variant, uint64_t staged_records, uint64_t fingerprint_attempts,
+	semindex_trace_t *trace)
 {
 	static const char *phases[] = {
 		"db.merge.files_insert",
@@ -604,12 +605,13 @@ static int merge_staging(sqlite3 *db, const char *variant, uint64_t staged_recor
 	if (!valid)
 		goto stale;
 	for (i = 0; i < sizeof(merge) / sizeof(merge[0]); i++) {
-		if (i == 4) {
+		if (i == 4 || i == 5) {
 			semindex_trace_time_t start = semindex_trace_begin(trace);
 			int merge_ret = exec_sql(db, merge[i]);
 			uint64_t inserted = merge_ret < 0 ? 0 : (uint64_t)sqlite3_changes64(db);
+			uint64_t attempted = i == 4 ? staged_records : fingerprint_attempts;
 
-			semindex_trace_end_counted(trace, phases[i], start, staged_records, inserted);
+			semindex_trace_end_counted(trace, phases[i], start, attempted, inserted);
 			if (merge_ret < 0)
 				goto rollback;
 		} else if (trace_exec_sql(db, merge[i], trace, phases[i]) < 0) {
@@ -681,7 +683,7 @@ int index_db_store(const char *path, semindex_t *s, const char *main_file, const
 	semindex_trace_end_counted(trace, "db.stage_records", start, records_in, records_staged);
 	if (trace_exec_sql(db, "COMMIT", trace, "db.staging_commit") < 0)
 		goto out;
-	merge_ret = merge_staging(db, variant, records_staged, trace);
+	merge_ret = merge_staging(db, variant, records_staged, files_in, trace);
 	if (merge_ret < 0)
 		goto out;
 	if (merge_ret > 0) {
@@ -705,7 +707,7 @@ int index_db_store(const char *path, semindex_t *s, const char *main_file, const
 		semindex_trace_end_counted(trace, "db.stage_records_retry", start, retry_in, retry_staged);
 		records_staged += retry_staged;
 		if (trace_exec_sql(db, "COMMIT", trace, "db.staging_retry_commit") < 0 ||
-			merge_staging(db, variant, records_staged, trace) != 0)
+			merge_staging(db, variant, records_staged, files_in, trace) != 0)
 			goto out;
 	}
 

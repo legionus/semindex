@@ -36,7 +36,7 @@ trace=$tmpdir/trace.jsonl
 
 valid_trace "$trace" || fail "trace contains an incomplete or malformed line"
 for phase in parse fingerprint db.stage_records db.merge.begin db.merge.records_insert symbol_database \
-	command_database total; do
+	db.merge.fingerprints_insert command_database total; do
 	if [ "$(grep -c "\"phase\":\"$phase\"" "$trace")" != 2 ]; then
 		fail "trace does not contain two $phase events"
 	fi
@@ -45,7 +45,8 @@ if ! grep -q '"command":"compiler"' "$trace" || ! grep -q '"command":"index"' "$
 	fail "trace omitted an indexing command"
 fi
 if [ "$(grep -c '"phase":"db.stage_records".*"items_in":[0-9][0-9]*,"items_out":[0-9][0-9]*' "$trace")" != 2 ] ||
-	[ "$(grep -c '"phase":"db.merge.records_insert".*"items_in":[0-9][0-9]*,"items_out":[0-9][0-9]*' "$trace")" != 2 ]; then
+	[ "$(grep -c '"phase":"db.merge.records_insert".*"items_in":[0-9][0-9]*,"items_out":[0-9][0-9]*' "$trace")" != 2 ] ||
+	[ "$(grep -c '"phase":"db.merge.fingerprints_insert".*"items_in":[0-9][0-9]*,"items_out":[0-9][0-9]*' "$trace")" != 2 ]; then
 	fail "record counters were not traced"
 fi
 
@@ -71,6 +72,15 @@ fi
 if ! awk '/^  reused files: / && $3 > 0 { found = 1 } END { exit !found }' "$tmpdir/flow.out"; then
 	cat "$tmpdir/flow.out" >&2
 	fail "file counters did not report a fingerprint cache hit"
+fi
+if ! awk '
+	/^  main database attempts: / { attempts = $4 }
+	/^  inserted fingerprints: / { inserted = $3 }
+	/^  late concurrent matches: / { late = $4; found = 1 }
+	END { exit !(found && attempts == 2 && inserted == 1 && late == 0) }
+' "$tmpdir/flow.out"; then
+	cat "$tmpdir/flow.out" >&2
+	fail "fingerprint merge counters are incorrect"
 fi
 
 parallel_trace=$tmpdir/parallel.jsonl
