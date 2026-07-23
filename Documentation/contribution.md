@@ -48,7 +48,7 @@ cmake --build build
 ```
 
 For changes that affect indexed source locations, update the corresponding
-`tests/*.expect` and `tests/*.dissect.expect` files in the same patch.
+`tests/*.json.expect` and `tests/*.dissect.expect` files in the same patch.
 
 ## Performance
 
