@@ -139,6 +139,15 @@ semindex callgraph --callers=schedule
 See [Documentation/callgraph.md](Documentation/callgraph.md) for function
 identity, variant filtering, output, and indirect-call limitations.
 
+Run the language server over standard input and output:
+
+```sh
+semindex-lsp --database=.semindex/semindex.db
+```
+
+See [Documentation/lsp.md](Documentation/lsp.md) for editor integration,
+variants, saved-file updates, diagnostics, and navigation after parse errors.
+
 The current database format is intentionally incompatible with earlier
 prototype versions. Remove an old `.semindex/semindex.db` before rebuilding an
 index.
