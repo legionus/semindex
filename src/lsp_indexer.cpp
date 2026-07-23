@@ -21,9 +21,11 @@ bool LspIndexer::update(const std::string &file, std::string &error) const
 {
 	command_db_command_t *saved = nullptr;
 	const semindex_compile_command_t *command = nullptr;
+	const semindex_index_result_t *result = nullptr;
 	semindex_t *index = nullptr;
 	std::error_code fs_error;
 	std::filesystem::path old_directory;
+	int index_ret;
 	int loaded;
 	bool changed_directory = false;
 	bool success = false;
@@ -59,7 +61,9 @@ bool LspIndexer::update(const std::string &file, std::string &error) const
 	}
 	semindex_set_scope(index, SEMINDEX_SCOPE_PROJECT);
 	semindex_set_include_local(index, include_local);
-	if (semindex_index_command(index, command) != 0) {
+	index_ret = semindex_index_command(index, command);
+	result = semindex_get_index_result(index);
+	if (index_ret != 0 || !result || result->status != SEMINDEX_INDEX_CLEAN) {
 		error = "failed to index '" + file + "'";
 		goto out;
 	}

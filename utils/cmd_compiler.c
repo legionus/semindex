@@ -178,11 +178,13 @@ int cmd_compiler(int argc, char **argv)
 	semindex_trace_time_t phase_start;
 	semindex_trace_time_t total_start = 0;
 	semindex_t *s = NULL;
+	const semindex_index_result_t *index_result;
 	semindex_compile_command_t cmd;
 	int compiler_argc;
 	char **compiler_argv;
 	char **default_argv = NULL;
 	char *default_commands_database = NULL;
+	int index_ret;
 	int ret = 1;
 	int print_output = 0;
 	int include_local = 1;
@@ -289,7 +291,9 @@ int cmd_compiler(int argc, char **argv)
 	cmd.argv = (const char *const *)compiler_argv;
 
 	phase_start = semindex_trace_begin(trace);
-	if (semindex_index_command(s, &cmd) != 0) {
+	index_ret = semindex_index_command(s, &cmd);
+	index_result = semindex_get_index_result(s);
+	if (index_ret != 0 || !index_result || index_result->status != SEMINDEX_INDEX_CLEAN) {
 		semindex_trace_end(trace, "parse", phase_start);
 		fprintf(stderr, "semindex: failed to index compiler command for '%s'\n", source_file);
 		goto out;

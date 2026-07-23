@@ -76,8 +76,10 @@ int cmd_index(int argc, char **argv)
 	semindex_trace_time_t phase_start;
 	semindex_trace_time_t total_start = 0;
 	semindex_t *s = NULL;
+	const semindex_index_result_t *index_result;
 	const semindex_compile_command_t *cmd;
 	char *default_commands_database = NULL;
+	int index_ret;
 	int ret = 1;
 	int include_local = 1;
 	int store_command = 1;
@@ -165,7 +167,9 @@ int cmd_index(int argc, char **argv)
 	semindex_set_include_local(s, include_local);
 
 	phase_start = semindex_trace_begin(trace);
-	if (semindex_index_file(s, compile_commands, source_file) != 0) {
+	index_ret = semindex_index_file(s, compile_commands, source_file);
+	index_result = semindex_get_index_result(s);
+	if (index_ret != 0 || !index_result || index_result->status != SEMINDEX_INDEX_CLEAN) {
 		semindex_trace_end(trace, "parse", phase_start);
 		fprintf(stderr, "semindex: failed to index '%s' using '%s'\n", source_file, compile_commands);
 		goto out;
