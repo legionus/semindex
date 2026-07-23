@@ -570,8 +570,14 @@ def main():
         ])
         if process.returncode != 0:
             fail(f"didSave lifecycle exited with status {process.returncode}", process)
-        if len(responses) != 4:
+        if len(responses) != 5:
             fail(f"didSave lifecycle returned {len(responses)} responses", process)
+        if responses[1] != {
+            "jsonrpc": "2.0",
+            "method": "textDocument/publishDiagnostics",
+            "params": {"uri": uri, "diagnostics": []},
+        }:
+            fail("clean didSave did not clear diagnostics")
         expected_updated_definition = {
             "uri": uri,
             "range": {
@@ -579,7 +585,7 @@ def main():
                 "end": {"line": 1, "character": 12},
             },
         }
-        if responses[1].get("result") != [expected_updated_definition]:
+        if responses[2].get("result") != [expected_updated_definition]:
             fail("didSave did not update the definition")
         expected_updated_reference = {
             "uri": uri,
@@ -588,9 +594,9 @@ def main():
                 "end": {"line": 5, "character": updated_character + 7},
             },
         }
-        if responses[2].get("result") != [expected_updated_reference]:
+        if responses[3].get("result") != [expected_updated_reference]:
             fail("didSave did not update references")
-        if responses[3] != {"id": 13, "jsonrpc": "2.0", "result": None}:
+        if responses[4] != {"id": 13, "jsonrpc": "2.0", "result": None}:
             fail("didSave shutdown response is malformed")
 
         with sqlite3.connect(database) as connection:
@@ -617,7 +623,7 @@ def main():
                 {"jsonrpc": "2.0", "method": "exit"},
             ],
         )
-        if process.returncode != 0 or len(responses) != 2:
+        if process.returncode != 0 or len(responses) != 3:
             fail("LSP --no-include-local lifecycle failed", process)
         with sqlite3.connect(database) as connection:
             local_records = connection.execute(
@@ -628,6 +634,141 @@ def main():
             ).fetchone()[0]
         if local_records:
             fail("LSP --no-include-local retained local records")
+
+        source.write_text(
+            "struct Nav {\n"
+            "\tint partial;\n"
+            "};\n"
+            "int broken(void)\n"
+            "{\n"
+            "\tint value = ;\n"
+            "}\n"
+            "int read_partial(struct Nav *p)\n"
+            "{\n"
+            "\treturn p->partial;\n"
+            "}\n"
+            "int local_partial(void)\n"
+            "{\n"
+            "\tint local_value = 1;\n"
+            "\treturn local_value;\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        partial_line = source.read_text(encoding="utf-8").splitlines()[9]
+        partial_character = len(
+            partial_line[:partial_line.index("partial")].encode("utf-16-le")
+        ) // 2
+        process, responses = run_server(sys.argv[1], options, [
+            {
+                "jsonrpc": "2.0", "id": 60, "method": "initialize",
+                "params": {"rootUri": root_uri},
+            },
+            {"jsonrpc": "2.0", "method": "initialized", "params": {}},
+            {
+                "jsonrpc": "2.0", "method": "textDocument/didSave",
+                "params": {"textDocument": {"uri": uri}},
+            },
+            {
+                "jsonrpc": "2.0", "id": 61,
+                "method": "textDocument/definition",
+                "params": {
+                    "textDocument": {"uri": uri},
+                    "position": {
+                        "line": 9, "character": partial_character,
+                    },
+                },
+            },
+            {
+                "jsonrpc": "2.0", "id": 62,
+                "method": "textDocument/references",
+                "params": {
+                    "textDocument": {"uri": uri},
+                    "position": {
+                        "line": 9, "character": partial_character,
+                    },
+                    "context": {"includeDeclaration": False},
+                },
+            },
+            {
+                "jsonrpc": "2.0", "id": 65,
+                "method": "textDocument/references",
+                "params": {
+                    "textDocument": {"uri": uri},
+                    "position": {
+                        "line": 9, "character": partial_character,
+                    },
+                    "context": {"includeDeclaration": True},
+                },
+            },
+            {
+                "jsonrpc": "2.0", "id": 64,
+                "method": "textDocument/definition",
+                "params": {
+                    "textDocument": {"uri": uri},
+                    "position": {"line": 14, "character": 10},
+                },
+            },
+            {
+                "jsonrpc": "2.0", "id": 66,
+                "method": "textDocument/documentHighlight",
+                "params": {
+                    "textDocument": {"uri": uri},
+                    "position": {
+                        "line": 9, "character": partial_character,
+                    },
+                },
+            },
+            {"jsonrpc": "2.0", "id": 63, "method": "shutdown"},
+            {"jsonrpc": "2.0", "method": "exit"},
+        ])
+        if process.returncode != 0 or len(responses) != 8:
+            fail("partial didSave lifecycle failed", process)
+        published = responses[1]
+        diagnostics = published.get("params", {}).get("diagnostics", [])
+        if published.get("method") != "textDocument/publishDiagnostics" or (
+            published.get("params", {}).get("uri") != uri
+        ) or not diagnostics or diagnostics[0].get("severity") != 1 or (
+            diagnostics[0].get("source") != "semindex"
+        ) or "expected expression" not in diagnostics[0].get("message", "") or (
+            diagnostics[0].get("range", {}).get("start", {}).get("line") != 5
+        ):
+            fail(f"partial didSave returned unexpected diagnostics: {published}")
+        expected_partial_definition = {
+            "uri": uri,
+            "range": source_range(1, 5, len("partial")),
+        }
+        if responses[2].get("result") != [expected_partial_definition]:
+            fail(f"partial overlay returned an unexpected definition: {responses[2]}")
+        expected_partial_reference = {
+            "uri": uri,
+            "range": source_range(9, partial_character, len("partial")),
+        }
+        if responses[3].get("result") != [expected_partial_reference]:
+            fail(f"partial overlay returned unexpected references: {responses[3]}")
+        if responses[4].get("result") != [
+            expected_partial_reference, expected_partial_definition,
+        ]:
+            fail(f"partial overlay omitted its declaration: {responses[4]}")
+        expected_local_definition = {
+            "uri": uri,
+            "range": source_range(13, 5, len("local_value")),
+        }
+        if responses[5].get("result") != [expected_local_definition]:
+            fail(f"partial overlay confused a local symbol: {responses[5]}")
+        if responses[6].get("result") != [
+            {"range": expected_partial_definition["range"], "kind": 1},
+            {"range": expected_partial_reference["range"], "kind": 2},
+        ]:
+            fail(f"partial overlay returned unexpected highlights: {responses[6]}")
+        with sqlite3.connect(database) as connection:
+            old_records = connection.execute(
+                "SELECT count(*) FROM records WHERE symbol = 'Nav.renamed'"
+            ).fetchone()[0]
+            partial_records = connection.execute(
+                "SELECT count(*) FROM records WHERE symbol = 'Nav.partial'"
+            ).fetchone()[0]
+        if not old_records or partial_records:
+            fail("partial LSP overlay modified the persistent index")
 
 
 if __name__ == "__main__":

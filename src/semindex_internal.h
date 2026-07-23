@@ -13,7 +13,6 @@
 namespace clang
 {
 class ASTContext;
-class DiagnosticsEngine;
 class SourceManager;
 
 namespace tooling
@@ -58,6 +57,14 @@ struct SemindexUse {
 	unsigned long long order;
 };
 
+struct SemindexDiagnostic {
+	semindex_diagnostic_severity_t severity;
+	std::string message;
+	std::string file;
+	unsigned line;
+	unsigned column;
+};
+
 struct semindex {
 	semindex_scope_t scope = SEMINDEX_SCOPE_PROJECT;
 	bool details = true;
@@ -76,6 +83,8 @@ struct semindex {
 	semindex_compile_command_t command_record{};
 	semindex_index_result_t index_result = { SEMINDEX_INDEX_FAILED, 0, 0, 0 };
 	bool has_index_data = false;
+	std::vector<SemindexDiagnostic> diagnostics;
+	std::vector<semindex_diagnostic_t> diagnostic_records;
 };
 
 class SemindexContext
@@ -106,7 +115,6 @@ private:
 
 void rebuildRecords(semindex *s);
 void rebuildFingerprints(semindex *s);
-void captureDiagnostics(semindex *s, const clang::DiagnosticsEngine &diagnostics);
 
 std::unique_ptr<clang::tooling::FrontendActionFactory> createSemindexActionFactory(semindex *out);
 std::unique_ptr<clang::tooling::FrontendActionFactory> createSemindexPreprocessorActionFactory(semindex *out);

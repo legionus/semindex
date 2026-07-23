@@ -791,11 +791,6 @@ public:
 		return std::make_unique<SemindexASTConsumer>(out, CI.getASTContext(), index);
 	}
 
-	void EndSourceFileAction() override
-	{
-		captureDiagnostics(out, getCompilerInstance().getDiagnostics());
-	}
-
 private:
 	semindex *out;
 };

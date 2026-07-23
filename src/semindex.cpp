@@ -2,9 +2,12 @@
 #include "semindex_internal.h"
 
 #include <clang/Basic/Diagnostic.h>
+#include <clang/Basic/DiagnosticOptions.h>
+#include <clang/Frontend/TextDiagnosticPrinter.h>
 #include <clang/Tooling/CompilationDatabase.h>
 #include <clang/Tooling/Tooling.h>
 
+#include <llvm/ADT/SmallString.h>
 #include <llvm/Support/Path.h>
 #include <llvm/Support/raw_ostream.h>
 
@@ -15,11 +18,70 @@
 
 using namespace clang::tooling;
 
-void captureDiagnostics(semindex *s, const clang::DiagnosticsEngine &diagnostics)
+class SemindexDiagnosticConsumer : public clang::TextDiagnosticPrinter
 {
-	s->index_result.warnings = diagnostics.getNumWarnings();
-	s->index_result.errors = diagnostics.getNumErrors();
-	s->index_result.fatal = diagnostics.hasFatalErrorOccurred();
+public:
+	SemindexDiagnosticConsumer(semindex *out, clang::DiagnosticOptions &options)
+	    : clang::TextDiagnosticPrinter(llvm::errs(), options), out(out)
+	{
+	}
+
+	void HandleDiagnostic(clang::DiagnosticsEngine::Level level, const clang::Diagnostic &info) override
+	{
+		clang::TextDiagnosticPrinter::HandleDiagnostic(level, info);
+		if (level == clang::DiagnosticsEngine::Fatal)
+			fatal = true;
+		if (level < clang::DiagnosticsEngine::Note)
+			return;
+
+		SemindexDiagnostic diagnostic;
+		llvm::SmallString<128> message;
+
+		if (level >= clang::DiagnosticsEngine::Error)
+			diagnostic.severity = SEMINDEX_DIAGNOSTIC_ERROR;
+		else if (level == clang::DiagnosticsEngine::Warning)
+			diagnostic.severity = SEMINDEX_DIAGNOSTIC_WARNING;
+		else
+			diagnostic.severity = SEMINDEX_DIAGNOSTIC_NOTE;
+		info.FormatDiagnostic(message);
+		diagnostic.message = message.str().str();
+		diagnostic.line = 0;
+		diagnostic.column = 0;
+		if (info.hasSourceManager() && info.getLocation().isValid()) {
+			clang::PresumedLoc location = info.getSourceManager().getPresumedLoc(info.getLocation());
+
+			if (location.isValid()) {
+				diagnostic.file = location.getFilename();
+				diagnostic.line = location.getLine();
+				diagnostic.column = location.getColumn();
+			}
+		}
+		out->diagnostics.push_back(std::move(diagnostic));
+	}
+
+	bool fatalOccurred() const
+	{
+		return fatal;
+	}
+
+private:
+	semindex *out;
+	bool fatal = false;
+};
+
+static void rebuildDiagnostics(semindex *s)
+{
+	s->diagnostic_records.clear();
+	s->diagnostic_records.reserve(s->diagnostics.size());
+	for (const auto &diagnostic : s->diagnostics) {
+		s->diagnostic_records.push_back({
+			.severity = diagnostic.severity,
+			.message = diagnostic.message.c_str(),
+			.file = diagnostic.file.c_str(),
+			.line = diagnostic.line,
+			.column = diagnostic.column,
+		});
+	}
 }
 
 static std::unique_ptr<CompilationDatabase> loadCompileCommands(const char *compile_commands_json, std::string &error)
@@ -76,6 +138,8 @@ static void clearIndex(semindex_t *s)
 	s->command_record = {};
 	s->index_result = { SEMINDEX_INDEX_FAILED, 0, 0, 0 };
 	s->has_index_data = false;
+	s->diagnostics.clear();
+	s->diagnostic_records.clear();
 }
 
 static void saveCompileCommand(semindex_t *s, const semindex_compile_command_t *cmd)
@@ -210,6 +274,10 @@ int semindex_index_command(semindex_t *s, const semindex_compile_command_t *cmd)
 	CompileCommand compile(cmd->directory ? cmd->directory : ".", cmd->file, args, "");
 	SingleCompilationDatabase db(compile);
 	ClangTool tool(db, { cmd->file });
+	clang::DiagnosticOptions diagnostic_options;
+	SemindexDiagnosticConsumer diagnostics(s, diagnostic_options);
+
+	tool.setDiagnosticConsumer(&diagnostics);
 	tool.appendArgumentsAdjuster(
 		[](const CommandLineArguments &args, llvm::StringRef) { return sanitizeCommandLine(args); });
 	std::unique_ptr<FrontendActionFactory> factory = isPreprocessedAssembly(cmd->file)
@@ -217,6 +285,9 @@ int semindex_index_command(semindex_t *s, const semindex_compile_command_t *cmd)
 		: createSemindexActionFactory(s);
 	int ret = tool.run(factory.get());
 
+	s->index_result.warnings = diagnostics.getNumWarnings();
+	s->index_result.errors = diagnostics.getNumErrors();
+	s->index_result.fatal = diagnostics.fatalOccurred();
 	if (ret == 0 && s->has_index_data && !s->index_result.errors)
 		s->index_result.status = SEMINDEX_INDEX_CLEAN;
 	else if (s->has_index_data)
@@ -225,6 +296,7 @@ int semindex_index_command(semindex_t *s, const semindex_compile_command_t *cmd)
 		s->index_result.status = SEMINDEX_INDEX_FAILED;
 	if (s->has_index_data)
 		rebuildRecords(s);
+	rebuildDiagnostics(s);
 
 	return ret;
 }
@@ -272,6 +344,18 @@ int semindex_index_file(semindex_t *s, const char *compile_commands_json, const 
 const semindex_index_result_t *semindex_get_index_result(const semindex_t *s)
 {
 	return s ? &s->index_result : nullptr;
+}
+
+size_t semindex_diagnostic_count(const semindex_t *s)
+{
+	return s ? s->diagnostic_records.size() : 0;
+}
+
+const semindex_diagnostic_t *semindex_get_diagnostic(const semindex_t *s, size_t idx)
+{
+	if (!s || idx >= s->diagnostic_records.size())
+		return nullptr;
+	return &s->diagnostic_records[idx];
 }
 
 const semindex_compile_command_t *semindex_get_compile_command(const semindex_t *s)

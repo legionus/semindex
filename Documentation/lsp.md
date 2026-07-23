@@ -26,8 +26,7 @@ Relative paths stored in the index are resolved against the workspace
 valid URI in `workspaceFolders` is used instead.
 
 The server reads `Content-Length` framed JSON-RPC messages from standard input
-and writes responses to standard output. Diagnostics are written only to
-standard error.
+and writes responses and notifications to standard output.
 
 Use `--logfile=FILE` to append protocol traffic to a file without corrupting
 standard output:
@@ -61,6 +60,19 @@ The server advertises save-only text synchronization. On
 `semindex compiler` or `semindex index`, indexes the saved file, and replaces
 that file's records in the symbol database before processing the next request.
 Unsaved buffer contents are not indexed.
+
+When Clang recovers a partial AST after an error, the server publishes its
+diagnostics with `textDocument/publishDiagnostics` and keeps the recovered
+main-file records in memory. Definition, reference, and document-highlight
+requests use this overlay while records from other files continue to come from
+the last clean database. A clean save replaces the database records and clears
+the overlay and diagnostics. A failed frontend run discards the overlay and
+falls back to the last clean database. Partial records never replace persistent
+records.
+
+Call hierarchy requests continue to use the persistent index. Recovery
+expressions may preserve a referenced function without preserving enough
+semantics to classify the operation as a call.
 
 The compiler command database defaults to `commands.db` beside the symbol
 database. Select another path with `--commands-database=PATH`. When no variant

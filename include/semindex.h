@@ -69,6 +69,20 @@ typedef struct {
 	int fatal;
 } semindex_index_result_t;
 
+typedef enum {
+	SEMINDEX_DIAGNOSTIC_NOTE,
+	SEMINDEX_DIAGNOSTIC_WARNING,
+	SEMINDEX_DIAGNOSTIC_ERROR,
+} semindex_diagnostic_severity_t;
+
+typedef struct {
+	semindex_diagnostic_severity_t severity;
+	const char *message;
+	const char *file;
+	unsigned line;
+	unsigned column;
+} semindex_diagnostic_t;
+
 /* symbol record */
 typedef struct {
 	semindex_symbol_kind_t kind;
@@ -127,6 +141,9 @@ int semindex_index_file(semindex_t *s, const char *compile_commands_json, const 
 int semindex_build_file_fingerprints(semindex_t *s);
 /* returned pointer is valid until the next index operation or destroy */
 const semindex_index_result_t *semindex_get_index_result(const semindex_t *s);
+size_t semindex_diagnostic_count(const semindex_t *s);
+/* returned pointer is valid until the next index operation or destroy */
+const semindex_diagnostic_t *semindex_get_diagnostic(const semindex_t *s, size_t idx);
 /* returned pointers are valid until the next index operation or destroy */
 const semindex_compile_command_t *semindex_get_compile_command(const semindex_t *s);
 

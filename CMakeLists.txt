@@ -17,6 +17,8 @@ set(SEMINDEX_FORMAT_SOURCES
 	src/lsp_call_hierarchy.h
 	src/lsp_indexer.cpp
 	src/lsp_indexer.h
+	src/lsp_overlay.cpp
+	src/lsp_overlay.h
 	src/lsp_source.cpp
 	src/lsp_source.h
 	src/lsp_server.cpp
@@ -175,6 +177,7 @@ target_link_libraries(semindex_parser PRIVATE clang-cpp ${LLVM_LIBS})
 add_executable(semindex_lsp
 	src/lsp_call_hierarchy.cpp
 	src/lsp_indexer.cpp
+	src/lsp_overlay.cpp
 	src/lsp_source.cpp
 	src/lsp_server.cpp
 	src/lsp_transport.cpp

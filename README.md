@@ -25,8 +25,8 @@ Implemented so far:
 * separate compiler-command capture and `compile_commands.json` export;
 * indexed search by qualified symbol name and access mode;
 * direct caller and callee queries with stable function identities;
-* LSP definition, reference, document-highlight, call-hierarchy, and saved-file
-  update support;
+* LSP definition, reference, document-highlight, call-hierarchy, diagnostics,
+  and saved-file update support;
 * a C API exported from the C++ indexing implementation.
 
 ## Architecture
@@ -151,8 +151,8 @@ Among the missing features are:
   their records are currently merged;
 * assembly labels, directives, and references in `.S` files; only
   preprocessor-level entities are indexed;
-* LSP support for unsaved buffers, completion, hover, rename, diagnostics, and
-  workspace symbols.
+* LSP support for unsaved buffers, completion, hover, rename, and workspace
+  symbols.
 
 ## Motivation
 

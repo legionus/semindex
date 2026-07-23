@@ -11,6 +11,8 @@ struct PartialCase {
 	semindex_index_status_t status;
 	std::vector<const char *> symbols;
 	size_t minimum_uses = 0;
+	const char *diagnostic = nullptr;
+	unsigned diagnostic_line = 0;
 };
 
 static bool hasSymbol(const semindex_t *index, const char *name)
@@ -19,6 +21,19 @@ static bool hasSymbol(const semindex_t *index, const char *name)
 		const semindex_symbol_t *symbol = semindex_get_symbol(index, i);
 
 		if (symbol && !std::strcmp(symbol->name, name))
+			return true;
+	}
+	return false;
+}
+
+static bool hasDiagnostic(const semindex_t *index, const PartialCase &test)
+{
+	for (size_t i = 0; i < semindex_diagnostic_count(index); i++) {
+		const semindex_diagnostic_t *diagnostic = semindex_get_diagnostic(index, i);
+
+		if (diagnostic && diagnostic->severity == SEMINDEX_DIAGNOSTIC_ERROR &&
+			std::strstr(diagnostic->message, test.diagnostic) &&
+			(!test.diagnostic_line || diagnostic->line == test.diagnostic_line))
 			return true;
 	}
 	return false;
@@ -62,12 +77,20 @@ static int runCase(const char *compiler, const char *directory, const PartialCas
 		std::fprintf(stderr, "%s: clean result has %u errors\n", test.file, result->errors);
 		goto out;
 	}
+	if (test.status == SEMINDEX_INDEX_CLEAN && semindex_diagnostic_count(index)) {
+		std::fprintf(stderr, "%s: clean result exposes diagnostics\n", test.file);
+		goto out;
+	}
 	if (test.status == SEMINDEX_INDEX_PARTIAL && !result->errors) {
 		std::fprintf(stderr, "%s: partial result has no errors\n", test.file);
 		goto out;
 	}
 	if (test.status == SEMINDEX_INDEX_FAILED && semindex_symbol_count(index)) {
 		std::fprintf(stderr, "%s: failed result exposes symbols\n", test.file);
+		goto out;
+	}
+	if (test.status == SEMINDEX_INDEX_FAILED && (!result->errors || !semindex_diagnostic_count(index))) {
+		std::fprintf(stderr, "%s: failed result omitted diagnostics\n", test.file);
 		goto out;
 	}
 	for (const char *name : test.symbols) {
@@ -80,6 +103,10 @@ static int runCase(const char *compiler, const char *directory, const PartialCas
 		std::fprintf(stderr, "%s: missing recovered uses\n", test.file);
 		goto out;
 	}
+	if (test.diagnostic && !hasDiagnostic(index, test)) {
+		std::fprintf(stderr, "%s: missing expected diagnostic\n", test.file);
+		goto out;
+	}
 	ret = 0;
 out:
 	semindex_destroy(index);
@@ -90,10 +117,14 @@ int main(int argc, char **argv)
 {
 	const std::vector<PartialCase> tests = {
 		{ "clean.c", SEMINDEX_INDEX_CLEAN, { "clean_symbol" } },
-		{ "semantic.c", SEMINDEX_INDEX_PARTIAL, { "before_semantic", "after_semantic" } },
-		{ "local-syntax.c", SEMINDEX_INDEX_PARTIAL, { "before_local_syntax", "after_local_syntax" } },
-		{ "broken-delimiter.c", SEMINDEX_INDEX_PARTIAL, { "before_delimiter", "after_delimiter" }, 1 },
-		{ "missing-header.c", SEMINDEX_INDEX_PARTIAL, { "before_missing_header", "after_missing_header" } },
+		{ "semantic.c", SEMINDEX_INDEX_PARTIAL, { "before_semantic", "after_semantic" }, 0,
+			"undeclared identifier", 5 },
+		{ "local-syntax.c", SEMINDEX_INDEX_PARTIAL, { "before_local_syntax", "after_local_syntax" }, 0,
+			"expected expression", 6 },
+		{ "broken-delimiter.c", SEMINDEX_INDEX_PARTIAL, { "before_delimiter", "after_delimiter" }, 1,
+			"expected ')'", 6 },
+		{ "missing-header.c", SEMINDEX_INDEX_PARTIAL, { "before_missing_header", "after_missing_header" }, 0,
+			"file not found", 4 },
 		{ "not-present.c", SEMINDEX_INDEX_FAILED, {} },
 	};
 
