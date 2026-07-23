@@ -16,8 +16,9 @@ run_quiet_case()
 	out=$tmpdir/quiet.out
 	err=$tmpdir/quiet.err
 
-	if ! "$SEMINDEX" compiler --database "$db" -- cc -I"$SOURCE_DIR/tests/include" \
-	     -c "$SOURCE_DIR/tests/test.c" -o "$tmpdir/quiet.o" >"$out" 2>"$err"; then
+	if ! "$SEMINDEX" compiler --database "$db" -- cc --no-default-config \
+	     -I"$SOURCE_DIR/tests/include" -c "$SOURCE_DIR/tests/test.c" \
+	     -o "$tmpdir/quiet.o" >"$out" 2>"$err"; then
 		cat "$err" >&2
 		fail "quiet compiler command failed"
 	fi
@@ -51,7 +52,7 @@ run_no_store_command_case()
 	commands_db=$tmpdir/no-command/.semindex/commands.db
 
 	if ! "$SEMINDEX" compiler --no-store-command --database "$db" -- \
-	     "$SOURCE_DIR/tests/test.c" >/dev/null; then
+	     --no-default-config "$SOURCE_DIR/tests/test.c" >/dev/null; then
 		fail "compiler --no-store-command failed"
 	fi
 	if [ -e "$commands_db" ]; then
@@ -103,7 +104,8 @@ run_no_include_local_case()
 	db=$tmpdir/no-local/.semindex/semindex.db
 
 	if ! "$SEMINDEX" compiler --no-include-local --database "$db" -- \
-	     cc -I"$SOURCE_DIR/tests/include" "$SOURCE_DIR/tests/test.c"; then
+	     cc --no-default-config -I"$SOURCE_DIR/tests/include" \
+	     "$SOURCE_DIR/tests/test.c"; then
 		fail "compiler --no-include-local failed"
 	fi
 	if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM records WHERE local != 0")" != 0 ]; then
@@ -120,7 +122,8 @@ run_format_case()
 	db=$tmpdir/$format/.semindex/semindex.db
 
 	if ! "$SEMINDEX" compiler --format "$format" --database "$db" -- \
-	     cc -I"$SOURCE_DIR/tests/include" -c "$SOURCE_DIR/tests/test.c" >"$out" 2>"$err"; then
+	     cc --no-default-config -I"$SOURCE_DIR/tests/include" -c \
+	     "$SOURCE_DIR/tests/test.c" >"$out" 2>"$err"; then
 		cat "$err" >&2
 		fail "compiler --format=$format failed"
 	fi
@@ -138,7 +141,7 @@ run_json_escape_case()
 
 	printf '%s\n' 'int json_value;' >"$source"
 	if ! "$SEMINDEX" compiler --format json --no-store-command \
-	     --database "$db" -- cc "$source" >"$out"; then
+	     --database "$db" -- cc --no-default-config "$source" >"$out"; then
 		fail "compiler JSON escaping case failed"
 	fi
 	if ! "$PYTHON" - "$out" "$source" <<'PY'
@@ -162,7 +165,7 @@ run_kernel_flags_case()
 	err=$tmpdir/kernel.err
 
 	if ! "$SEMINDEX" compiler --database "$db" -- \
-	     -D__STDC__ -Werror -Wbitwise -Wno-return-void \
+	     --no-default-config -D__STDC__ -Werror -Wbitwise -Wno-return-void \
 	     -Wimplicit-fallthrough=5 -Werror=designated-init -Werror=date-time \
 	     --arch=x86 --arch arm64 -mpreferred-stack-boundary=3 \
 	     -mindirect-branch=thunk-extern -mindirect-branch-register \
@@ -180,13 +183,13 @@ run_target_builtin_case()
 	db=$tmpdir/target/.semindex/semindex.db
 	err=$tmpdir/target.err
 
-	if ! "$SEMINDEX" compiler --database "$db" -- cc \
+	if ! "$SEMINDEX" compiler --database "$db" -- cc --no-default-config \
 	     -D__x86_64__ -m64 -m16 "$SOURCE_DIR/tests/compiler-target.c" \
 	     >/dev/null 2>"$err"; then
 		cat "$err" >&2
 		fail "target builtin macro was not sanitized"
 	fi
-	if ! "$SEMINDEX" compiler --database "$db" -- cc \
+	if ! "$SEMINDEX" compiler --database "$db" -- cc --no-default-config \
 	     -D __x86_64__ -m64 -m16 "$SOURCE_DIR/tests/compiler-target.c" \
 	     >/dev/null 2>"$err"; then
 		cat "$err" >&2
@@ -204,7 +207,7 @@ run_preprocessed_assembly_case()
 
 	printf '%s\n' '#define ASM_VALUE 7' '#define ASM_USE ASM_VALUE' \
 		'.long ASM_USE' >"$asm"
-	if ! "$SEMINDEX" compiler --database "$db" -- "$asm"; then
+	if ! "$SEMINDEX" compiler --database "$db" -- --no-default-config "$asm"; then
 		fail "preprocessed assembly compiler command failed"
 	fi
 	if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM records WHERE symbol IN ('ASM_VALUE', 'ASM_USE') AND record = 0")" != 2 ]; then
@@ -217,7 +220,7 @@ run_preprocessed_assembly_case()
 		fail "preprocessed assembly compiler command was not stored"
 	fi
 
-	printf '[{"directory":"%s","file":"%s","arguments":["cc","-c","%s"]}]\n' \
+	printf '[{"directory":"%s","file":"%s","arguments":["cc","--no-default-config","-c","%s"]}]\n' \
 		"$tmpdir" "$asm" "$asm" >"$compile_commands"
 	if ! "$SEMINDEX" index --database "$index_db" \
 	     --compile-commands "$compile_commands" "$asm" >/dev/null; then

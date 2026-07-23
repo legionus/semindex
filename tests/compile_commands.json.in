@@ -1,0 +1,13 @@
+[
+  {
+    "directory": "@CMAKE_CURRENT_SOURCE_DIR@",
+    "file": "@CMAKE_CURRENT_SOURCE_DIR@/tests/test.c",
+    "arguments": [
+      "@CMAKE_C_COMPILER@",
+      "--no-default-config",
+      "-I@CMAKE_CURRENT_SOURCE_DIR@/tests/include",
+      "-c",
+      "@CMAKE_CURRENT_SOURCE_DIR@/tests/test.c"
+    ]
+  }
+]

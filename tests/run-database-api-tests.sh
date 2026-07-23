@@ -21,7 +21,8 @@ source=$SOURCE_DIR/tests/test11.c
 callgraph_source=$SOURCE_DIR/tests/callgraph-a.c
 
 "$SEMINDEX" index --database="$db" --compile-commands="$COMPILE_COMMANDS" "$source" >/dev/null
-"$SEMINDEX" compiler --database="$db" --no-store-command -- cc "$callgraph_source"
+"$SEMINDEX" compiler --database="$db" --no-store-command -- \
+	cc --no-default-config "$callgraph_source"
 "$DATABASE_API_TEST" "$db" "$source" "$callgraph_source"
 
 position_plan=$(sqlite3 "$db" "EXPLAIN QUERY PLAN

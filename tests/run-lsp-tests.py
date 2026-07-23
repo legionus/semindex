@@ -132,7 +132,7 @@ def main():
             [
                 sys.argv[2], "compiler", f"--database={database}",
                 f"--commands-database={commands_database}", "--", "cc",
-                source.name,
+                "--no-default-config", source.name,
             ],
             cwd=directory,
             stdout=subprocess.PIPE,
@@ -152,7 +152,8 @@ def main():
         indexed = subprocess.run(
             [
                 sys.argv[2], "compiler", f"--database={database}",
-                "--no-store-command", "--", "cc", macro_source.name,
+                "--no-store-command", "--", "cc", "--no-default-config",
+                macro_source.name,
             ],
             cwd=directory,
             stdout=subprocess.PIPE,
@@ -183,7 +184,8 @@ def main():
             indexed = subprocess.run(
                 [
                     sys.argv[2], "compiler", f"--database={database}",
-                    "--no-store-command", "--", "cc", str(callgraph_source),
+                    "--no-store-command", "--", "cc", "--no-default-config",
+                    str(callgraph_source),
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -369,7 +371,11 @@ def main():
         if responses[6].get("result") != expected_highlights:
             fail(f"document highlights differ: {responses[6].get('result')}")
         if responses[7].get("result") != [caller_a]:
-            fail("prepareCallHierarchy returned an unexpected item")
+            fail(
+                "prepareCallHierarchy returned an unexpected item: "
+                f"expected {[caller_a]}, got {responses[7]}",
+                process,
+            )
         expected_outgoing = [
             {
                 "to": caller_a,

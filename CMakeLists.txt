@@ -200,6 +200,17 @@ target_link_libraries(semindex PRIVATE semindex_parser semindex_storage)
 if(BUILD_TESTING)
 	find_package(Python3 COMPONENTS Interpreter REQUIRED)
 
+	# Keep fixture indexing independent of distribution Clang configuration.
+	file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/tests)
+	configure_file(
+		tests/compile_commands.json.in
+		${CMAKE_CURRENT_BINARY_DIR}/tests/compile_commands.json
+		@ONLY
+	)
+	set(SEMINDEX_TEST_COMPILE_COMMANDS
+		${CMAKE_CURRENT_BINARY_DIR}/tests/compile_commands.json
+	)
+
 	add_executable(semindex_database_api_test
 		tests/database-api.c
 	)
@@ -232,7 +243,7 @@ if(BUILD_TESTING)
 			COMMAND
 				${CMAKE_COMMAND} -E env
 				SEMINDEX=$<TARGET_FILE:semindex>
-				COMPILE_COMMANDS=${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
+				COMPILE_COMMANDS=${SEMINDEX_TEST_COMPILE_COMMANDS}
 				SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 				PYTHON=${Python3_EXECUTABLE}
 				sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-output-tests.sh
@@ -245,7 +256,7 @@ if(BUILD_TESTING)
 			COMMAND
 				${CMAKE_COMMAND} -E env
 				SEMINDEX=$<TARGET_FILE:semindex>
-				COMPILE_COMMANDS=${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
+				COMPILE_COMMANDS=${SEMINDEX_TEST_COMPILE_COMMANDS}
 				SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 				PYTHON=${Python3_EXECUTABLE}
 				sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-output-tests.sh
@@ -258,7 +269,7 @@ if(BUILD_TESTING)
 		COMMAND
 			${CMAKE_COMMAND} -E env
 			SEMINDEX=$<TARGET_FILE:semindex>
-			COMPILE_COMMANDS=${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
+			COMPILE_COMMANDS=${SEMINDEX_TEST_COMPILE_COMMANDS}
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-scope-tests.sh
 	)
@@ -267,7 +278,7 @@ if(BUILD_TESTING)
 		COMMAND
 			${CMAKE_COMMAND} -E env
 			SEMINDEX=$<TARGET_FILE:semindex>
-			COMPILE_COMMANDS=${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
+			COMPILE_COMMANDS=${SEMINDEX_TEST_COMPILE_COMMANDS}
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			PYTHON=${Python3_EXECUTABLE}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-compiler-tests.sh
@@ -277,7 +288,7 @@ if(BUILD_TESTING)
 		COMMAND
 			${CMAKE_COMMAND} -E env
 			SEMINDEX=$<TARGET_FILE:semindex>
-			COMPILE_COMMANDS=${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
+			COMPILE_COMMANDS=${SEMINDEX_TEST_COMPILE_COMMANDS}
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-search-tests.sh
 	)
@@ -294,7 +305,7 @@ if(BUILD_TESTING)
 			${CMAKE_COMMAND} -E env
 			SEMINDEX=$<TARGET_FILE:semindex>
 			DATABASE_API_TEST=$<TARGET_FILE:semindex_database_api_test>
-			COMPILE_COMMANDS=${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
+			COMPILE_COMMANDS=${SEMINDEX_TEST_COMPILE_COMMANDS}
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-database-api-tests.sh
 	)
@@ -319,7 +330,7 @@ if(BUILD_TESTING)
 		COMMAND
 			${CMAKE_COMMAND} -E env
 			SEMINDEX=$<TARGET_FILE:semindex>
-			COMPILE_COMMANDS=${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
+			COMPILE_COMMANDS=${SEMINDEX_TEST_COMPILE_COMMANDS}
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-trace-tests.sh
 	)

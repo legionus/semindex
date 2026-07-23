@@ -401,22 +401,25 @@ bool LspServer::dispatch(const llvm::json::Object &message)
 		if (!id)
 			return true;
 		llvm::json::Value result(nullptr);
-		return hierarchyReply(*id, call_hierarchy.prepare(message.getObject("params"), result),
-			std::move(result));
+		auto status = call_hierarchy.prepare(message.getObject("params"), result);
+
+		return hierarchyReply(*id, status, std::move(result));
 	}
 	if (*method == "callHierarchy/incomingCalls") {
 		if (!id)
 			return true;
 		llvm::json::Value result(nullptr);
-		return hierarchyReply(*id, call_hierarchy.incoming(message.getObject("params"), result),
-			std::move(result));
+		auto status = call_hierarchy.incoming(message.getObject("params"), result);
+
+		return hierarchyReply(*id, status, std::move(result));
 	}
 	if (*method == "callHierarchy/outgoingCalls") {
 		if (!id)
 			return true;
 		llvm::json::Value result(nullptr);
-		return hierarchyReply(*id, call_hierarchy.outgoing(message.getObject("params"), result),
-			std::move(result));
+		auto status = call_hierarchy.outgoing(message.getObject("params"), result);
+
+		return hierarchyReply(*id, status, std::move(result));
 	}
 	if (*method == "textDocument/didSave")
 		return id ? error(id, INVALID_REQUEST, "Invalid Request") : didSave(message.getObject("params"));

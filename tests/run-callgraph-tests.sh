@@ -20,8 +20,10 @@ commands_db=$tmpdir/commands.db
 source_a=$SOURCE_DIR/tests/callgraph-a.c
 source_b=$SOURCE_DIR/tests/callgraph-b.c
 
-"$SEMINDEX" compiler --database="$db" --commands-database="$commands_db" -- cc "$source_a"
-"$SEMINDEX" compiler --database="$db" --commands-database="$commands_db" -- cc "$source_b"
+"$SEMINDEX" compiler --database="$db" --commands-database="$commands_db" -- \
+	cc --no-default-config "$source_a"
+"$SEMINDEX" compiler --database="$db" --commands-database="$commands_db" -- \
+	cc --no-default-config "$source_b"
 
 "$SEMINDEX" callgraph --database="$db" --variant=general --callees=caller >"$tmpdir/callees.out"
 sed "s|$SOURCE_DIR|@SOURCE_DIR@|g" "$tmpdir/callees.out" >"$tmpdir/callees.normalized"
@@ -64,7 +66,8 @@ if [ "$(wc -l <"$tmpdir/path.out")" != 1 ] || grep -qv 'callgraph-b.c' "$tmpdir/
 	fail "callsite path filter returned unexpected results"
 fi
 
-"$SEMINDEX" compiler --variant=debug --database="$db" --commands-database="$commands_db" -- cc "$source_a"
+"$SEMINDEX" compiler --variant=debug --database="$db" --commands-database="$commands_db" -- \
+	cc --no-default-config "$source_a"
 "$SEMINDEX" callgraph --database="$db" --variant=debug --callees=caller >"$tmpdir/variant.out"
 if [ "$(wc -l <"$tmpdir/variant.out")" != 4 ] || grep -qv "debug:$source_a:" "$tmpdir/variant.out"; then
 	cat "$tmpdir/variant.out" >&2

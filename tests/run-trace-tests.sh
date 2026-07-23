@@ -30,7 +30,8 @@ db=$tmpdir/semindex.db
 commands_db=$tmpdir/commands.db
 trace=$tmpdir/trace.jsonl
 
-"$SEMINDEX" compiler --trace="$trace" --commands-database="$commands_db" --database="$db" -- cc "$source"
+"$SEMINDEX" compiler --trace="$trace" --commands-database="$commands_db" \
+	--database="$db" -- cc --no-default-config "$source"
 "$SEMINDEX" index --trace="$trace" --commands-database="$commands_db" --database="$db" \
 	--compile-commands="$COMPILE_COMMANDS" "$source" >/dev/null
 
@@ -58,7 +59,7 @@ printf '%s\n' '#include "shared.h"' \
 flow_trace=$tmpdir/flow.jsonl
 for input in "$tmpdir/one.c" "$tmpdir/two.c"; do
 	"$SEMINDEX" compiler --trace="$flow_trace" --no-store-command --database="$tmpdir/flow.db" -- \
-		cc -I"$tmpdir" "$input"
+		cc --no-default-config -I"$tmpdir" "$input"
 done
 "$SOURCE_DIR/scripts/analyze-trace.py" "$flow_trace" >"$tmpdir/flow.out"
 if ! awk '
@@ -87,7 +88,7 @@ parallel_trace=$tmpdir/parallel.jsonl
 pids=
 for worker in 1 2 3 4 5 6 7 8; do
 	"$SEMINDEX" compiler --trace="$parallel_trace" --no-store-command --variant="trace-$worker" \
-		--database="$db" -- cc "$source" >"$tmpdir/worker-$worker.out" \
+		--database="$db" -- cc --no-default-config "$source" >"$tmpdir/worker-$worker.out" \
 		2>"$tmpdir/worker-$worker.err" &
 	pids="$pids $!"
 done
@@ -137,7 +138,8 @@ if ! grep -q '^Translation units: 1$' "$tmpdir/escaped.out" ||
 fi
 
 if "$SEMINDEX" compiler --trace="$tmpdir/missing/trace.jsonl" --no-store-command \
-	--database="$db" -- cc "$source" >"$tmpdir/open.out" 2>"$tmpdir/open.err"; then
+	--database="$db" -- cc --no-default-config "$source" \
+	>"$tmpdir/open.out" 2>"$tmpdir/open.err"; then
 	fail "unwritable trace path succeeded"
 fi
 if ! grep -q 'failed to open trace' "$tmpdir/open.err"; then
