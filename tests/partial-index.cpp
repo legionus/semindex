@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-#include "semindex_internal.h"
+#include "semindex.h"
 
 #include <cstdio>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -9,12 +10,15 @@ struct PartialCase {
 	const char *file;
 	semindex_index_status_t status;
 	std::vector<const char *> symbols;
+	size_t minimum_uses = 0;
 };
 
 static bool hasSymbol(const semindex_t *index, const char *name)
 {
-	for (const auto &symbol : index->symbols) {
-		if (symbol.name == name)
+	for (size_t i = 0; i < semindex_symbol_count(index); i++) {
+		const semindex_symbol_t *symbol = semindex_get_symbol(index, i);
+
+		if (symbol && !std::strcmp(symbol->name, name))
 			return true;
 	}
 	return false;
@@ -62,11 +66,19 @@ static int runCase(const char *compiler, const char *directory, const PartialCas
 		std::fprintf(stderr, "%s: partial result has no errors\n", test.file);
 		goto out;
 	}
+	if (test.status == SEMINDEX_INDEX_FAILED && semindex_symbol_count(index)) {
+		std::fprintf(stderr, "%s: failed result exposes symbols\n", test.file);
+		goto out;
+	}
 	for (const char *name : test.symbols) {
 		if (!hasSymbol(index, name)) {
 			std::fprintf(stderr, "%s: missing recovered symbol '%s'\n", test.file, name);
 			goto out;
 		}
+	}
+	if (semindex_use_count(index) < test.minimum_uses) {
+		std::fprintf(stderr, "%s: missing recovered uses\n", test.file);
+		goto out;
 	}
 	ret = 0;
 out:
@@ -80,7 +92,7 @@ int main(int argc, char **argv)
 		{ "clean.c", SEMINDEX_INDEX_CLEAN, { "clean_symbol" } },
 		{ "semantic.c", SEMINDEX_INDEX_PARTIAL, { "before_semantic", "after_semantic" } },
 		{ "local-syntax.c", SEMINDEX_INDEX_PARTIAL, { "before_local_syntax", "after_local_syntax" } },
-		{ "broken-delimiter.c", SEMINDEX_INDEX_PARTIAL, { "before_delimiter", "after_delimiter" } },
+		{ "broken-delimiter.c", SEMINDEX_INDEX_PARTIAL, { "before_delimiter", "after_delimiter" }, 1 },
 		{ "missing-header.c", SEMINDEX_INDEX_PARTIAL, { "before_missing_header", "after_missing_header" } },
 		{ "not-present.c", SEMINDEX_INDEX_FAILED, {} },
 	};

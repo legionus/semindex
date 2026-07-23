@@ -223,7 +223,7 @@ int semindex_index_command(semindex_t *s, const semindex_compile_command_t *cmd)
 		s->index_result.status = SEMINDEX_INDEX_PARTIAL;
 	else
 		s->index_result.status = SEMINDEX_INDEX_FAILED;
-	if (ret == 0)
+	if (s->has_index_data)
 		rebuildRecords(s);
 
 	return ret;
@@ -293,7 +293,7 @@ int semindex_build_file_fingerprints(semindex_t *s)
 
 size_t semindex_symbol_count(const semindex_t *s)
 {
-	return s ? s->symbols.size() : 0;
+	return s ? s->symbol_records.size() : 0;
 }
 
 const semindex_symbol_t *semindex_get_symbol(const semindex_t *s, size_t idx)
@@ -306,7 +306,7 @@ const semindex_symbol_t *semindex_get_symbol(const semindex_t *s, size_t idx)
 
 size_t semindex_use_count(const semindex_t *s)
 {
-	return s ? s->uses.size() : 0;
+	return s ? s->use_records.size() : 0;
 }
 
 const semindex_use_t *semindex_get_use(const semindex_t *s, size_t idx)

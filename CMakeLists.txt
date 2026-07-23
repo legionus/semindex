@@ -225,10 +225,7 @@ if(BUILD_TESTING)
 	add_executable(semindex_partial_index_test
 		tests/partial-index.cpp
 	)
-	target_include_directories(semindex_partial_index_test PRIVATE src)
-	target_compile_options(semindex_partial_index_test PRIVATE ${LLVM_CXXFLAGS})
-	target_link_directories(semindex_partial_index_test PRIVATE ${LLVM_LIBDIR})
-	target_link_libraries(semindex_partial_index_test PRIVATE semindex_parser ${LLVM_LIBS})
+	target_link_libraries(semindex_partial_index_test PRIVATE semindex_parser)
 
 	foreach(test_source IN ITEMS
 		tests/test.c
