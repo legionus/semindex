@@ -59,18 +59,16 @@ The project is split into two layers.
 
 Only the implementation library is written in C++. All public interfaces are exposed through a plain C API.
 
-## Project goals
+## Future work
 
-The intended capabilities include:
+The remaining long-term work is to deepen the semantic model beyond the
+implemented symbol index, direct call graph, and SQLite queries. This includes:
 
-* semantic symbol database;
-* indexing of declarations and references;
-* accurate type information;
-* struct/union/enum relationships;
-* typedef resolution;
-* function call graph;
-* SQLite backend;
-* semantic search similar to the original Sparse semind.
+* persistent, queryable type relationships;
+* expanded typedef relationships;
+* richer struct, union, and enum relationships;
+* indirect-call target resolution;
+* semantic queries beyond the original Sparse semind interface.
 
 ## Building
 
