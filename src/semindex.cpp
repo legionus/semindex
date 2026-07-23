@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "semindex_internal.h"
 
+#include <clang/Basic/Diagnostic.h>
 #include <clang/Tooling/CompilationDatabase.h>
 #include <clang/Tooling/Tooling.h>
 
@@ -13,6 +14,13 @@
 #include <vector>
 
 using namespace clang::tooling;
+
+void captureDiagnostics(semindex *s, const clang::DiagnosticsEngine &diagnostics)
+{
+	s->index_result.warnings = diagnostics.getNumWarnings();
+	s->index_result.errors = diagnostics.getNumErrors();
+	s->index_result.fatal = diagnostics.hasFatalErrorOccurred();
+}
 
 static std::unique_ptr<CompilationDatabase> loadCompileCommands(const char *compile_commands_json, std::string &error)
 {
@@ -66,6 +74,8 @@ static void clearIndex(semindex_t *s)
 	s->command_arguments.clear();
 	s->command_argv.clear();
 	s->command_record = {};
+	s->index_result = { SEMINDEX_INDEX_FAILED, 0, 0, 0 };
+	s->has_index_data = false;
 }
 
 static void saveCompileCommand(semindex_t *s, const semindex_compile_command_t *cmd)
@@ -207,6 +217,12 @@ int semindex_index_command(semindex_t *s, const semindex_compile_command_t *cmd)
 		: createSemindexActionFactory(s);
 	int ret = tool.run(factory.get());
 
+	if (ret == 0 && s->has_index_data && !s->index_result.errors)
+		s->index_result.status = SEMINDEX_INDEX_CLEAN;
+	else if (s->has_index_data)
+		s->index_result.status = SEMINDEX_INDEX_PARTIAL;
+	else
+		s->index_result.status = SEMINDEX_INDEX_FAILED;
 	if (ret == 0)
 		rebuildRecords(s);
 
@@ -251,6 +267,11 @@ int semindex_index_file(semindex_t *s, const char *compile_commands_json, const 
 	cmd.argv = argv.data();
 
 	return semindex_index_command(s, &cmd);
+}
+
+const semindex_index_result_t *semindex_get_index_result(const semindex_t *s)
+{
+	return s ? &s->index_result : nullptr;
 }
 
 const semindex_compile_command_t *semindex_get_compile_command(const semindex_t *s)

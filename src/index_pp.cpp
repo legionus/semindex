@@ -156,6 +156,12 @@ protected:
 
 		CI.getPreprocessor().addPPCallbacks(createSemindexPPCallbacks(index));
 		PreprocessOnlyAction::ExecuteAction();
+		out->has_index_data = true;
+	}
+
+	void EndSourceFileAction() override
+	{
+		captureDiagnostics(out, getCompilerInstance().getDiagnostics());
 	}
 
 private:

@@ -49,12 +49,25 @@ typedef enum {
 	SEMINDEX_SCOPE_ALL,
 } semindex_scope_t;
 
+typedef enum {
+	SEMINDEX_INDEX_CLEAN,	/* frontend completed without errors */
+	SEMINDEX_INDEX_PARTIAL, /* frontend produced index data with errors */
+	SEMINDEX_INDEX_FAILED,	/* frontend produced no usable index data */
+} semindex_index_status_t;
+
 typedef struct {
 	const char *directory;
 	const char *file;
 	size_t argc;
 	const char *const *argv;
 } semindex_compile_command_t;
+
+typedef struct {
+	semindex_index_status_t status;
+	unsigned warnings;
+	unsigned errors;
+	int fatal;
+} semindex_index_result_t;
 
 /* symbol record */
 typedef struct {
@@ -112,6 +125,8 @@ void semindex_set_include_local(semindex_t *s, int enabled);
 int semindex_index_command(semindex_t *s, const semindex_compile_command_t *cmd);
 int semindex_index_file(semindex_t *s, const char *compile_commands_json, const char *source_file);
 int semindex_build_file_fingerprints(semindex_t *s);
+/* returned pointer is valid until the next index operation or destroy */
+const semindex_index_result_t *semindex_get_index_result(const semindex_t *s);
 /* returned pointers are valid until the next index operation or destroy */
 const semindex_compile_command_t *semindex_get_compile_command(const semindex_t *s);
 

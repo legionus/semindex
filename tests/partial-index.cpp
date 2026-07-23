@@ -7,6 +7,7 @@
 
 struct PartialCase {
 	const char *file;
+	semindex_index_status_t status;
 	std::vector<const char *> symbols;
 };
 
@@ -36,13 +37,29 @@ static int runCase(const char *compiler, const char *directory, const PartialCas
 		.argv = arguments,
 	};
 	semindex_t *index;
+	const semindex_index_result_t *result;
 	int ret = -1;
 
 	index = semindex_create();
 	if (!index)
 		return -1;
-	if (semindex_index_command(index, &command) == 0) {
-		std::fprintf(stderr, "%s: indexing unexpectedly succeeded\n", test.file);
+	ret = semindex_index_command(index, &command);
+	result = semindex_get_index_result(index);
+	if (!result || result->status != test.status) {
+		std::fprintf(stderr, "%s: expected status %d, got %d\n", test.file, test.status,
+			result ? result->status : -1);
+		goto out;
+	}
+	if ((test.status == SEMINDEX_INDEX_CLEAN) != (ret == 0)) {
+		std::fprintf(stderr, "%s: status disagrees with frontend result\n", test.file);
+		goto out;
+	}
+	if (test.status == SEMINDEX_INDEX_CLEAN && result->errors) {
+		std::fprintf(stderr, "%s: clean result has %u errors\n", test.file, result->errors);
+		goto out;
+	}
+	if (test.status == SEMINDEX_INDEX_PARTIAL && !result->errors) {
+		std::fprintf(stderr, "%s: partial result has no errors\n", test.file);
 		goto out;
 	}
 	for (const char *name : test.symbols) {
@@ -60,10 +77,12 @@ out:
 int main(int argc, char **argv)
 {
 	const std::vector<PartialCase> tests = {
-		{ "semantic.c", { "before_semantic", "after_semantic" } },
-		{ "local-syntax.c", { "before_local_syntax", "after_local_syntax" } },
-		{ "broken-delimiter.c", { "before_delimiter", "after_delimiter" } },
-		{ "missing-header.c", { "before_missing_header", "after_missing_header" } },
+		{ "clean.c", SEMINDEX_INDEX_CLEAN, { "clean_symbol" } },
+		{ "semantic.c", SEMINDEX_INDEX_PARTIAL, { "before_semantic", "after_semantic" } },
+		{ "local-syntax.c", SEMINDEX_INDEX_PARTIAL, { "before_local_syntax", "after_local_syntax" } },
+		{ "broken-delimiter.c", SEMINDEX_INDEX_PARTIAL, { "before_delimiter", "after_delimiter" } },
+		{ "missing-header.c", SEMINDEX_INDEX_PARTIAL, { "before_missing_header", "after_missing_header" } },
+		{ "not-present.c", SEMINDEX_INDEX_FAILED, {} },
 	};
 
 	if (argc != 3) {

@@ -758,16 +758,19 @@ private:
 class SemindexASTConsumer : public ASTConsumer
 {
 public:
-	SemindexASTConsumer(ASTContext &ctx, SemindexContext index) : index(index), visitor(ctx, this->index)
+	SemindexASTConsumer(semindex *out, ASTContext &ctx, SemindexContext index)
+	    : out(out), index(index), visitor(ctx, this->index)
 	{
 	}
 
 	void HandleTranslationUnit(ASTContext &ctx) override
 	{
+		out->has_index_data = true;
 		visitor.TraverseDecl(ctx.getTranslationUnitDecl());
 	}
 
 private:
+	semindex *out;
 	SemindexContext index;
 	SemindexVisitor visitor;
 };
@@ -785,7 +788,12 @@ public:
 
 		CI.getPreprocessor().addPPCallbacks(createSemindexPPCallbacks(index));
 
-		return std::make_unique<SemindexASTConsumer>(CI.getASTContext(), index);
+		return std::make_unique<SemindexASTConsumer>(out, CI.getASTContext(), index);
+	}
+
+	void EndSourceFileAction() override
+	{
+		captureDiagnostics(out, getCompilerInstance().getDiagnostics());
 	}
 
 private:

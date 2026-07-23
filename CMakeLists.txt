@@ -36,6 +36,7 @@ set(SEMINDEX_FORMAT_SOURCES
 	tests/database-api.c
 	tests/partial-index.cpp
 	tests/partial/broken-delimiter.c
+	tests/partial/clean.c
 	tests/partial/local-syntax.c
 	tests/partial/missing-header.c
 	tests/partial/semantic.c
