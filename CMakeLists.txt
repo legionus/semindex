@@ -34,6 +34,11 @@ set(SEMINDEX_FORMAT_SOURCES
 	tests/callgraph-a.c
 	tests/callgraph-b.c
 	tests/database-api.c
+	tests/partial-index.cpp
+	tests/partial/broken-delimiter.c
+	tests/partial/local-syntax.c
+	tests/partial/missing-header.c
+	tests/partial/semantic.c
 	tests/test.c
 	tests/test1.c
 	tests/test2.c
@@ -216,6 +221,14 @@ if(BUILD_TESTING)
 	)
 	target_link_libraries(semindex_database_api_test PRIVATE semindex_database)
 
+	add_executable(semindex_partial_index_test
+		tests/partial-index.cpp
+	)
+	target_include_directories(semindex_partial_index_test PRIVATE src)
+	target_compile_options(semindex_partial_index_test PRIVATE ${LLVM_CXXFLAGS})
+	target_link_directories(semindex_partial_index_test PRIVATE ${LLVM_LIBDIR})
+	target_link_libraries(semindex_partial_index_test PRIVATE semindex_parser ${LLVM_LIBS})
+
 	foreach(test_source IN ITEMS
 		tests/test.c
 		tests/test1.c
@@ -308,6 +321,13 @@ if(BUILD_TESTING)
 			COMPILE_COMMANDS=${SEMINDEX_TEST_COMPILE_COMMANDS}
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-database-api-tests.sh
+	)
+	add_test(
+		NAME semindex-partial-index
+		COMMAND
+			$<TARGET_FILE:semindex_partial_index_test>
+			${CMAKE_C_COMPILER}
+			${CMAKE_CURRENT_SOURCE_DIR}/tests/partial
 	)
 	add_test(
 		NAME semindex-command-database
