@@ -26,6 +26,7 @@ static int prepare(semindex_db_t *db, const char *sql, sqlite3_stmt **stmt)
 	int ret;
 
 	ret = sqlite3_prepare_v3(db->handle, sql, -1, SQLITE_PREPARE_PERSISTENT, stmt, NULL);
+
 	if (ret != SQLITE_OK) {
 		fprintf(stderr, "semindex: sqlite: %s\n", sqlite3_errmsg(db->handle));
 		return -1;
@@ -50,6 +51,7 @@ static semindex_db_record_type_t record_type(int record, int action)
 {
 	if (record == STORED_RECORD_USE)
 		return SEMINDEX_DB_REFERENCE;
+
 	return action ? SEMINDEX_DB_DEFINITION : SEMINDEX_DB_DECLARATION;
 }
 
@@ -62,6 +64,7 @@ static int emit_records(semindex_db_t *db, sqlite3_stmt *stmt, semindex_db_recor
 	while ((step = sqlite3_step(stmt)) == SQLITE_ROW) {
 		int stored_record = sqlite3_column_int(stmt, 4);
 		unsigned action = sqlite3_column_int(stmt, 5);
+
 		semindex_db_record_t record = {
 			.variant = column_text(stmt, 0),
 			.path = column_text(stmt, 1),
@@ -84,10 +87,12 @@ static int emit_records(semindex_db_t *db, sqlite3_stmt *stmt, semindex_db_recor
 
 			name = name ? name + 1 : record.symbol;
 			length = strlen(name);
+
 			if (position_column < record.column || position_column - record.column >= length)
 				continue;
 		}
 		ret = callback(data, &record);
+
 		if (ret)
 			goto out;
 	}
@@ -107,10 +112,13 @@ int semindex_db_open(const char *path, semindex_db_t **result)
 
 	if (!path || !result)
 		return -1;
+
 	*result = NULL;
 	db = calloc(1, sizeof(*db));
+
 	if (!db)
 		return -1;
+
 	if (sqlite3_open_v2(path, &db->handle, SQLITE_OPEN_READONLY, NULL) != SQLITE_OK) {
 		fprintf(stderr, "semindex: failed to open database '%s': %s\n", path,
 			db->handle ? sqlite3_errmsg(db->handle) : "unknown error");
@@ -129,6 +137,7 @@ void semindex_db_close(semindex_db_t *db)
 {
 	if (!db)
 		return;
+
 	if (db->handle)
 		sqlite3_close(db->handle);
 	free(db);
@@ -138,6 +147,7 @@ int semindex_db_query(semindex_db_t *db, const semindex_db_query_options_t *opts
 	semindex_db_record_callback_t callback, void *data)
 {
 	semindex_db_query_options_t defaults = { 0 };
+
 	sqlite3_str *query = NULL;
 	sqlite3_stmt *stmt = NULL;
 	char *sql = NULL;
@@ -145,30 +155,39 @@ int semindex_db_query(semindex_db_t *db, const semindex_db_query_options_t *opts
 
 	if (!db || !callback)
 		return -1;
+
 	if (!opts)
 		opts = &defaults;
+
 	if (opts->record < SEMINDEX_DB_RECORD_ALL || opts->record > SEMINDEX_DB_RECORD_REFERENCE)
 		return -1;
 
 	query = sqlite3_str_new(db->handle);
+
 	if (!query)
 		goto out;
+
 	sqlite3_str_appendall(query,
 		"SELECT files.variant, files.path, records.line, records.column, records.record, records.action, "
 		"records.kind, records.symbol, records.context, records.mode, records.usr_id, "
 		"records.context_usr_id, records.local "
 		"FROM records JOIN files ON files.id = records.file_id WHERE 1");
+
 	if (opts->symbol)
 		sqlite3_str_appendf(query, " AND records.symbol %s %Q", pattern_uses_glob(opts->symbol) ? "GLOB" : "=",
 			opts->symbol);
+
 	if (opts->path)
 		sqlite3_str_appendf(query, " AND files.path %s %Q", pattern_uses_glob(opts->path) ? "GLOB" : "=",
 			opts->path);
+
 	if (opts->variant)
 		sqlite3_str_appendf(query, " AND files.variant %s %Q", pattern_uses_glob(opts->variant) ? "GLOB" : "=",
 			opts->variant);
+
 	if (opts->context)
 		sqlite3_str_appendf(query, " AND records.context = %Q", opts->context);
+
 	switch (opts->record) {
 	case SEMINDEX_DB_RECORD_ALL:
 		break;
@@ -194,19 +213,24 @@ int semindex_db_query(semindex_db_t *db, const semindex_db_query_options_t *opts
 	}
 	if (opts->has_kind)
 		sqlite3_str_appendf(query, " AND records.kind = %d", opts->kind);
+
 	if (opts->has_usr_id)
 		sqlite3_str_appendf(query, " AND records.usr_id = 0x%016llx", opts->usr_id);
+
 	if (opts->has_local)
 		sqlite3_str_appendf(query, " AND records.local = %d", !!opts->local);
 	sqlite3_str_appendall(query,
 		" ORDER BY files.variant, files.path, records.line, records.column, records.record");
+
 	if (sqlite3_str_errcode(query) != SQLITE_OK)
 		goto out;
 
 	sql = sqlite3_str_finish(query);
 	query = NULL;
+
 	if (!sql || prepare(db, sql, &stmt) < 0)
 		goto out;
+
 	ret = emit_records(db, stmt, callback, data, 0);
 out:
 	if (query)
@@ -252,19 +276,24 @@ int semindex_db_query_calls(semindex_db_t *db, const semindex_db_call_options_t 
 		"AND records.record = 1 AND records.action = 3 AND records.kind = 7 "
 		"ORDER BY records.symbol, files.path, records.line, records.column";
 	const char *sql;
+
 	sqlite3_stmt *stmt = NULL;
 	int ret = -1;
 
 	if (!db || !opts || !opts->function || !opts->function[0] || !callback)
 		return -1;
+
 	if (opts->direction != SEMINDEX_DB_CALLERS && opts->direction != SEMINDEX_DB_CALLEES)
 		return -1;
+
 	if (opts->direction == SEMINDEX_DB_CALLERS)
 		sql = opts->variant ? callers_variant : callers;
 	else
 		sql = opts->variant ? callees_variant : callees;
+
 	if (prepare(db, sql, &stmt) < 0)
 		goto out;
+
 	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 1, opts->function));
 	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int64(stmt, 2, (sqlite3_int64)opts->usr_id));
 
@@ -287,9 +316,12 @@ static int query_function_batch(semindex_db_t *db, const semindex_db_function_t 
 	int ret = -1;
 
 	query = sqlite3_str_new(db->handle);
+
 	if (!query)
 		goto out;
+
 	sqlite3_str_appendall(query, "WITH requested(variant, symbol, usr_id) AS (VALUES ");
+
 	for (i = 0; i < count; i++)
 		sqlite3_str_appendf(query, "%s(?, ?, ?)", i ? ", " : "");
 	sqlite3_str_appendall(query,
@@ -301,12 +333,16 @@ static int query_function_batch(semindex_db_t *db, const semindex_db_function_t 
 		"WHERE records.record = 0 AND records.kind = 7 "
 		"ORDER BY files.variant, records.symbol, records.action DESC, files.path, records.line, "
 		"records.column");
+
 	if (sqlite3_str_errcode(query) != SQLITE_OK)
 		goto out;
+
 	sql = sqlite3_str_finish(query);
 	query = NULL;
+
 	if (!sql || prepare(db, sql, &stmt) < 0)
 		goto out;
+
 	for (i = 0; i < count; i++) {
 		int column = i * 3 + 1;
 
@@ -333,16 +369,20 @@ int semindex_db_query_functions(semindex_db_t *db, const semindex_db_function_t 
 
 	if (!db || (!functions && count) || !callback)
 		return -1;
+
 	if (!count)
 		return 0;
+
 	for (i = 0; i < count; i++) {
 		if (!functions[i].variant || !functions[i].variant[0] || !functions[i].symbol ||
 			!functions[i].symbol[0])
 			return -1;
 	}
 	batch_size = sqlite3_limit(db->handle, SQLITE_LIMIT_VARIABLE_NUMBER, -1) / 3;
+
 	if (!batch_size)
 		return -1;
+
 	for (offset = 0; offset < count; offset += batch_size) {
 		size_t remaining = count - offset;
 		size_t current = remaining < batch_size ? remaining : batch_size;
@@ -377,8 +417,10 @@ int semindex_db_find_at(semindex_db_t *db, const char *path, const char *variant
 
 	if (!db || !path || !path[0] || !line || !column || !callback)
 		return -1;
+
 	if (prepare(db, variant ? with_variant : all_variants, &stmt) < 0)
 		goto out;
+
 	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 1, path));
 
 	if (variant)

@@ -17,6 +17,7 @@ static int same_string(const char *a, const char *b)
 {
 	if (!a)
 		a = "";
+
 	if (!b)
 		b = "";
 
@@ -37,6 +38,7 @@ static void print_dissect_symbol(FILE *out, const semindex_symbol_t *sym)
 	const char *action = sym->definition ? "def" : "decl";
 
 	symbol_name = symbol_name_for_dissect(sym->owner, sym->name, name, sizeof(name));
+
 	if (sym->type && sym->type[0])
 		fprintf(out, "%4u:%-3u %-16s %s %c %c %-32s %s\n", sym->line, sym->column, sym->context, action,
 			sym->local ? '.' : ' ', output_symbol_kind_char(sym->kind), symbol_name, sym->type);
@@ -53,6 +55,7 @@ static void print_dissect_use(FILE *out, const semindex_use_t *use)
 
 	symbol_name = symbol_name_for_dissect(use->owner, use->name, name, sizeof(name));
 	output_mode_string(use->mode, mode);
+
 	if (use->type && use->type[0])
 		fprintf(out, "%4u:%-3u %-16s %s %c %c %-32s %s\n", use->line, use->column, use->context, mode,
 			use->local ? '.' : ' ', output_symbol_kind_char(use->symbol_kind), symbol_name, use->type);
@@ -78,6 +81,7 @@ int output_dissect(FILE *out, semindex_t *s)
 
 		if (symbol_index < symbol_count)
 			sym = semindex_get_symbol(s, symbol_index);
+
 		if (use_index < use_count)
 			use = semindex_get_use(s, use_index);
 

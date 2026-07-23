@@ -16,6 +16,7 @@ extern "C" {
 char *command_db_default_path(const char *index_database);
 int command_db_store(const char *path, const char *variant, const char *directory, const char *file, size_t argc,
 	const char *const *argv);
+
 /* Returns zero when found, one when absent, and minus one on error. */
 int command_db_load(const char *path, const char *variant, const char *file, command_db_command_t **result);
 const semindex_compile_command_t *command_db_command_get(const command_db_command_t *command);

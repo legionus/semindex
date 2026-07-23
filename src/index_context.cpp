@@ -76,6 +76,7 @@ static void updateFingerprints(FileFingerprintState &state, int local, int recor
 	hashRecord(state.hash[0], record, action, kind, mode, owner, name, line, column, context, usr_id,
 		context_usr_id, local);
 	state.records[0]++;
+
 	if (state.has_local) {
 		hashRecord(state.hash[1], record, action, kind, mode, owner, name, line, column, context, usr_id,
 			context_usr_id, local);
@@ -113,6 +114,7 @@ static unsigned displayColumnForLoc(const clang::ASTContext &ctx, clang::SourceL
 		ptr--;
 
 	const char *end = sm.getCharacterData(spelling, &invalid);
+
 	while (!invalid && ptr < end) {
 		if (*ptr == '\t')
 			col = ((col - 1) / 8 + 1) * 8 + 1;
@@ -153,10 +155,12 @@ static bool locInScope(const clang::SourceManager &sm, semindex_scope_t scope, c
 
 	if (scope == SEMINDEX_SCOPE_ALL)
 		return true;
+
 	if (loc.isInvalid())
 		return false;
 
 	spelling = sm.getSpellingLoc(loc);
+
 	if (scope == SEMINDEX_SCOPE_FILE)
 		return sm.isWrittenInMainFile(spelling);
 
@@ -333,6 +337,7 @@ void rebuildFingerprints(semindex *s)
 	s->file_fingerprints[0].reserve(s->files.size());
 	s->file_fingerprints[1].reserve(s->files.size());
 	index = 0;
+
 	for (const auto &file : s->files) {
 		semindex_file_fingerprint_t nonlocal;
 		semindex_file_fingerprint_t all;

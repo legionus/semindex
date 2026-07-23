@@ -72,12 +72,15 @@ int cmd_index(int argc, char **argv)
 	const char *commands_database = NULL;
 	const char *variant = "general";
 	const char *trace_path = NULL;
+
 	semindex_trace_t *trace = NULL;
 	semindex_trace_time_t phase_start;
 	semindex_trace_time_t total_start = 0;
+
 	semindex_t *s = NULL;
 	const semindex_index_result_t *index_result;
 	const semindex_compile_command_t *cmd;
+
 	char *default_commands_database = NULL;
 	int index_ret;
 	int ret = 1;
@@ -86,6 +89,7 @@ int cmd_index(int argc, char **argv)
 	int opt;
 
 	optind = 1;
+
 	while ((opt = getopt_long(argc, argv, "f:s:c:d:h", long_options, NULL)) != -1) {
 		switch (opt) {
 		case 1:
@@ -124,6 +128,7 @@ int cmd_index(int argc, char **argv)
 		case 'h':
 			index_help();
 			return 0;
+
 		default:
 			index_usage(stderr);
 			return 1;
@@ -148,6 +153,7 @@ int cmd_index(int argc, char **argv)
 	}
 	if (store_command && !commands_database) {
 		default_commands_database = command_db_default_path(database);
+
 		if (!default_commands_database) {
 			fprintf(stderr, "semindex: failed to allocate command database path\n");
 			return 1;
@@ -157,8 +163,10 @@ int cmd_index(int argc, char **argv)
 
 	if (trace_path) {
 		trace = semindex_trace_open(trace_path, "index", source_file);
+
 		if (!trace)
 			goto out;
+
 		total_start = semindex_trace_begin(trace);
 	}
 
@@ -169,6 +177,7 @@ int cmd_index(int argc, char **argv)
 	phase_start = semindex_trace_begin(trace);
 	index_ret = semindex_index_file(s, compile_commands, source_file);
 	index_result = semindex_get_index_result(s);
+
 	if (index_ret != 0 || !index_result || index_result->status != SEMINDEX_INDEX_CLEAN) {
 		semindex_trace_end(trace, "parse", phase_start);
 		fprintf(stderr, "semindex: failed to index '%s' using '%s'\n", source_file, compile_commands);
@@ -176,6 +185,7 @@ int cmd_index(int argc, char **argv)
 	}
 	semindex_trace_end(trace, "parse", phase_start);
 	phase_start = semindex_trace_begin(trace);
+
 	if (semindex_build_file_fingerprints(s) < 0) {
 		semindex_trace_end(trace, "fingerprint", phase_start);
 		fprintf(stderr, "semindex: failed to fingerprint '%s'\n", source_file);
@@ -183,14 +193,17 @@ int cmd_index(int argc, char **argv)
 	}
 	semindex_trace_end(trace, "fingerprint", phase_start);
 	phase_start = semindex_trace_begin(trace);
+
 	if (index_db_store(database, s, source_file, variant, include_local, trace) < 0) {
 		semindex_trace_end(trace, "symbol_database", phase_start);
 		goto out;
 	}
 	semindex_trace_end(trace, "symbol_database", phase_start);
 	cmd = semindex_get_compile_command(s);
+
 	if (store_command) {
 		phase_start = semindex_trace_begin(trace);
+
 		if (!cmd ||
 			command_db_store(commands_database, variant, cmd->directory, cmd->file, cmd->argc, cmd->argv) <
 				0) {
@@ -207,11 +220,13 @@ int cmd_index(int argc, char **argv)
 
 out:
 	phase_start = semindex_trace_begin(trace);
+
 	if (s)
 		semindex_destroy(s);
 	free(default_commands_database);
 	semindex_trace_end(trace, "cleanup", phase_start);
 	semindex_trace_end(trace, "total", total_start);
+
 	if (semindex_trace_close(trace) < 0)
 		ret = 1;
 	return ret;

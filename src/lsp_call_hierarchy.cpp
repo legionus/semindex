@@ -84,17 +84,22 @@ static bool parsePosition(const llvm::json::Object *params, llvm::StringRef &uri
 {
 	if (!params)
 		return false;
+
 	const llvm::json::Object *document = params->getObject("textDocument");
 	const llvm::json::Object *position = params->getObject("position");
+
 	if (!document || !position)
 		return false;
+
 	auto parsed_uri = document->getString("uri");
 	auto parsed_line = position->getInteger("line");
 	auto parsed_character = position->getInteger("character");
+
 	if (!parsed_uri || !parsed_line || !parsed_character || *parsed_line < 0 || *parsed_character < 0 ||
 		*parsed_line >= std::numeric_limits<unsigned>::max() ||
 		*parsed_character > std::numeric_limits<unsigned>::max())
 		return false;
+
 	uri = *parsed_uri;
 	line = *parsed_line;
 	character = *parsed_character;
@@ -113,14 +118,18 @@ static bool parseIdentity(const llvm::json::Object *params, const std::string &v
 {
 	const llvm::json::Object *item = params ? params->getObject("item") : nullptr;
 	const llvm::json::Object *data = item ? item->getObject("data") : nullptr;
+
 	if (!data)
 		return false;
+
 	auto parsed_variant = data->getString("variant");
 	auto symbol = data->getString("symbol");
 	auto id = data->getString("id");
+
 	if (!parsed_variant || parsed_variant->empty() || !symbol || symbol->empty() || !id || id->empty() ||
 		id->size() > 16 || (!variant.empty() && *parsed_variant != variant))
 		return false;
+
 	identity.variant = parsed_variant->str();
 	identity.symbol = symbol->str();
 	auto parsed = std::from_chars(id->begin(), id->end(), identity.usr_id, 16);
@@ -161,6 +170,7 @@ static int loadFunctionRecords(semindex_db_t *database, const std::vector<Functi
 	std::vector<semindex_db_function_t> functions;
 
 	functions.reserve(identities.size());
+
 	for (const auto &identity : identities)
 		functions.push_back(semindex_db_function_t{
 			.variant = identity.variant.c_str(),
@@ -204,6 +214,7 @@ static int collectCall(void *data, const semindex_db_record_t *record)
 	FunctionIdentity identity;
 
 	identity.variant = record->variant;
+
 	if (collector.direction == SEMINDEX_DB_CALLERS) {
 		identity.symbol = record->context;
 		identity.usr_id = record->context_usr_id;
@@ -213,6 +224,7 @@ static int collectCall(void *data, const semindex_db_record_t *record)
 	}
 	if (identity.symbol.empty() || !identity.usr_id)
 		return 0;
+
 	collector.groups[std::move(identity)].push_back(copyRecord(*record));
 	return 0;
 }
@@ -230,17 +242,21 @@ LspCallHierarchy::Status LspCallHierarchy::prepare(const llvm::json::Object *par
 
 	if (!parsePosition(params, uri, line, character))
 		return Status::InvalidParams;
+
 	auto column = sources.byteColumn(uri, line, character);
+
 	if (!column) {
 		result = nullptr;
 		return Status::Success;
 	}
 
 	FunctionCollector collector;
+
 	for (const auto &path : sources.databasePaths(uri)) {
 		if (semindex_db_find_at(database, path.c_str(), variant.empty() ? nullptr : variant.c_str(), line + 1,
 			    *column, collectFunctionIdentity, &collector) < 0)
 			return Status::DatabaseError;
+
 		if (!collector.identities.empty())
 			break;
 	}
@@ -252,10 +268,13 @@ LspCallHierarchy::Status LspCallHierarchy::prepare(const llvm::json::Object *par
 	llvm::json::Array items;
 	std::vector<FunctionIdentity> identities(collector.identities.begin(), collector.identities.end());
 	FunctionRecordCollector functions;
+
 	if (loadFunctionRecords(database, identities, functions) < 0)
 		return Status::DatabaseError;
+
 	for (const auto &identity : identities) {
 		auto function = functions.records.find(identity);
+
 		if (function != functions.records.end())
 			items.push_back(hierarchyItem(sources, identity, function->second));
 	}
@@ -267,34 +286,43 @@ LspCallHierarchy::Status LspCallHierarchy::calls(const llvm::json::Object *param
 	semindex_db_call_direction_t direction, llvm::json::Value &result) const
 {
 	FunctionIdentity requested;
+
 	if (!parseIdentity(params, variant, requested))
 		return Status::InvalidParams;
 
 	semindex_db_call_options_t options = {};
+
 	options.function = requested.symbol.c_str();
 	options.variant = requested.variant.c_str();
 	options.usr_id = requested.usr_id;
 	options.direction = direction;
 	CallCollector collector{ direction };
+
 	if (semindex_db_query_calls(database, &options, collectCall, &collector) < 0)
 		return Status::DatabaseError;
 
 	std::vector<FunctionIdentity> identities;
+
 	identities.reserve(collector.groups.size());
+
 	for (const auto &entry : collector.groups)
 		identities.push_back(entry.first);
 	FunctionRecordCollector functions;
+
 	if (loadFunctionRecords(database, identities, functions) < 0)
 		return Status::DatabaseError;
 
 	llvm::json::Array calls;
+
 	for (const auto &[identity, records] : collector.groups) {
 		auto function = functions.records.find(identity);
 		const CallRecord &location = function != functions.records.end() ? function->second : records.front();
 		llvm::json::Array ranges;
 		LspSourceMapper::Cache cache;
+
 		for (const auto &record : records) {
 			semindex_db_record_t view = record.view();
+
 			ranges.push_back(sources.range(view, cache));
 		}
 		calls.push_back(llvm::json::Object{

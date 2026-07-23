@@ -23,15 +23,18 @@ public:
 	void MacroDefined(const Token &macroNameTok, const MacroDirective *) override
 	{
 		IdentifierInfo *ident = macroNameTok.getIdentifierInfo();
+
 		if (!ident)
 			return;
 
 		SourceLocation loc = macroNameTok.getLocation();
 		SemindexSymbol s;
+
 		s.kind = SEMINDEX_SYMBOL_MACRO;
 		s.name = ident->getName().str();
 		s.owner = "";
 		s.type = "";
+
 		if (index.details())
 			s.usr = "macro:" + s.name;
 		s.context = "";
@@ -45,6 +48,7 @@ public:
 	void MacroExpands(const Token &macroNameTok, const MacroDefinition &, SourceRange, const MacroArgs *) override
 	{
 		SourceLocation spelling = index.spellingLoc(macroNameTok.getLocation());
+
 		addMacroUse(macroNameTok, spelling);
 	}
 
@@ -99,12 +103,14 @@ private:
 		std::string target = includeTarget(fileName, isAngled, file);
 
 		SemindexUse u;
+
 		u.kind = SEMINDEX_USE_READ;
 		u.symbol_kind = SEMINDEX_SYMBOL_FILE;
 		u.mode = SEMINDEX_MODE_R_VAL;
 		u.name = target;
 		u.owner = "";
 		u.type = "";
+
 		if (index.details())
 			u.usr = "file:" + target;
 		u.context = "";
@@ -117,18 +123,21 @@ private:
 	void addMacroUse(const Token &macroNameTok, SourceLocation loc)
 	{
 		IdentifierInfo *ident = macroNameTok.getIdentifierInfo();
+
 		if (!ident)
 			return;
 
 		SourceLocation spelling = index.spellingLoc(loc);
 
 		SemindexUse u;
+
 		u.kind = SEMINDEX_USE_READ;
 		u.symbol_kind = SEMINDEX_SYMBOL_MACRO;
 		u.mode = SEMINDEX_MODE_R_VAL;
 		u.name = ident->getName().str();
 		u.owner = "";
 		u.type = "";
+
 		if (index.details())
 			u.usr = "macro:" + u.name;
 		u.context = "";

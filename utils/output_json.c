@@ -6,22 +6,31 @@ static const char *symbol_kind_string(semindex_symbol_kind_t kind)
 	switch (kind) {
 	case SEMINDEX_SYMBOL_VAR:
 		return "variable";
+
 	case SEMINDEX_SYMBOL_FIELD:
 		return "field";
+
 	case SEMINDEX_SYMBOL_STRUCT:
 		return "struct";
+
 	case SEMINDEX_SYMBOL_UNION:
 		return "union";
+
 	case SEMINDEX_SYMBOL_ENUM:
 		return "enum";
+
 	case SEMINDEX_SYMBOL_ENUM_CONSTANT:
 		return "enumerator";
+
 	case SEMINDEX_SYMBOL_TYPEDEF:
 		return "typedef";
+
 	case SEMINDEX_SYMBOL_FUNCTION:
 		return "function";
+
 	case SEMINDEX_SYMBOL_MACRO:
 		return "macro";
+
 	case SEMINDEX_SYMBOL_FILE:
 		return "file";
 	}
@@ -34,10 +43,13 @@ static const char *use_kind_string(semindex_use_kind_t kind)
 	switch (kind) {
 	case SEMINDEX_USE_READ:
 		return "read";
+
 	case SEMINDEX_USE_WRITE:
 		return "write";
+
 	case SEMINDEX_USE_ADDR:
 		return "address";
+
 	case SEMINDEX_USE_CALL:
 		return "call";
 	}
@@ -55,6 +67,7 @@ static void print_json_string(FILE *out, const char *value)
 	}
 
 	fputc('"', out);
+
 	for (p = (const unsigned char *)value; *p; p++) {
 		switch (*p) {
 		case '"':
@@ -165,12 +178,14 @@ int output_json(FILE *out, semindex_t *s)
 
 	fputs("{\n  \"version\": 1,\n  \"symbols\": [\n", out);
 	count = semindex_symbol_count(s);
+
 	for (size_t i = 0; i < count; i++) {
 		print_json_symbol(out, semindex_get_symbol(s, i));
 		fputs(i + 1 < count ? ",\n" : "\n", out);
 	}
 	fputs("  ],\n  \"uses\": [\n", out);
 	count = semindex_use_count(s);
+
 	for (size_t i = 0; i < count; i++) {
 		print_json_use(out, semindex_get_use(s, i));
 		fputs(i + 1 < count ? ",\n" : "\n", out);

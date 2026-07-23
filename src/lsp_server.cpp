@@ -60,6 +60,7 @@ static int collectCursorRecord(void *data, const semindex_db_record_t *record)
 {
 	auto &collector = *static_cast<CursorCollector *>(data);
 	CursorRecord copy;
+
 	copy.variant = record->variant;
 	copy.path = record->path;
 	copy.symbol = record->symbol;
@@ -79,10 +80,12 @@ static int collectLocation(void *data, const semindex_db_record_t *record)
 
 	if (!collector.excluded_uri.empty() && collector.sources.uri(record->path) == collector.excluded_uri)
 		return 0;
+
 	std::string key =
 		std::string(record->path) + ':' + std::to_string(record->line) + ':' + std::to_string(record->column);
 
 	collector.records++;
+
 	if (collector.keys.insert(std::move(key)).second)
 		collector.locations.push_back(collector.sources.location(*record, collector.source_cache));
 	return 0;
@@ -92,10 +95,13 @@ static int highlightKind(const semindex_db_record_t &record)
 {
 	if (record.record != SEMINDEX_DB_REFERENCE)
 		return DOCUMENT_HIGHLIGHT_TEXT;
+
 	if (record.action == SEMINDEX_USE_READ)
 		return DOCUMENT_HIGHLIGHT_READ;
+
 	if (record.action == SEMINDEX_USE_WRITE)
 		return DOCUMENT_HIGHLIGHT_WRITE;
+
 	return DOCUMENT_HIGHLIGHT_TEXT;
 }
 
@@ -105,9 +111,11 @@ static int collectHighlight(void *data, const semindex_db_record_t *record)
 
 	if (!collector.excluded_uri.empty() && collector.sources.uri(record->path) == collector.excluded_uri)
 		return 0;
+
 	std::string key =
 		std::string(record->path) + ':' + std::to_string(record->line) + ':' + std::to_string(record->column);
 	int kind = highlightKind(*record);
+
 	auto [entry, inserted] = collector.indices.emplace(std::move(key), collector.highlights.size());
 
 	if (inserted) {
@@ -122,17 +130,22 @@ static bool parsePosition(const llvm::json::Object *params, llvm::StringRef &uri
 {
 	if (!params)
 		return false;
+
 	const llvm::json::Object *document = params->getObject("textDocument");
 	const llvm::json::Object *position = params->getObject("position");
+
 	if (!document || !position)
 		return false;
+
 	auto parsed_uri = document->getString("uri");
 	auto parsed_line = position->getInteger("line");
 	auto parsed_character = position->getInteger("character");
+
 	if (!parsed_uri || !parsed_line || !parsed_character || *parsed_line < 0 || *parsed_character < 0 ||
 		*parsed_line >= std::numeric_limits<unsigned>::max() ||
 		*parsed_character > std::numeric_limits<unsigned>::max())
 		return false;
+
 	uri = *parsed_uri;
 	line = *parsed_line;
 	character = *parsed_character;
@@ -143,18 +156,23 @@ static void setWorkspaceRoot(LspSourceMapper &sources, const llvm::json::Object 
 {
 	if (!params)
 		return;
+
 	if (auto root_uri = params->getString("rootUri")) {
 		if (sources.setRootUri(*root_uri))
 			return;
 	}
 
 	const llvm::json::Array *folders = params->getArray("workspaceFolders");
+
 	if (!folders)
 		return;
+
 	for (const llvm::json::Value &folder : *folders) {
 		const llvm::json::Object *object = folder.getAsObject();
+
 		if (!object)
 			continue;
+
 		if (auto uri = object->getString("uri")) {
 			if (sources.setRootUri(*uri))
 				return;
@@ -172,6 +190,7 @@ static int querySymbol(semindex_db_t *database, const LspOverlay &overlay, const
 	semindex_db_record_filter_t filter, LocationCollector &collector)
 {
 	semindex_db_query_options_t options = {};
+
 	options.symbol = cursor.symbol.c_str();
 	options.variant = cursor.variant.c_str();
 	options.context = cursor.local ? cursor.context.c_str() : nullptr;
@@ -181,11 +200,14 @@ static int querySymbol(semindex_db_t *database, const LspOverlay &overlay, const
 
 	collector.excluded_uri.clear();
 	unsigned before = collector.records;
+
 	if (overlay.contains(cursor.path) &&
 		overlay.query(cursor.path, cursor.variant.c_str(), options, collectLocation, &collector) < 0)
 		return -1;
+
 	if (collector.records != before)
 		collector.excluded_uri = collector.sources.uri(cursor.path.c_str());
+
 	if (!cursor.local) {
 		int ret = semindex_db_query(database, &options, collectLocation, &collector);
 
@@ -194,6 +216,7 @@ static int querySymbol(semindex_db_t *database, const LspOverlay &overlay, const
 	}
 	for (const auto &path : collector.sources.databasePaths(collector.sources.uri(cursor.path.c_str()))) {
 		options.path = path.c_str();
+
 		if (semindex_db_query(database, &options, collectLocation, &collector) < 0) {
 			collector.excluded_uri.clear();
 			return -1;
@@ -208,21 +231,25 @@ static int symbolsAt(semindex_db_t *database, const LspOverlay &overlay, const s
 	std::vector<CursorRecord> &records)
 {
 	auto column = sources.byteColumn(uri, line, character);
+
 	if (!column)
 		return 0;
 
 	CursorCollector collector;
+
 	for (const auto &path : sources.databasePaths(uri)) {
 		if (overlay.contains(path)) {
 			if (overlay.findAt(path, variant.empty() ? nullptr : variant.c_str(), line + 1, *column,
 				    collectCursorRecord, &collector) < 0)
 				return -1;
+
 			if (!collector.records.empty())
 				break;
 		}
 		if (semindex_db_find_at(database, path.c_str(), variant.empty() ? nullptr : variant.c_str(), line + 1,
 			    *column, collectCursorRecord, &collector) < 0)
 			return -1;
+
 		if (!collector.records.empty())
 			break;
 	}
@@ -238,24 +265,31 @@ bool LspServer::definition(const llvm::json::Value &id, const llvm::json::Object
 
 	if (!parsePosition(params, uri, line, character))
 		return error(&id, INVALID_PARAMS, "Invalid params");
+
 	std::vector<CursorRecord> cursors;
 	const LspOverlay &overlay = indexer.overlay();
+
 	if (symbolsAt(database, overlay, variant, sources, uri, line, character, cursors) < 0)
 		return error(&id, INTERNAL_ERROR, "Database query failed");
+
 	if (cursors.empty())
 		return reply(id, nullptr);
 
 	LocationCollector collector{ sources };
+
 	for (const auto &cursor : cursors) {
 		unsigned before = collector.records;
+
 		if (querySymbol(database, overlay, cursor, SEMINDEX_DB_RECORD_DEFINITION, collector) < 0)
 			return error(&id, INTERNAL_ERROR, "Database query failed");
+
 		if (collector.records == before &&
 			querySymbol(database, overlay, cursor, SEMINDEX_DB_RECORD_DECLARATION, collector) < 0)
 			return error(&id, INTERNAL_ERROR, "Database query failed");
 	}
 	if (collector.locations.empty())
 		return reply(id, nullptr);
+
 	return reply(id, std::move(collector.locations));
 }
 
@@ -267,17 +301,22 @@ bool LspServer::references(const llvm::json::Value &id, const llvm::json::Object
 
 	if (!parsePosition(params, uri, line, character))
 		return error(&id, INVALID_PARAMS, "Invalid params");
+
 	std::vector<CursorRecord> cursors;
 	const LspOverlay &overlay = indexer.overlay();
+
 	if (symbolsAt(database, overlay, variant, sources, uri, line, character, cursors) < 0)
 		return error(&id, INTERNAL_ERROR, "Database query failed");
+
 	LocationCollector collector{ sources };
+
 	for (const auto &cursor : cursors) {
 		if (querySymbol(database, overlay, cursor, SEMINDEX_DB_RECORD_REFERENCE, collector) < 0)
 			return error(&id, INTERNAL_ERROR, "Database query failed");
 	}
 
 	bool include_declaration = false;
+
 	if (const llvm::json::Object *context = params->getObject("context")) {
 		if (auto include = context->getBoolean("includeDeclaration"))
 			include_declaration = *include;
@@ -299,14 +338,18 @@ bool LspServer::documentHighlight(const llvm::json::Value &id, const llvm::json:
 
 	if (!parsePosition(params, uri, line, character))
 		return error(&id, INVALID_PARAMS, "Invalid params");
+
 	std::vector<CursorRecord> cursors;
 	const LspOverlay &overlay = indexer.overlay();
+
 	if (symbolsAt(database, overlay, variant, sources, uri, line, character, cursors) < 0)
 		return error(&id, INTERNAL_ERROR, "Database query failed");
 
 	HighlightCollector collector{ sources };
+
 	for (const auto &cursor : cursors) {
 		semindex_db_query_options_t options = {};
+
 		options.symbol = cursor.symbol.c_str();
 		options.path = cursor.path.c_str();
 		options.variant = cursor.variant.c_str();
@@ -316,13 +359,17 @@ bool LspServer::documentHighlight(const llvm::json::Value &id, const llvm::json:
 		options.local = cursor.local;
 		collector.excluded_uri.clear();
 		unsigned before = collector.highlights.size();
+
 		if (overlay.contains(cursor.path) &&
 			overlay.query(cursor.path, cursor.variant.c_str(), options, collectHighlight, &collector) < 0)
 			return error(&id, INTERNAL_ERROR, "Database query failed");
+
 		if (collector.highlights.size() != before)
 			collector.excluded_uri = sources.uri(cursor.path.c_str());
+
 		for (const auto &path : sources.databasePaths(uri)) {
 			options.path = path.c_str();
+
 			if (semindex_db_query(database, &options, collectHighlight, &collector) < 0) {
 				collector.excluded_uri.clear();
 				return error(&id, INTERNAL_ERROR, "Database query failed");
@@ -332,7 +379,9 @@ bool LspServer::documentHighlight(const llvm::json::Value &id, const llvm::json:
 	}
 
 	llvm::json::Array result;
+
 	result.reserve(collector.highlights.size());
+
 	for (auto &highlight : collector.highlights) {
 		result.push_back(llvm::json::Object{
 			{ "range", std::move(highlight.range) },
@@ -359,15 +408,18 @@ bool LspServer::didSave(const llvm::json::Object *params)
 		return true;
 	}
 	LspIndexResult result = indexer.update(*file);
+
 	if (result.status == LspIndexResult::Status::Failed && !result.error.empty())
 		std::cerr << "semindex-lsp: " << result.error << '\n';
 
 	llvm::json::Array diagnostics;
 	LspSourceMapper::Cache cache;
+
 	for (const auto &diagnostic : result.diagnostics) {
 		if (diagnostic.file.empty() || sources.uri(diagnostic.file.c_str()) != uri)
 			continue;
 		const char *symbol = " ";
+
 		semindex_db_record_t record = {
 			.path = diagnostic.file.c_str(),
 			.symbol = symbol,
@@ -400,8 +452,10 @@ bool LspServer::hierarchyReply(const llvm::json::Value &id, LspCallHierarchy::St
 {
 	if (status == LspCallHierarchy::Status::InvalidParams)
 		return error(&id, INVALID_PARAMS, "Invalid params");
+
 	if (status == LspCallHierarchy::Status::DatabaseError)
 		return error(&id, INTERNAL_ERROR, "Database query failed");
+
 	return reply(id, std::move(result));
 }
 
@@ -439,6 +493,7 @@ bool LspServer::dispatch(const llvm::json::Object &message)
 	if (*method == "exit") {
 		if (id)
 			return error(id, INVALID_REQUEST, "Invalid Request");
+
 		exit_status = state == State::Shutdown ? 0 : 1;
 		exiting = true;
 		return true;
@@ -447,6 +502,7 @@ bool LspServer::dispatch(const llvm::json::Object &message)
 	if (*method == "initialize") {
 		if (!id || state != State::Uninitialized)
 			return error(id, INVALID_REQUEST, "Invalid Request");
+
 		setWorkspaceRoot(sources, message.getObject("params"));
 		state = State::Running;
 		return reply(*id,
@@ -473,20 +529,26 @@ bool LspServer::dispatch(const llvm::json::Object &message)
 
 	if (state == State::Uninitialized)
 		return id ? error(id, SERVER_NOT_INITIALIZED, "Server not initialized") : true;
+
 	if (state == State::Shutdown)
 		return id ? error(id, INVALID_REQUEST, "Invalid Request") : true;
 
 	if (*method == "initialized")
 		return id ? error(id, INVALID_REQUEST, "Invalid Request") : true;
+
 	if (*method == "textDocument/definition")
 		return id ? definition(*id, message.getObject("params")) : true;
+
 	if (*method == "textDocument/documentHighlight")
 		return id ? documentHighlight(*id, message.getObject("params")) : true;
+
 	if (*method == "textDocument/references")
 		return id ? references(*id, message.getObject("params")) : true;
+
 	if (*method == "textDocument/prepareCallHierarchy") {
 		if (!id)
 			return true;
+
 		llvm::json::Value result(nullptr);
 		auto status = call_hierarchy.prepare(message.getObject("params"), result);
 
@@ -495,6 +557,7 @@ bool LspServer::dispatch(const llvm::json::Object &message)
 	if (*method == "callHierarchy/incomingCalls") {
 		if (!id)
 			return true;
+
 		llvm::json::Value result(nullptr);
 		auto status = call_hierarchy.incoming(message.getObject("params"), result);
 
@@ -503,6 +566,7 @@ bool LspServer::dispatch(const llvm::json::Object &message)
 	if (*method == "callHierarchy/outgoingCalls") {
 		if (!id)
 			return true;
+
 		llvm::json::Value result(nullptr);
 		auto status = call_hierarchy.outgoing(message.getObject("params"), result);
 
@@ -510,9 +574,11 @@ bool LspServer::dispatch(const llvm::json::Object &message)
 	}
 	if (*method == "textDocument/didSave")
 		return id ? error(id, INVALID_REQUEST, "Invalid Request") : didSave(message.getObject("params"));
+
 	if (*method == "shutdown") {
 		if (!id)
 			return true;
+
 		state = State::Shutdown;
 		return reply(*id, nullptr);
 	}
@@ -528,20 +594,26 @@ int LspServer::run()
 
 		if (read == LspTransport::ReadResult::EndOfFile)
 			break;
+
 		if (read == LspTransport::ReadResult::Error)
 			return 1;
 
 		auto parsed = llvm::json::parse(payload);
+
 		if (!parsed) {
 			llvm::consumeError(parsed.takeError());
+
 			if (!error(nullptr, PARSE_ERROR, "Parse error"))
 				return 1;
+
 			continue;
 		}
 		const llvm::json::Object *message = parsed->getAsObject();
+
 		if (!message) {
 			if (!error(nullptr, INVALID_REQUEST, "Invalid Request"))
 				return 1;
+
 			continue;
 		}
 		if (!dispatch(*message))

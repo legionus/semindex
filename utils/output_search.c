@@ -9,6 +9,7 @@
 struct output_search {
 	FILE *out;
 	const char *format;
+
 	char *path;
 	FILE *source;
 	char *text;
@@ -41,9 +42,12 @@ static int open_source(output_search_t *search, const char *path)
 	search->source = NULL;
 	search->line = 0;
 	search->length = 0;
+
 	if (!search->path)
 		return -1;
+
 	search->source = fopen(path, "r");
+
 	if (!search->source) {
 		fprintf(stderr, "semindex: failed to open source file '%s': %s\n", path, strerror(errno));
 		return -1;
@@ -56,6 +60,7 @@ static int print_source_line(output_search_t *search, const char *path, int line
 {
 	if (open_source(search, path) < 0)
 		return -1;
+
 	if (line < search->line) {
 		rewind(search->source);
 		search->line = 0;
@@ -63,6 +68,7 @@ static int print_source_line(output_search_t *search, const char *path, int line
 	while (search->line < line) {
 		errno = 0;
 		search->length = getline(&search->text, &search->capacity, search->source);
+
 		if (search->length < 0) {
 			if (errno)
 				fprintf(stderr, "semindex: failed to read source file '%s': %s\n", path,
@@ -75,6 +81,7 @@ static int print_source_line(output_search_t *search, const char *path, int line
 	}
 	if (search->length > 0 && search->text[search->length - 1] == '\n')
 		search->length--;
+
 	if (fwrite(search->text, 1, search->length, search->out) != (size_t)search->length)
 		return -1;
 
@@ -87,9 +94,12 @@ output_search_t *output_search_create(FILE *out, const char *format)
 
 	if (!out)
 		return NULL;
+
 	search = calloc(1, sizeof(*search));
+
 	if (!search)
 		return NULL;
+
 	search->out = out;
 	search->format = format ? format : OUTPUT_SEARCH_DEFAULT_FORMAT;
 
@@ -100,6 +110,7 @@ void output_search_destroy(output_search_t *search)
 {
 	if (!search)
 		return;
+
 	if (search->source)
 		fclose(search->source);
 	free(search->path);
@@ -113,13 +124,16 @@ int output_search_write(output_search_t *search, const output_search_record_t *r
 
 	if (!search || !record)
 		return -1;
+
 	for (p = search->format; *p; p++) {
 		char c = *p;
 
 		if (c == '\\') {
 			c = *++p;
+
 			if (!c)
 				break;
+
 			switch (c) {
 			case 't':
 				c = '\t';
@@ -140,6 +154,7 @@ int output_search_write(output_search_t *search, const output_search_record_t *r
 		}
 
 		c = *++p;
+
 		if (!c) {
 			fprintf(stderr, "semindex: unexpected end of format string\n");
 			return -1;
@@ -175,6 +190,7 @@ int output_search_write(output_search_t *search, const output_search_record_t *r
 		case 's':
 			if (print_source_line(search, record->file, record->line) < 0)
 				return -1;
+
 			break;
 		default:
 			fprintf(stderr, "semindex: invalid format specification: %%%c\n", c);

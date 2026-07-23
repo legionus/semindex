@@ -56,6 +56,7 @@ int cmd_callgraph(int argc, char **argv)
 	int opt;
 
 	optind = 1;
+
 	while ((opt = getopt_long(argc, argv, "p:d:h", long_options, NULL)) != -1) {
 		switch (opt) {
 		case 1:
@@ -95,6 +96,7 @@ int cmd_callgraph(int argc, char **argv)
 			}
 			errno = 0;
 			opts.id = strtoull(optarg, &end, 16);
+
 			if (errno || end == optarg || *end) {
 				fprintf(stderr, "semindex: invalid function ID: %s\n", optarg);
 				return 1;
@@ -114,6 +116,7 @@ int cmd_callgraph(int argc, char **argv)
 		case 'h':
 			callgraph_help();
 			return 0;
+
 		default:
 			callgraph_usage(stderr);
 			return 1;

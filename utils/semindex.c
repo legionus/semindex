@@ -36,6 +36,7 @@ int parse_format(const char *value, enum output_format *format)
 {
 	if (!strcmp(value, "dissect"))
 		*format = FORMAT_DISSECT;
+
 	else if (!strcmp(value, "json"))
 		*format = FORMAT_JSON;
 	else
@@ -48,8 +49,10 @@ int parse_scope(const char *value, semindex_scope_t *scope)
 {
 	if (!strcmp(value, "file"))
 		*scope = SEMINDEX_SCOPE_FILE;
+
 	else if (!strcmp(value, "project"))
 		*scope = SEMINDEX_SCOPE_PROJECT;
+
 	else if (!strcmp(value, "all"))
 		*scope = SEMINDEX_SCOPE_ALL;
 	else
@@ -79,6 +82,7 @@ int main(int argc, char **argv)
 		case 'h':
 			semindex_help();
 			return 0;
+
 		default:
 			semindex_usage(stderr);
 			return 1;
@@ -92,12 +96,16 @@ int main(int argc, char **argv)
 
 	if (!strcmp(argv[optind], "compiler"))
 		return cmd_compiler(argc - optind, argv + optind);
+
 	if (!strcmp(argv[optind], "callgraph"))
 		return cmd_callgraph(argc - optind, argv + optind);
+
 	if (!strcmp(argv[optind], "compile-commands"))
 		return cmd_compile_commands(argc - optind, argv + optind);
+
 	if (!strcmp(argv[optind], "index"))
 		return cmd_index(argc - optind, argv + optind);
+
 	if (!strcmp(argv[optind], "search"))
 		return cmd_search(argc - optind, argv + optind);
 

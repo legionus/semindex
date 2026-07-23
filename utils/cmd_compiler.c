@@ -56,6 +56,7 @@ static int has_suffix(const char *str, const char *suffix)
 
 	str_len = strlen(str);
 	suffix_len = strlen(suffix);
+
 	if (str_len < suffix_len)
 		return 0;
 
@@ -103,6 +104,7 @@ static int option_takes_joined_or_next_arg(const char *arg)
 
 		if (!strcmp(arg, opt))
 			return 1;
+
 		if (!strncmp(arg, opt, len) && arg[len])
 			return 0;
 	}
@@ -122,6 +124,7 @@ static int find_source_file(int argc, char **argv, const char **source_file)
 
 		if (!strcmp(arg, "-c"))
 			continue;
+
 		if (!strcmp(arg, "-E")) {
 			preprocess_only = 1;
 			continue;
@@ -147,6 +150,7 @@ static int find_source_file(int argc, char **argv, const char **source_file)
 
 	if (preprocess_only || assemble_only)
 		return -1;
+
 	if (sources != 1)
 		return -1;
 
@@ -174,13 +178,16 @@ int cmd_compiler(int argc, char **argv)
 	const char *variant = "general";
 	const char *source_file = NULL;
 	const char *trace_path = NULL;
+
 	semindex_trace_t *trace = NULL;
 	semindex_trace_time_t phase_start;
 	semindex_trace_time_t total_start = 0;
+
 	semindex_t *s = NULL;
 	const semindex_index_result_t *index_result;
 	semindex_compile_command_t cmd;
 	int compiler_argc;
+
 	char **compiler_argv;
 	char **default_argv = NULL;
 	char *default_commands_database = NULL;
@@ -192,6 +199,7 @@ int cmd_compiler(int argc, char **argv)
 	int opt;
 
 	optind = 1;
+
 	while ((opt = getopt_long(argc, argv, "+d:f:s:h", long_options, NULL)) != -1) {
 		switch (opt) {
 		case 1:
@@ -228,6 +236,7 @@ int cmd_compiler(int argc, char **argv)
 		case 'h':
 			compiler_help();
 			return 0;
+
 		default:
 			compiler_usage(stderr);
 			return 1;
@@ -236,6 +245,7 @@ int cmd_compiler(int argc, char **argv)
 
 	if (optind < argc && !strcmp(argv[optind], "--"))
 		optind++;
+
 	if (optind >= argc) {
 		compiler_usage(stderr);
 		return 1;
@@ -247,8 +257,10 @@ int cmd_compiler(int argc, char **argv)
 
 	compiler_argc = argc - optind;
 	compiler_argv = argv + optind;
+
 	if (compiler_is_omitted(compiler_argv[0])) {
 		default_argv = calloc(compiler_argc + 1, sizeof(*default_argv));
+
 		if (!default_argv) {
 			fprintf(stderr, "semindex: failed to allocate compiler arguments\n");
 			return 1;
@@ -265,6 +277,7 @@ int cmd_compiler(int argc, char **argv)
 	}
 	if (store_command && !commands_database) {
 		default_commands_database = command_db_default_path(database);
+
 		if (!default_commands_database) {
 			fprintf(stderr, "semindex: failed to allocate command database path\n");
 			free(default_argv);
@@ -275,8 +288,10 @@ int cmd_compiler(int argc, char **argv)
 
 	if (trace_path) {
 		trace = semindex_trace_open(trace_path, "compiler", source_file);
+
 		if (!trace)
 			goto out;
+
 		total_start = semindex_trace_begin(trace);
 	}
 
@@ -293,6 +308,7 @@ int cmd_compiler(int argc, char **argv)
 	phase_start = semindex_trace_begin(trace);
 	index_ret = semindex_index_command(s, &cmd);
 	index_result = semindex_get_index_result(s);
+
 	if (index_ret != 0 || !index_result || index_result->status != SEMINDEX_INDEX_CLEAN) {
 		semindex_trace_end(trace, "parse", phase_start);
 		fprintf(stderr, "semindex: failed to index compiler command for '%s'\n", source_file);
@@ -300,6 +316,7 @@ int cmd_compiler(int argc, char **argv)
 	}
 	semindex_trace_end(trace, "parse", phase_start);
 	phase_start = semindex_trace_begin(trace);
+
 	if (semindex_build_file_fingerprints(s) < 0) {
 		semindex_trace_end(trace, "fingerprint", phase_start);
 		fprintf(stderr, "semindex: failed to fingerprint '%s'\n", source_file);
@@ -307,13 +324,16 @@ int cmd_compiler(int argc, char **argv)
 	}
 	semindex_trace_end(trace, "fingerprint", phase_start);
 	phase_start = semindex_trace_begin(trace);
+
 	if (index_db_store(database, s, source_file, variant, include_local, trace) < 0) {
 		semindex_trace_end(trace, "symbol_database", phase_start);
 		goto out;
 	}
 	semindex_trace_end(trace, "symbol_database", phase_start);
+
 	if (store_command) {
 		phase_start = semindex_trace_begin(trace);
+
 		if (command_db_store(commands_database, variant, cmd.directory, source_file, compiler_argc,
 			    (const char *const *)compiler_argv) < 0) {
 			semindex_trace_end(trace, "command_database", phase_start);
@@ -329,12 +349,14 @@ int cmd_compiler(int argc, char **argv)
 
 out:
 	phase_start = semindex_trace_begin(trace);
+
 	if (s)
 		semindex_destroy(s);
 	free(default_commands_database);
 	free(default_argv);
 	semindex_trace_end(trace, "cleanup", phase_start);
 	semindex_trace_end(trace, "total", total_start);
+
 	if (semindex_trace_close(trace) < 0)
 		ret = 1;
 	return ret;

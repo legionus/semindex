@@ -39,11 +39,13 @@ int cmd_compile_commands(int argc, char **argv)
 	const char *database = ".semindex/commands.db";
 	const char *variant = "general";
 	const char *output = NULL;
+
 	FILE *out = stdout;
 	int ret;
 	int opt;
 
 	optind = 1;
+
 	while ((opt = getopt_long(argc, argv, "d:o:h", long_options, NULL)) != -1) {
 		switch (opt) {
 		case 1:
@@ -58,6 +60,7 @@ int cmd_compile_commands(int argc, char **argv)
 		case 'h':
 			compile_commands_help();
 			return 0;
+
 		default:
 			compile_commands_usage(stderr);
 			return 1;
@@ -74,6 +77,7 @@ int cmd_compile_commands(int argc, char **argv)
 	}
 	if (output) {
 		out = fopen(output, "w");
+
 		if (!out) {
 			perror("semindex: failed to open output file");
 			return 1;
@@ -81,6 +85,7 @@ int cmd_compile_commands(int argc, char **argv)
 	}
 
 	ret = command_db_export(database, variant, out);
+
 	if (output && fclose(out) != 0) {
 		perror("semindex: failed to close output file");
 		ret = -1;

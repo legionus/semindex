@@ -52,8 +52,10 @@ static int parse_record(const char *value, index_db_record_t *record)
 {
 	if (!strcmp(value, "all"))
 		*record = INDEX_DB_RECORD_ALL;
+
 	else if (!strcmp(value, "symbol"))
 		*record = INDEX_DB_RECORD_SYMBOL;
+
 	else if (!strcmp(value, "use"))
 		*record = INDEX_DB_RECORD_USE;
 	else
@@ -66,22 +68,31 @@ static int parse_kind(const char *value, int *kind)
 {
 	if (!strcmp(value, "var"))
 		*kind = SEMINDEX_SYMBOL_VAR;
+
 	else if (!strcmp(value, "field"))
 		*kind = SEMINDEX_SYMBOL_FIELD;
+
 	else if (!strcmp(value, "struct"))
 		*kind = SEMINDEX_SYMBOL_STRUCT;
+
 	else if (!strcmp(value, "union"))
 		*kind = SEMINDEX_SYMBOL_UNION;
+
 	else if (!strcmp(value, "enum"))
 		*kind = SEMINDEX_SYMBOL_ENUM;
+
 	else if (!strcmp(value, "enumerator"))
 		*kind = SEMINDEX_SYMBOL_ENUM_CONSTANT;
+
 	else if (!strcmp(value, "typedef"))
 		*kind = SEMINDEX_SYMBOL_TYPEDEF;
+
 	else if (!strcmp(value, "function"))
 		*kind = SEMINDEX_SYMBOL_FUNCTION;
+
 	else if (!strcmp(value, "macro"))
 		*kind = SEMINDEX_SYMBOL_MACRO;
+
 	else if (!strcmp(value, "file"))
 		*kind = SEMINDEX_SYMBOL_FILE;
 	else
@@ -134,6 +145,7 @@ static int parse_mode(const char *value, index_db_search_options_t *opts)
 	}
 
 	opts->mode = 0;
+
 	for (i = 0; i < 3; i++) {
 		switch (expanded[i]) {
 		case 'r':
@@ -176,6 +188,7 @@ int cmd_search(int argc, char **argv)
 	int opt;
 
 	optind = 1;
+
 	while ((opt = getopt_long(argc, argv, "+d:p:f:m:r:k:h", long_options, NULL)) != -1) {
 		switch (opt) {
 		case 1:
@@ -212,6 +225,7 @@ int cmd_search(int argc, char **argv)
 		case 'h':
 			search_help();
 			return 0;
+
 		default:
 			search_usage(stderr);
 			return 1;

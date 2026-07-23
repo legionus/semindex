@@ -257,7 +257,9 @@ static int init_schema(sqlite3 *db)
 commit:
 	if (exec_sql(db, "COMMIT") < 0)
 		return -1;
+
 	return 0;
+
 rollback:
 	exec_sql(db, "ROLLBACK");
 	return -1;
@@ -544,6 +546,7 @@ static int stage_files(sqlite3 *db, semindex_t *s, const char *main_file, const 
 		if (stat(fingerprint->file, &st) == 0) {
 			mtime_ns = stat_mtime_ns(&st);
 			size = st.st_size;
+
 			if (have_main_stat && st.st_dev == main_stat.st_dev && st.st_ino == main_stat.st_ino)
 				is_main = 1;
 		}
@@ -674,6 +677,7 @@ static int cached_files_valid(sqlite3 *db, const char *variant)
 
 	if (step == SQLITE_DONE)
 		ret = 1;
+
 	else if (step == SQLITE_ROW)
 		ret = 0;
 	else
@@ -776,9 +780,11 @@ static int merge_staging(sqlite3 *db, const char *variant, uint64_t staged_recor
 
 	ret = 0;
 	goto out;
+
 rollback:
 	exec_sql(db, "ROLLBACK");
 	goto out;
+
 stale:
 	exec_sql(db, "ROLLBACK");
 	ret = 1;
@@ -809,6 +815,7 @@ int index_db_store(const char *path, semindex_t *s, const char *main_file, const
 
 	if (cached_count) {
 		cached = calloc(cached_count, sizeof(*cached));
+
 		if (!cached)
 			return -1;
 	}
@@ -912,6 +919,7 @@ struct search_output {
 static int print_search_result(void *data, const semindex_db_record_t *record)
 {
 	struct search_output *output = data;
+
 	output_search_record_t result = {
 		.variant = record->variant,
 		.file = record->path,
@@ -948,6 +956,7 @@ int index_db_search(const char *path, const index_db_search_options_t *opts, FIL
 		.record = INDEX_DB_RECORD_ALL,
 	};
 	semindex_db_query_options_t query = { 0 };
+
 	semindex_db_t *db = NULL;
 	struct search_output output = { 0 };
 	int ret = -1;
@@ -976,8 +985,10 @@ int index_db_search(const char *path, const index_db_search_options_t *opts, FIL
 
 	if (opts->mode_definition)
 		query.record = SEMINDEX_DB_RECORD_DEFINITION;
+
 	else if (opts->record == INDEX_DB_RECORD_SYMBOL)
 		query.record = SEMINDEX_DB_RECORD_SYMBOL;
+
 	else if (opts->record == INDEX_DB_RECORD_USE)
 		query.record = SEMINDEX_DB_RECORD_REFERENCE;
 
@@ -1015,6 +1026,7 @@ static int print_callgraph_results(sqlite3 *db, const char *sql, int show_id, FI
 			if (fprintf(out, "%s\t%016llx\t%s\t%016llx\t%s:%s:%d:%d\n", caller, caller_id, callee,
 				    callee_id, variant, file, line, column) < 0)
 				goto out;
+
 		} else if (fprintf(out, "%s -> %s\t%s:%s:%d:%d\n", caller, callee, variant, file, line, column) < 0) {
 			goto out;
 		}
@@ -1041,12 +1053,15 @@ int index_db_callgraph(const char *path, const index_db_callgraph_options_t *opt
 
 	if (!path || !opts || !opts->function || !opts->function[0] || !out)
 		return -1;
+
 	if (open_reader(path, &db) < 0)
 		goto out;
 
 	query = sqlite3_str_new(db);
+
 	if (!query)
 		goto out;
+
 	sqlite3_str_appendf(query,
 		"SELECT files.variant, records.context, records.context_usr_id, records.symbol, records.usr_id, "
 		"files.path, records.line, records.column "
@@ -1061,6 +1076,7 @@ int index_db_callgraph(const char *path, const index_db_callgraph_options_t *opt
 			sqlite3_str_appendf(query, " AND records.usr_id = 0x%016llx", opts->id);
 	} else {
 		sqlite3_str_appendf(query, " AND records.context = %Q", opts->function);
+
 		if (opts->has_id)
 			sqlite3_str_appendf(query, " AND records.context_usr_id = 0x%016llx", opts->id);
 	}

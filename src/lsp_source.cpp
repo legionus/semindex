@@ -11,10 +11,13 @@ static int hexDigit(char value)
 {
 	if (value >= '0' && value <= '9')
 		return value - '0';
+
 	if (value >= 'a' && value <= 'f')
 		return value - 'a' + 10;
+
 	if (value >= 'A' && value <= 'F')
 		return value - 'A' + 10;
+
 	return -1;
 }
 
@@ -22,17 +25,21 @@ static std::optional<std::filesystem::path> pathFromUri(llvm::StringRef uri)
 {
 	if (!uri.consume_front("file://"))
 		return std::nullopt;
+
 	if (!uri.starts_with('/')) {
 		size_t slash = uri.find('/');
 		llvm::StringRef authority = uri.take_front(slash);
 
 		if (slash == llvm::StringRef::npos || authority != "localhost")
 			return std::nullopt;
+
 		uri = uri.drop_front(slash);
 	}
 
 	std::string decoded;
+
 	decoded.reserve(uri.size());
+
 	for (size_t i = 0; i < uri.size(); i++) {
 		if (uri[i] != '%') {
 			decoded.push_back(uri[i]);
@@ -40,10 +47,13 @@ static std::optional<std::filesystem::path> pathFromUri(llvm::StringRef uri)
 		}
 		if (i + 2 >= uri.size())
 			return std::nullopt;
+
 		int high = hexDigit(uri[i + 1]);
 		int low = hexDigit(uri[i + 2]);
+
 		if (high < 0 || low < 0 || (!high && !low))
 			return std::nullopt;
+
 		decoded.push_back(static_cast<char>((high << 4) | low));
 		i += 2;
 	}
@@ -76,6 +86,7 @@ static bool readLine(const std::filesystem::path &path, unsigned line_number, st
 
 	if (!input)
 		return false;
+
 	for (unsigned current = 0; current <= line_number; current++) {
 		if (!std::getline(input, line))
 			return false;
@@ -91,8 +102,10 @@ static void readLines(const std::filesystem::path &path, std::vector<std::string
 	std::string line;
 
 	lines.clear();
+
 	if (!input)
 		return;
+
 	while (std::getline(input, line)) {
 		if (!line.empty() && line.back() == '\r')
 			line.pop_back();
@@ -104,6 +117,7 @@ static bool nextCodePoint(llvm::StringRef text, size_t &offset, uint32_t &codepo
 {
 	if (offset >= text.size())
 		return false;
+
 	unsigned char first = text[offset++];
 	unsigned length;
 
@@ -125,10 +139,13 @@ static bool nextCodePoint(llvm::StringRef text, size_t &offset, uint32_t &codepo
 	}
 	if (offset + length - 1 > text.size())
 		return false;
+
 	for (unsigned i = 1; i < length; i++) {
 		unsigned char continuation = text[offset++];
+
 		if ((continuation & 0xc0) != 0x80)
 			return false;
+
 		codepoint = (codepoint << 6) | (continuation & 0x3f);
 	}
 	return codepoint <= 0x10ffff && !(codepoint >= 0xd800 && codepoint <= 0xdfff);
@@ -141,11 +158,15 @@ static std::optional<size_t> byteOffset(llvm::StringRef text, unsigned utf16_col
 
 	while (units < utf16_column) {
 		uint32_t codepoint;
+
 		if (!nextCodePoint(text, offset, codepoint))
 			return std::nullopt;
+
 		unsigned width = codepoint > 0xffff ? 2 : 1;
+
 		if (units + width > utf16_column)
 			return std::nullopt;
+
 		units += width;
 	}
 	return offset;
@@ -158,8 +179,10 @@ static unsigned utf16Length(llvm::StringRef text)
 
 	while (offset < text.size()) {
 		uint32_t codepoint;
+
 		if (!nextCodePoint(text, offset, codepoint))
 			return text.size();
+
 		units += codepoint > 0xffff ? 2 : 1;
 	}
 	return units;
@@ -172,8 +195,10 @@ LspSourceMapper::LspSourceMapper() : root(std::filesystem::current_path())
 bool LspSourceMapper::setRootUri(llvm::StringRef uri)
 {
 	auto path = pathFromUri(uri);
+
 	if (!path || !path->is_absolute())
 		return false;
+
 	root = std::move(*path);
 	return true;
 }
@@ -184,6 +209,7 @@ std::optional<std::string> LspSourceMapper::filePath(llvm::StringRef uri) const
 
 	if (!path || !path->is_absolute())
 		return std::nullopt;
+
 	return path->string();
 }
 
@@ -191,14 +217,17 @@ std::vector<std::string> LspSourceMapper::databasePaths(llvm::StringRef uri) con
 {
 	std::vector<std::string> result;
 	auto path = pathFromUri(uri);
+
 	if (!path || !path->is_absolute())
 		return result;
 
 	result.push_back(path->string());
 	std::filesystem::path relative = path->lexically_relative(root);
+
 	if (!relative.empty() && *relative.begin() != "..")
 		result.push_back(relative.string());
 	std::filesystem::path cwd_relative = path->lexically_relative(std::filesystem::current_path());
+
 	if (!cwd_relative.empty() && *cwd_relative.begin() != ".." && (cwd_relative != relative || result.size() == 1))
 		result.push_back(cwd_relative.string());
 	return result;
@@ -211,9 +240,12 @@ std::optional<unsigned> LspSourceMapper::byteColumn(llvm::StringRef uri, unsigne
 
 	if (!path || !readLine(*path, line, text))
 		return std::nullopt;
+
 	auto offset = byteOffset(text, character);
+
 	if (!offset)
 		return std::nullopt;
+
 	return *offset + 1;
 }
 
@@ -242,12 +274,14 @@ llvm::json::Value LspSourceMapper::range(const semindex_db_record_t &record, Cac
 	if (const char *dot = strrchr(leaf, '.'))
 		leaf = dot + 1;
 	std::string path_string = path.string();
+
 	if (cache.path != path_string) {
 		cache.path = path_string;
 		readLines(path, cache.lines);
 	}
 	if (record.line && record.line <= cache.lines.size()) {
 		const std::string &line = cache.lines[record.line - 1];
+
 		start = utf16Length(llvm::StringRef(line).take_front(std::min<size_t>(start, line.size())));
 	}
 	end = start + utf16Length(leaf);

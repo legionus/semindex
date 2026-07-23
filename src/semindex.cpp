@@ -29,8 +29,10 @@ public:
 	void HandleDiagnostic(clang::DiagnosticsEngine::Level level, const clang::Diagnostic &info) override
 	{
 		clang::TextDiagnosticPrinter::HandleDiagnostic(level, info);
+
 		if (level == clang::DiagnosticsEngine::Fatal)
 			fatal = true;
+
 		if (level < clang::DiagnosticsEngine::Note)
 			return;
 
@@ -39,6 +41,7 @@ public:
 
 		if (level >= clang::DiagnosticsEngine::Error)
 			diagnostic.severity = SEMINDEX_DIAGNOSTIC_ERROR;
+
 		else if (level == clang::DiagnosticsEngine::Warning)
 			diagnostic.severity = SEMINDEX_DIAGNOSTIC_WARNING;
 		else
@@ -47,6 +50,7 @@ public:
 		diagnostic.message = message.str().str();
 		diagnostic.line = 0;
 		diagnostic.column = 0;
+
 		if (info.hasSourceManager() && info.getLocation().isValid()) {
 			clang::PresumedLoc location = info.getSourceManager().getPresumedLoc(info.getLocation());
 
@@ -73,6 +77,7 @@ static void rebuildDiagnostics(semindex *s)
 {
 	s->diagnostic_records.clear();
 	s->diagnostic_records.reserve(s->diagnostics.size());
+
 	for (const auto &diagnostic : s->diagnostics) {
 		s->diagnostic_records.push_back({
 			.severity = diagnostic.severity,
@@ -147,10 +152,12 @@ static void saveCompileCommand(semindex_t *s, const semindex_compile_command_t *
 	s->command_directory = cmd->directory ? cmd->directory : ".";
 	s->command_file = cmd->file;
 	s->command_arguments.reserve(cmd->argc);
+
 	for (size_t i = 0; i < cmd->argc; i++)
 		s->command_arguments.emplace_back(cmd->argv[i]);
 
 	s->command_argv.reserve(s->command_arguments.size());
+
 	for (const auto &arg : s->command_arguments)
 		s->command_argv.push_back(arg.c_str());
 
@@ -196,21 +203,26 @@ static std::vector<std::string> sanitizeCommandLine(const std::vector<std::strin
 	std::vector<std::string> args;
 
 	args.reserve(input.size() + 5);
+
 	for (size_t i = 0; i < input.size(); i++) {
 		llvm::StringRef arg(input[i]);
 
 		if (arg == "--")
 			continue;
+
 		if (isUnsupportedJoinedArg(arg))
 			continue;
+
 		if (isWarningErrorArg(arg))
 			continue;
+
 		if (arg == "-D" && i + 1 < input.size() && isX86_64BuiltinDefinition(input[i + 1])) {
 			i++;
 			continue;
 		}
 		if (arg.starts_with("-D") && isX86_64BuiltinDefinition(arg.drop_front(2)))
 			continue;
+
 		if (unsupportedArgTakesValue(arg)) {
 			i++;
 			continue;
@@ -267,7 +279,9 @@ int semindex_index_command(semindex_t *s, const semindex_compile_command_t *cmd)
 	saveCompileCommand(s, cmd);
 
 	std::vector<std::string> args;
+
 	args.reserve(cmd->argc);
+
 	for (size_t i = 0; i < cmd->argc; i++)
 		args.emplace_back(cmd->argv[i]);
 
@@ -288,12 +302,15 @@ int semindex_index_command(semindex_t *s, const semindex_compile_command_t *cmd)
 	s->index_result.warnings = diagnostics.getNumWarnings();
 	s->index_result.errors = diagnostics.getNumErrors();
 	s->index_result.fatal = diagnostics.fatalOccurred();
+
 	if (ret == 0 && s->has_index_data && !s->index_result.errors)
 		s->index_result.status = SEMINDEX_INDEX_CLEAN;
+
 	else if (s->has_index_data)
 		s->index_result.status = SEMINDEX_INDEX_PARTIAL;
 	else
 		s->index_result.status = SEMINDEX_INDEX_FAILED;
+
 	if (s->has_index_data)
 		rebuildRecords(s);
 	rebuildDiagnostics(s);
@@ -311,8 +328,10 @@ int semindex_index_file(semindex_t *s, const char *compile_commands_json, const 
 
 	if (!db) {
 		llvm::errs() << "semindex: failed to load compilation database";
+
 		if (compile_commands_json)
 			llvm::errs() << " from '" << compile_commands_json << "'";
+
 		if (!error.empty())
 			llvm::errs() << ": " << error;
 		llvm::errs() << "\n";
@@ -320,6 +339,7 @@ int semindex_index_file(semindex_t *s, const char *compile_commands_json, const 
 	}
 
 	std::vector<CompileCommand> commands = db->getCompileCommands(source_file);
+
 	if (commands.empty()) {
 		llvm::errs() << "semindex: no compile command for '" << source_file << "'\n";
 		return -1;
@@ -327,7 +347,9 @@ int semindex_index_file(semindex_t *s, const char *compile_commands_json, const 
 
 	std::vector<const char *> argv;
 	const CompileCommand &compile = commands[0];
+
 	argv.reserve(compile.CommandLine.size());
+
 	for (const auto &arg : compile.CommandLine)
 		argv.push_back(arg.c_str());
 
@@ -355,6 +377,7 @@ const semindex_diagnostic_t *semindex_get_diagnostic(const semindex_t *s, size_t
 {
 	if (!s || idx >= s->diagnostic_records.size())
 		return nullptr;
+
 	return &s->diagnostic_records[idx];
 }
 

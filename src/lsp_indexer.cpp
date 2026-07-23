@@ -43,6 +43,7 @@ LspIndexResult LspIndexer::update(const std::string &file)
 	command_db_command_t *saved = nullptr;
 	const semindex_compile_command_t *command = nullptr;
 	const semindex_index_result_t *index_result = nullptr;
+
 	semindex_t *index = nullptr;
 	LspIndexResult result;
 	std::error_code fs_error;
@@ -52,6 +53,7 @@ LspIndexResult LspIndexer::update(const std::string &file)
 	bool changed_directory = false;
 
 	loaded = command_db_load(commands_database.c_str(), variant.c_str(), file.c_str(), &saved);
+
 	if (loaded > 0) {
 		result.error = "no saved compiler command for '" + file + "' in variant '" + variant + "'";
 		goto out;
@@ -63,11 +65,13 @@ LspIndexResult LspIndexer::update(const std::string &file)
 
 	command = command_db_command_get(saved);
 	old_directory = std::filesystem::current_path(fs_error);
+
 	if (fs_error) {
 		result.error = "failed to read the current directory: " + fs_error.message();
 		goto out;
 	}
 	std::filesystem::current_path(command->directory, fs_error);
+
 	if (fs_error) {
 		result.error = "failed to enter compiler directory '" + std::string(command->directory) +
 			"': " + fs_error.message();
@@ -76,6 +80,7 @@ LspIndexResult LspIndexer::update(const std::string &file)
 	changed_directory = true;
 
 	index = semindex_create();
+
 	if (!index) {
 		result.error = "failed to create indexer";
 		goto out;
@@ -85,6 +90,7 @@ LspIndexResult LspIndexer::update(const std::string &file)
 	index_ret = semindex_index_command(index, command);
 	index_result = semindex_get_index_result(index);
 	copyDiagnostics(index, command->directory, result);
+
 	if (!index_result || index_result->status == SEMINDEX_INDEX_FAILED) {
 		result.error = "failed to index '" + file + "'";
 		overlays.erase(file);
@@ -108,8 +114,10 @@ LspIndexResult LspIndexer::update(const std::string &file)
 out:
 	semindex_destroy(index);
 	command_db_command_free(saved);
+
 	if (changed_directory) {
 		std::filesystem::current_path(old_directory, fs_error);
+
 		if (fs_error) {
 			result.status = LspIndexResult::Status::Failed;
 			result.error = "failed to restore the current directory: " + fs_error.message();

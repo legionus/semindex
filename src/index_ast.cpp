@@ -28,14 +28,17 @@ static std::string getName(const Decl *D)
 {
 	if (const auto *ND = llvm::dyn_cast<NamedDecl>(D))
 		return ND->getNameAsString();
+
 	return "";
 }
 
 static std::string getUSR(const Decl *D, const ASTContext &ctx)
 {
 	llvm::SmallVector<char, 128> buf;
+
 	if (index::generateUSRForDecl(D, buf, ctx.getLangOpts()))
 		return "";
+
 	return std::string(buf.begin(), buf.end());
 }
 
@@ -54,10 +57,12 @@ static bool isDirectCallCallee(const Expr *E, ASTContext &ctx)
 
 	for (;;) {
 		auto parents = ctx.getParents(*current);
+
 		if (parents.empty())
 			return false;
 
 		const Stmt *parent = parents.begin()->get<Stmt>();
+
 		if (!parent)
 			return false;
 
@@ -74,6 +79,7 @@ static bool isDirectCallCallee(const Expr *E, ASTContext &ctx)
 static const Stmt *getParentStmt(const Expr *E, ASTContext &ctx)
 {
 	auto parents = ctx.getParents(*E);
+
 	if (parents.empty())
 		return nullptr;
 
@@ -91,6 +97,7 @@ static bool isPointerReadOperand(const Expr *E, ASTContext &ctx)
 
 	for (;;) {
 		const Stmt *parent = getParentStmt(current, ctx);
+
 		if (!parent)
 			return false;
 
@@ -117,6 +124,7 @@ static bool isCallCallee(const Expr *E, ASTContext &ctx)
 
 	for (;;) {
 		const Stmt *parent = getParentStmt(current, ctx);
+
 		if (!parent)
 			return false;
 
@@ -141,20 +149,26 @@ static semindex_use_kind_t classifyUse(const Expr *E, ASTContext &ctx)
 			return SEMINDEX_USE_READ;
 
 		/* &x */
+
 		if (const auto *U = dyn_cast<UnaryOperator>(parent)) {
 			if (U->getOpcode() == UO_AddrOf)
 				return SEMINDEX_USE_ADDR;
+
 			/* ++x, x++ */
+
 			if (U->isIncrementDecrementOp())
 				return SEMINDEX_USE_WRITE;
+
 		} else if (const auto *B = dyn_cast<BinaryOperator>(parent)) {
 			/* x = ... */
+
 			if (B->isAssignmentOp() && B->getLHS() == current)
 				return SEMINDEX_USE_WRITE;
 		}
 
 		if (!isa<ParenExpr>(parent) && !isa<ImplicitCastExpr>(parent))
 			return SEMINDEX_USE_READ;
+
 		current = cast<Expr>(parent);
 	}
 }
@@ -164,13 +178,17 @@ static unsigned accessModeForUse(semindex_use_kind_t kind, const Expr *E, ASTCon
 	switch (kind) {
 	case SEMINDEX_USE_ADDR:
 		return SEMINDEX_MODE_R_AOF | SEMINDEX_MODE_W_AOF;
+
 	case SEMINDEX_USE_WRITE:
 		return SEMINDEX_MODE_W_VAL;
+
 	case SEMINDEX_USE_CALL:
 		return SEMINDEX_MODE_R_PTR;
+
 	case SEMINDEX_USE_READ:
 		if (isCallCallee(E, ctx) || isPointerReadOperand(E, ctx))
 			return SEMINDEX_MODE_R_PTR;
+
 		return SEMINDEX_MODE_R_VAL;
 	}
 
@@ -181,20 +199,25 @@ static semindex_symbol_kind_t symbolKindForDecl(const ValueDecl *D)
 {
 	if (isa<FieldDecl>(D))
 		return SEMINDEX_SYMBOL_FIELD;
+
 	if (isa<EnumConstantDecl>(D))
 		return SEMINDEX_SYMBOL_ENUM_CONSTANT;
+
 	if (isa<FunctionDecl>(D))
 		return SEMINDEX_SYMBOL_FUNCTION;
+
 	return SEMINDEX_SYMBOL_VAR;
 }
 
 static std::string getOwnerName(const Decl *D)
 {
 	const auto *FD = dyn_cast<FieldDecl>(D);
+
 	if (!FD)
 		return "";
 
 	const auto *RD = FD->getParent();
+
 	if (!RD)
 		return "";
 
@@ -270,10 +293,12 @@ public:
 		std::string oldFunction = currentFunction;
 		std::string oldFunctionUSR = currentFunctionUSR;
 		unsigned long long oldFunctionUSRId = currentFunctionUSRId;
+
 		currentFunction = getName(D);
 		currentFunctionUSR = D->doesThisDeclarationHaveABody() ? functionUSR(D) : "";
 		currentFunctionUSRId = currentFunctionUSR.empty() ? 0 : llvm::xxHash64(currentFunctionUSR);
 		bool ret = RecursiveASTVisitor<SemindexVisitor>::TraverseFunctionDecl(D);
+
 		currentFunction = oldFunction;
 		currentFunctionUSR = oldFunctionUSR;
 		currentFunctionUSRId = oldFunctionUSRId;
@@ -284,6 +309,7 @@ public:
 	{
 		if (getName(D).empty() || isNonDefinitionParameter(D))
 			return true;
+
 		if (!index.includeLocal() && !currentFunction.empty())
 			return true;
 
@@ -294,6 +320,7 @@ public:
 		if (!isTypedefType(D->getType()) && !isWrittenAsTypedef(D->getTypeSourceInfo()) &&
 			isAnonymousRecord(anonymousRecord)) {
 			anonymousName = anonymousRecordNameForVar(D);
+
 			if (details)
 				typeName = typeNameForRecord(anonymousRecord, anonymousName);
 			addAnonymousRecordSymbols(anonymousRecord, anonymousName);
@@ -302,6 +329,7 @@ public:
 		}
 
 		SemindexSymbol s;
+
 		s.kind = SEMINDEX_SYMBOL_VAR;
 		s.name = getName(D);
 		s.owner = "";
@@ -316,6 +344,7 @@ public:
 
 		if (D->hasInit()) {
 			SemindexUse u;
+
 			u.kind = SEMINDEX_USE_WRITE;
 			u.symbol_kind = SEMINDEX_SYMBOL_VAR;
 			u.mode = SEMINDEX_MODE_W_VAL;
@@ -337,8 +366,10 @@ public:
 	{
 		if (isAnonymousRecord(D->getParent()))
 			return true;
+
 		const ValueInfo &info = valueInfo(D);
 		SemindexSymbol s;
+
 		s.kind = info.kind;
 		s.name = info.name;
 		s.owner = info.owner;
@@ -368,6 +399,7 @@ public:
 		}
 
 		SemindexSymbol s;
+
 		s.kind = SEMINDEX_SYMBOL_TYPEDEF;
 		s.name = getName(D);
 		s.owner = "";
@@ -396,6 +428,7 @@ public:
 			return true;
 
 		const RecordDecl *D = TL.getDecl();
+
 		if (isAnonymousRecord(D))
 			return true;
 
@@ -409,6 +442,7 @@ public:
 			return true;
 
 		const EnumDecl *D = TL.getDecl();
+
 		if (!D || getName(D).empty())
 			return true;
 
@@ -424,7 +458,9 @@ public:
 
 		if (!D)
 			return true;
+
 		local = !currentFunction.empty() && !D->hasExternalFormalLinkage();
+
 		if (local && !index.includeLocal())
 			return true;
 
@@ -432,8 +468,10 @@ public:
 			return true;
 
 		const ValueInfo &info = valueInfo(D);
+
 		spelling = index.spellingLoc(E->getExprLoc());
 		SemindexUse u;
+
 		u.kind = classifyUse(E, ctx);
 		u.symbol_kind = info.kind;
 		u.mode = accessModeForUse(u.kind, E, ctx);
@@ -456,10 +494,12 @@ public:
 	bool VisitMemberExpr(MemberExpr *E)
 	{
 		const ValueDecl *D = E->getMemberDecl();
+
 		if (!D)
 			return true;
 
 		semindex_use_kind_t kind = classifyUse(E, ctx);
+
 		addValueUse(D, kind, accessModeForUse(kind, E, ctx), currentFunction, E->getExprLoc(), false);
 		return true;
 	}
@@ -471,6 +511,7 @@ public:
 				continue;
 
 			const FieldDecl *D = designator.getFieldDecl();
+
 			if (!D)
 				continue;
 			addValueUse(D, SEMINDEX_USE_WRITE, SEMINDEX_MODE_W_VAL, currentFunction,
@@ -484,10 +525,12 @@ public:
 	{
 		if (!D->isThisDeclarationADefinition())
 			return true;
+
 		if (isAnonymousRecord(D))
 			return true;
 
 		SemindexSymbol s;
+
 		s.kind = D->isUnion() ? SEMINDEX_SYMBOL_UNION : SEMINDEX_SYMBOL_STRUCT;
 
 		s.name = getName(D);
@@ -507,10 +550,12 @@ public:
 	{
 		if (!D->isThisDeclarationADefinition())
 			return true;
+
 		if (getName(D).empty())
 			return true;
 
 		SemindexSymbol s;
+
 		s.kind = SEMINDEX_SYMBOL_ENUM;
 		s.name = getName(D);
 		s.owner = "";
@@ -528,9 +573,11 @@ public:
 	bool VisitEnumConstantDecl(EnumConstantDecl *D)
 	{
 		SemindexSymbol s;
+
 		s.kind = SEMINDEX_SYMBOL_ENUM_CONSTANT;
 		s.name = getName(D);
 		s.owner = "";
+
 		if (details)
 			s.type = D->getType().getAsString();
 		s.usr = detailedUSR(D);
@@ -547,11 +594,14 @@ public:
 	{
 		if (!D->isThisDeclarationADefinition() && !D->hasPrototype())
 			return true;
+
 		if (!functionSymbols.insert(D->getCanonicalDecl()).second)
 			return true;
+
 		const ValueInfo &info = valueInfo(D);
 
 		SemindexSymbol s;
+
 		s.kind = SEMINDEX_SYMBOL_FUNCTION;
 		s.name = info.name;
 		s.owner = "";
@@ -570,12 +620,14 @@ public:
 	{
 		const FunctionDecl *FD = E->getDirectCallee();
 		SourceLocation spelling;
+
 		if (!FD)
 			return true; /* indirect call: fp() */
 
 		spelling = index.spellingLoc(E->getExprLoc());
 		const ValueInfo &info = valueInfo(FD);
 		SemindexUse u;
+
 		u.kind = SEMINDEX_USE_CALL;
 		u.symbol_kind = SEMINDEX_SYMBOL_FUNCTION;
 		u.mode = SEMINDEX_MODE_R_PTR;
@@ -616,6 +668,7 @@ private:
 			entry->second.kind = symbolKindForDecl(D);
 			entry->second.name = getName(D);
 			entry->second.owner = getOwnerName(D);
+
 			if (details) {
 				entry->second.type = D->getType().getAsString();
 				entry->second.usr = getUSR(D, ctx);
@@ -637,10 +690,12 @@ private:
 	static bool isNonDefinitionParameter(const VarDecl *D)
 	{
 		const auto *P = dyn_cast<ParmVarDecl>(D);
+
 		if (!P)
 			return false;
 
 		const auto *F = dyn_cast_or_null<FunctionDecl>(P->getDeclContext());
+
 		return !F || !F->doesThisDeclarationHaveABody();
 	}
 
@@ -648,16 +703,20 @@ private:
 	{
 		if (!D || loc.isInvalid())
 			return;
+
 		if (!index.includeLocal() && !currentFunction.empty())
 			return;
 
 		SourceLocation spelling = index.spellingLoc(loc);
+
 		if (!index.inScope(spelling))
 			return;
+
 		if (!typeUses.emplace(D->getCanonicalDecl(), spelling.getRawEncoding(), currentFunction).second)
 			return;
 
 		SemindexUse u;
+
 		u.kind = SEMINDEX_USE_READ;
 		u.symbol_kind = kind;
 		u.mode = SEMINDEX_MODE_R_VAL;
@@ -678,6 +737,7 @@ private:
 		const ValueInfo &info = valueInfo(D);
 		SourceLocation spelling = index.spellingLoc(loc);
 		SemindexUse u;
+
 		u.kind = kind;
 		u.symbol_kind = info.kind;
 		u.mode = mode;
@@ -695,6 +755,7 @@ private:
 	void addAnonymousRecordSymbols(const RecordDecl *D, const std::string &name)
 	{
 		SemindexSymbol s;
+
 		s.kind = D->isUnion() ? SEMINDEX_SYMBOL_UNION : SEMINDEX_SYMBOL_STRUCT;
 		s.name = name;
 		s.owner = "";
@@ -724,9 +785,11 @@ private:
 				continue;
 
 			SemindexSymbol s;
+
 			s.kind = SEMINDEX_SYMBOL_FIELD;
 			s.name = getName(field);
 			s.owner = owner;
+
 			if (details)
 				s.type = field->getType().getAsString();
 			s.usr = detailedUSR(field);

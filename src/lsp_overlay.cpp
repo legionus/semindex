@@ -22,6 +22,7 @@ static std::string qualifiedName(const char *owner, const char *name)
 {
 	if (owner && owner[0])
 		return std::string(owner) + "." + (name ? name : "");
+
 	return name ? name : "";
 }
 
@@ -30,12 +31,16 @@ static bool matchesFilter(semindex_db_record_type_t record, const semindex_db_qu
 	switch (options.record) {
 	case SEMINDEX_DB_RECORD_ALL:
 		return true;
+
 	case SEMINDEX_DB_RECORD_SYMBOL:
 		return record != SEMINDEX_DB_REFERENCE;
+
 	case SEMINDEX_DB_RECORD_DECLARATION:
 		return record == SEMINDEX_DB_DECLARATION;
+
 	case SEMINDEX_DB_RECORD_DEFINITION:
 		return record == SEMINDEX_DB_DEFINITION;
+
 	case SEMINDEX_DB_RECORD_REFERENCE:
 		return record == SEMINDEX_DB_REFERENCE;
 	}
@@ -46,18 +51,25 @@ static bool matchesOptions(const semindex_db_record_t &record, const semindex_db
 {
 	if (options.symbol && record.symbol != std::string(options.symbol))
 		return false;
+
 	if (options.path && normalizedPath(record.path) != normalizedPath(options.path))
 		return false;
+
 	if (options.context && record.context != std::string(options.context))
 		return false;
+
 	if (options.has_mode && record.mode != options.mode)
 		return false;
+
 	if (options.has_usr_id && record.usr_id != options.usr_id)
 		return false;
+
 	if (options.has_kind && record.kind != options.kind)
 		return false;
+
 	if (options.has_local && record.local != options.local)
 		return false;
+
 	return matchesFilter(record.record, options);
 }
 
@@ -146,6 +158,7 @@ int LspOverlay::emitRecord(const Record &stored, const char *path, const char *v
 
 	if (options && !matchesOptions(record, *options))
 		return 0;
+
 	if (line) {
 		size_t length = std::char_traits<char>::length(leafName(stored.symbol));
 
@@ -162,8 +175,10 @@ int LspOverlay::findAt(const std::string &path, const char *variant, unsigned li
 
 	if (entry == indices.end())
 		return 0;
+
 	if (!line || !column || !callback)
 		return -1;
+
 	for (const auto &record : entry->second.records) {
 		int ret = emitRecord(record, entry->first.c_str(), variant ? variant : "", nullptr, line, column,
 			callback, data);
@@ -181,8 +196,10 @@ int LspOverlay::query(const std::string &path, const char *variant, const semind
 
 	if (entry == indices.end())
 		return 0;
+
 	if (!callback)
 		return -1;
+
 	for (const auto &record : entry->second.records) {
 		int ret = emitRecord(record, entry->first.c_str(), variant ? variant : "", &options, 0, 0, callback,
 			data);

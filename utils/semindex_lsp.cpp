@@ -44,6 +44,7 @@ int main(int argc, char **argv)
 	std::string logfile_path;
 	bool include_local = true;
 	bool logfile_requested = false;
+
 	semindex_db_t *database = nullptr;
 
 	for (int i = 1; i < argc; i++) {
@@ -128,8 +129,10 @@ int main(int argc, char **argv)
 	database_path = std::filesystem::absolute(database_path).lexically_normal().string();
 	commands_database_path = std::filesystem::absolute(commands_database_path).lexically_normal().string();
 	std::ofstream logfile;
+
 	if (!logfile_path.empty()) {
 		logfile.open(logfile_path, std::ios::app);
+
 		if (!logfile) {
 			std::cerr << "semindex-lsp: failed to open log file: " << logfile_path << '\n';
 			return 1;
@@ -142,6 +145,7 @@ int main(int argc, char **argv)
 	LspIndexer indexer(database_path, commands_database_path, variant.empty() ? "general" : variant, include_local);
 	LspServer server(transport, database, indexer, std::move(variant));
 	int ret = server.run();
+
 	semindex_db_close(database);
 	return ret;
 }

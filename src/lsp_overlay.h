@@ -17,6 +17,7 @@ public:
 
 	int findAt(const std::string &path, const char *variant, unsigned line, unsigned column,
 		semindex_db_record_callback_t callback, void *data) const;
+
 	int query(const std::string &path, const char *variant, const semindex_db_query_options_t &options,
 		semindex_db_record_callback_t callback, void *data) const;
 
