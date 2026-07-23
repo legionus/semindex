@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "semindex_database.h"
+#include "sqlite.h"
 
 enum stored_record_kind {
 	STORED_RECORD_SYMBOL,
@@ -264,10 +265,12 @@ int semindex_db_query_calls(semindex_db_t *db, const semindex_db_call_options_t 
 		sql = opts->variant ? callees_variant : callees;
 	if (prepare(db, sql, &stmt) < 0)
 		goto out;
-	if (sqlite3_bind_text(stmt, 1, opts->function, -1, SQLITE_TRANSIENT) != SQLITE_OK ||
-		sqlite3_bind_int64(stmt, 2, (sqlite3_int64)opts->usr_id) != SQLITE_OK ||
-		(opts->variant && sqlite3_bind_text(stmt, 3, opts->variant, -1, SQLITE_TRANSIENT) != SQLITE_OK))
-		goto out;
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 1, opts->function));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int64(stmt, 2, (sqlite3_int64)opts->usr_id));
+
+	if (opts->variant)
+		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 3, opts->variant));
+
 	ret = emit_records(db, stmt, callback, data, 0);
 out:
 	sqlite3_finalize(stmt);
@@ -307,10 +310,10 @@ static int query_function_batch(semindex_db_t *db, const semindex_db_function_t 
 	for (i = 0; i < count; i++) {
 		int column = i * 3 + 1;
 
-		if (sqlite3_bind_text(stmt, column, functions[i].variant, -1, SQLITE_TRANSIENT) != SQLITE_OK ||
-			sqlite3_bind_text(stmt, column + 1, functions[i].symbol, -1, SQLITE_TRANSIENT) != SQLITE_OK ||
-			sqlite3_bind_int64(stmt, column + 2, (sqlite3_int64)functions[i].usr_id) != SQLITE_OK)
-			goto out;
+		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, column, functions[i].variant));
+		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, column + 1, functions[i].symbol));
+		SEMINDEX_SQLITE_BIND_OR_GOTO(out,
+			semindex_sqlite_bind_int64(stmt, column + 2, (sqlite3_int64)functions[i].usr_id));
 	}
 	ret = emit_records(db, stmt, callback, data, 0);
 out:
@@ -376,11 +379,14 @@ int semindex_db_find_at(semindex_db_t *db, const char *path, const char *variant
 		return -1;
 	if (prepare(db, variant ? with_variant : all_variants, &stmt) < 0)
 		goto out;
-	if (sqlite3_bind_text(stmt, 1, path, -1, SQLITE_TRANSIENT) != SQLITE_OK ||
-		(variant && sqlite3_bind_text(stmt, 2, variant, -1, SQLITE_TRANSIENT) != SQLITE_OK) ||
-		sqlite3_bind_int64(stmt, line_index, line) != SQLITE_OK ||
-		sqlite3_bind_int64(stmt, line_index + 1, column) != SQLITE_OK)
-		goto out;
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 1, path));
+
+	if (variant)
+		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 2, variant));
+
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int64(stmt, line_index, line));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int64(stmt, line_index + 1, column));
+
 	ret = emit_records(db, stmt, callback, data, column);
 out:
 	sqlite3_finalize(stmt);

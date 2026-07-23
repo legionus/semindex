@@ -78,6 +78,7 @@ set(SEMINDEX_FORMAT_SOURCES
 	utils/output_search.c
 	utils/perf_trace.c
 	utils/perf_trace.h
+	utils/sqlite.h
 	utils/semindex.c
 	utils/semindex_cli.h
 	utils/semindex_lsp.cpp
@@ -107,6 +108,7 @@ add_library(semindex_database STATIC
 )
 target_include_directories(semindex_database PUBLIC
 	${CMAKE_CURRENT_SOURCE_DIR}/include
+	${CMAKE_CURRENT_SOURCE_DIR}/utils
 )
 target_link_libraries(semindex_database PUBLIC SQLite3::SQLite3)
 

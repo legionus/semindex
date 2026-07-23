@@ -10,6 +10,7 @@
 #include "index_db.h"
 #include "output.h"
 #include "semindex_database.h"
+#include "sqlite.h"
 
 #define INDEX_SCHEMA_VERSION 9
 #define STRINGIFY_VALUE(value) #value
@@ -20,6 +21,27 @@ enum stored_record_kind {
 	STORED_RECORD_USE,
 };
 
+struct optional_record_id {
+	unsigned long long value;
+	int present;
+};
+
+struct staging_record {
+	enum stored_record_kind type;
+	int action;
+	semindex_symbol_kind_t symbol_kind;
+	unsigned mode;
+	const char *file;
+	unsigned line;
+	unsigned column;
+	const char *owner;
+	const char *name;
+	const char *context;
+	struct optional_record_id usr_id;
+	struct optional_record_id context_usr_id;
+	int local;
+};
+
 static int exec_sql(sqlite3 *db, const char *sql)
 {
 	char *errmsg = NULL;
@@ -28,17 +50,20 @@ static int exec_sql(sqlite3 *db, const char *sql)
 	do {
 		sqlite3_free(errmsg);
 		errmsg = NULL;
+
 		ret = sqlite3_exec(db, sql, NULL, NULL, &errmsg);
+
 		if (ret == SQLITE_BUSY || ret == SQLITE_LOCKED)
 			sqlite3_sleep(10);
-	} while (ret == SQLITE_BUSY || ret == SQLITE_LOCKED);
-	if (ret != SQLITE_OK) {
-		fprintf(stderr, "semindex: sqlite: %s\n", errmsg ? errmsg : sqlite3_errmsg(db));
-		sqlite3_free(errmsg);
-		return -1;
-	}
 
-	return 0;
+	} while (ret == SQLITE_BUSY || ret == SQLITE_LOCKED);
+
+	if (ret == SQLITE_OK)
+		return 0;
+
+	fprintf(stderr, "semindex: sqlite: %s\n", errmsg ? errmsg : sqlite3_errmsg(db));
+	sqlite3_free(errmsg);
+	return -1;
 }
 
 static int trace_exec_sql(sqlite3 *db, const char *sql, semindex_trace_t *trace, const char *phase)
@@ -56,20 +81,17 @@ static int prepare(sqlite3 *db, const char *sql, sqlite3_stmt **stmt)
 
 	do {
 		ret = sqlite3_prepare_v3(db, sql, -1, SQLITE_PREPARE_PERSISTENT, stmt, NULL);
+
 		if (ret == SQLITE_BUSY || ret == SQLITE_LOCKED)
 			sqlite3_sleep(10);
+
 	} while (ret == SQLITE_BUSY || ret == SQLITE_LOCKED);
-	if (ret != SQLITE_OK) {
-		fprintf(stderr, "semindex: sqlite: %s\n", sqlite3_errmsg(db));
-		return -1;
-	}
 
-	return 0;
-}
+	if (ret == SQLITE_OK)
+		return 0;
 
-static int bind_text(sqlite3_stmt *stmt, int idx, const char *value)
-{
-	return sqlite3_bind_text(stmt, idx, value ? value : "", -1, SQLITE_TRANSIENT) == SQLITE_OK ? 0 : -1;
+	fprintf(stderr, "semindex: sqlite: %s\n", sqlite3_errmsg(db));
+	return -1;
 }
 
 static int schema_version(sqlite3 *db, int *version)
@@ -79,6 +101,7 @@ static int schema_version(sqlite3 *db, int *version)
 
 	if (prepare(db, "PRAGMA user_version", &stmt) < 0)
 		return -1;
+
 	if (sqlite3_step(stmt) != SQLITE_ROW)
 		goto out;
 
@@ -99,6 +122,7 @@ static int has_user_tables(sqlite3 *db, int *has_tables)
 		    "WHERE type = 'table' AND name NOT LIKE 'sqlite_%')",
 		    &stmt) < 0)
 		return -1;
+
 	if (sqlite3_step(stmt) != SQLITE_ROW)
 		goto out;
 
@@ -111,6 +135,8 @@ out:
 
 static int mkdir_one(const char *path)
 {
+	errno = 0;
+
 	if (mkdir(path, 0777) == 0 || errno == EEXIST)
 		return 0;
 
@@ -120,35 +146,39 @@ static int mkdir_one(const char *path)
 
 static int ensure_parent_directory(const char *path)
 {
-	char *dir;
-	char *p;
+	char *dir, *p;
 	const char *slash;
+	int ret = -1;
 
 	slash = strrchr(path, '/');
+
 	if (!slash || slash == path)
 		return 0;
 
-	dir = strdup(path);
-	if (!dir)
-		return -1;
+	if (!(dir = strdup(path)))
+		goto fail;
 
 	dir[slash - path] = '\0';
+
 	for (p = dir + 1; *p; p++) {
 		if (*p != '/')
 			continue;
+
 		*p = '\0';
+
 		if (mkdir_one(dir) < 0)
 			goto fail;
+
 		*p = '/';
 	}
+
 	if (mkdir_one(dir) < 0)
 		goto fail;
 
-	free(dir);
-	return 0;
+	ret = 0;
 fail:
 	free(dir);
-	return -1;
+	return ret;
 }
 
 static int init_schema(sqlite3 *db)
@@ -193,31 +223,37 @@ static int init_schema(sqlite3 *db)
 
 	if (exec_sql(db, "PRAGMA foreign_keys = ON") < 0 || schema_version(db, &version) < 0)
 		return -1;
+
 	if (version == INDEX_SCHEMA_VERSION)
 		return 0;
 
 	if (exec_sql(db, "BEGIN IMMEDIATE") < 0)
 		return -1;
+
 	if (schema_version(db, &version) < 0)
 		goto rollback;
+
 	if (version == INDEX_SCHEMA_VERSION)
 		goto commit;
+
 	if (version != 0) {
 		fprintf(stderr, "semindex: database schema version %d is incompatible; remove the old index\n",
 			version);
 		goto rollback;
 	}
+
 	if (has_user_tables(db, &has_tables) < 0)
 		goto rollback;
+
 	if (has_tables) {
 		fprintf(stderr, "semindex: database schema is incompatible; remove the old index\n");
 		goto rollback;
 	}
+
 	for (i = 0; i < sizeof(schema) / sizeof(schema[0]); i++) {
 		if (exec_sql(db, schema[i]) < 0)
 			goto rollback;
 	}
-
 commit:
 	if (exec_sql(db, "COMMIT") < 0)
 		return -1;
@@ -229,15 +265,17 @@ rollback:
 
 static int open_writer(const char *path, sqlite3 **db, semindex_trace_t *trace)
 {
-	semindex_trace_time_t start;
+	semindex_trace_time_t start = semindex_trace_begin(trace);
 
-	start = semindex_trace_begin(trace);
 	if (ensure_parent_directory(path) < 0) {
 		semindex_trace_end(trace, "db.mkdir", start);
 		return -1;
 	}
+
 	semindex_trace_end(trace, "db.mkdir", start);
+
 	start = semindex_trace_begin(trace);
+
 	if (sqlite3_open_v2(path, db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX, NULL) !=
 		SQLITE_OK) {
 		fprintf(stderr, "semindex: failed to open database '%s': %s\n", path,
@@ -245,18 +283,24 @@ static int open_writer(const char *path, sqlite3 **db, semindex_trace_t *trace)
 		semindex_trace_end(trace, "db.open", start);
 		return -1;
 	}
+
 	semindex_trace_end(trace, "db.open", start);
+
 	if (sqlite3_busy_timeout(*db, INT_MAX) != SQLITE_OK)
 		return -1;
+
 	if (trace_exec_sql(*db, "PRAGMA journal_mode = WAL", trace, "db.journal_mode") < 0 ||
 		trace_exec_sql(*db, "PRAGMA synchronous = OFF", trace, "db.synchronous") < 0 ||
 		trace_exec_sql(*db, "PRAGMA temp_store = MEMORY", trace, "db.temp_store") < 0)
 		return -1;
+
 	start = semindex_trace_begin(trace);
+
 	if (init_schema(*db) < 0) {
 		semindex_trace_end(trace, "db.schema", start);
 		return -1;
 	}
+
 	semindex_trace_end(trace, "db.schema", start);
 
 	return 0;
@@ -298,32 +342,43 @@ static char *qualified_name(const char *owner, const char *name)
 {
 	if (owner && owner[0])
 		return sqlite3_mprintf("%s.%s", owner, name ? name : "");
+
 	return sqlite3_mprintf("%s", name ? name : "");
 }
 
-static int stage_record(sqlite3 *db, sqlite3_stmt *stmt, int record, int action, int kind, unsigned mode,
-	const char *file, unsigned line, unsigned column, const char *owner, const char *name, const char *context,
-	const char *usr, unsigned long long usr_id, const char *context_usr, unsigned long long context_usr_id,
-	int local)
+static int bind_optional_record_id(sqlite3_stmt *stmt, int index, const struct optional_record_id *id)
 {
-	char *symbol = qualified_name(owner, name);
+	if (id->present)
+		return semindex_sqlite_bind_int64(stmt, index, (sqlite3_int64)id->value);
+
+	return semindex_sqlite_bind_null(stmt, index);
+}
+
+static int stage_record(sqlite3_stmt *stmt, const struct staging_record *record)
+{
+	sqlite3 *db = sqlite3_db_handle(stmt);
+	char *symbol = qualified_name(record->owner, record->name);
 	int ret = -1;
 
 	if (!symbol)
 		return -1;
+
 	sqlite3_reset(stmt);
 	sqlite3_clear_bindings(stmt);
-	if (bind_text(stmt, 1, symbol) < 0 || sqlite3_bind_int(stmt, 2, record) != SQLITE_OK ||
-		sqlite3_bind_int(stmt, 3, action) != SQLITE_OK || sqlite3_bind_int(stmt, 4, kind) != SQLITE_OK ||
-		sqlite3_bind_int64(stmt, 5, mode) != SQLITE_OK || bind_text(stmt, 6, file) < 0 ||
-		sqlite3_bind_int64(stmt, 7, line) != SQLITE_OK || sqlite3_bind_int64(stmt, 8, column) != SQLITE_OK ||
-		bind_text(stmt, 9, context) < 0 ||
-		(usr && usr[0] ? sqlite3_bind_int64(stmt, 10, (sqlite3_int64)usr_id) : sqlite3_bind_null(stmt, 10)) !=
-			SQLITE_OK ||
-		(context_usr && context_usr[0] ? sqlite3_bind_int64(stmt, 11, (sqlite3_int64)context_usr_id)
-					       : sqlite3_bind_null(stmt, 11)) != SQLITE_OK ||
-		sqlite3_bind_int(stmt, 12, local) != SQLITE_OK)
-		goto out;
+
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 1, symbol));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int(stmt, 2, record->type));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int(stmt, 3, record->action));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int(stmt, 4, record->symbol_kind));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int64(stmt, 5, record->mode));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 6, record->file));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int64(stmt, 7, record->line));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int64(stmt, 8, record->column));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 9, record->context));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, bind_optional_record_id(stmt, 10, &record->usr_id));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, bind_optional_record_id(stmt, 11, &record->context_usr_id));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int(stmt, 12, record->local));
+
 	if (sqlite3_step(stmt) != SQLITE_DONE) {
 		fprintf(stderr, "semindex: sqlite: %s\n", sqlite3_errmsg(db));
 		goto out;
@@ -355,36 +410,84 @@ static int stage_records(sqlite3 *db, semindex_t *s, int include_local, const un
 
 	for (i = 0; i < semindex_symbol_count(s); i++) {
 		const semindex_symbol_t *sym = semindex_get_symbol(s, i);
+		struct staging_record record;
 		int function;
 
 		if (!sym)
 			goto out;
+
 		if (sym->local && !include_local)
 			continue;
+
 		(*items_in)++;
+
 		if (sym->file_index < cached_count && cached[sym->file_index])
 			continue;
+
 		function = sym->kind == SEMINDEX_SYMBOL_FUNCTION;
-		if (stage_record(db, stmt, STORED_RECORD_SYMBOL, sym->definition, sym->kind, 0, sym->file, sym->line,
-			    sym->column, sym->owner, sym->name, sym->context, function ? sym->usr : NULL,
-			    function ? sym->usr_id : 0, NULL, 0, sym->local) < 0)
+
+		record = (struct staging_record) {
+			.type = STORED_RECORD_SYMBOL,
+			.action = sym->definition,
+			.symbol_kind = sym->kind,
+			.file = sym->file,
+			.line = sym->line,
+			.column = sym->column,
+			.owner = sym->owner,
+			.name = sym->name,
+			.context = sym->context,
+			.usr_id = {
+				.value = sym->usr_id,
+				.present = function && sym->usr && sym->usr[0],
+			},
+			.local = sym->local,
+		};
+
+		if (stage_record(stmt, &record) < 0)
 			goto out;
 	}
+
 	for (i = 0; i < semindex_use_count(s); i++) {
 		const semindex_use_t *use = semindex_get_use(s, i);
+		struct staging_record record;
 		int direct_call;
 
 		if (!use)
 			goto out;
+
 		if (use->local && !include_local)
 			continue;
+
 		(*items_in)++;
+
 		if (use->file_index < cached_count && cached[use->file_index])
 			continue;
+
 		direct_call = use->kind == SEMINDEX_USE_CALL && use->symbol_kind == SEMINDEX_SYMBOL_FUNCTION;
-		if (stage_record(db, stmt, STORED_RECORD_USE, use->kind, use->symbol_kind, use->mode, use->file,
-			    use->line, use->column, use->owner, use->name, use->context, direct_call ? use->usr : NULL,
-			    use->usr_id, direct_call ? use->context_usr : NULL, use->context_usr_id, use->local) < 0)
+
+		record = (struct staging_record) {
+			.type = STORED_RECORD_USE,
+			.action = use->kind,
+			.symbol_kind = use->symbol_kind,
+			.mode = use->mode,
+			.file = use->file,
+			.line = use->line,
+			.column = use->column,
+			.owner = use->owner,
+			.name = use->name,
+			.context = use->context,
+			.usr_id = {
+				.value = use->usr_id,
+				.present = direct_call && use->usr && use->usr[0],
+			},
+			.context_usr_id = {
+				.value = use->context_usr_id,
+				.present = direct_call && use->context_usr && use->context_usr[0],
+			},
+			.local = use->local,
+		};
+
+		if (stage_record(stmt, &record) < 0)
 			goto out;
 	}
 
@@ -408,6 +511,7 @@ static int stage_files(sqlite3 *db, semindex_t *s, const char *main_file, const 
 		" VALUES(?1, ?2, ?3, ?4, ?5, ?6) ON CONFLICT(path) DO UPDATE SET"
 		" mtime_ns = excluded.mtime_ns, size = excluded.size, is_main = excluded.is_main,"
 		" ordinal = excluded.ordinal, fingerprint = excluded.fingerprint";
+
 	sqlite3_stmt *insert = NULL;
 	sqlite3_stmt *select = NULL;
 	char *cache_sql = NULL;
@@ -423,6 +527,7 @@ static int stage_files(sqlite3 *db, semindex_t *s, const char *main_file, const 
 
 	if (prepare(db, insert_sql, &insert) < 0)
 		goto out;
+
 	for (i = 0; i < cached_count; i++) {
 		const semindex_file_fingerprint_t *fingerprint = semindex_get_file_fingerprint(s, i, include_local);
 		struct stat st;
@@ -432,29 +537,40 @@ static int stage_files(sqlite3 *db, semindex_t *s, const char *main_file, const 
 
 		if (!fingerprint)
 			goto out;
+
 		if (!fingerprint->record_count)
 			continue;
+
 		if (stat(fingerprint->file, &st) == 0) {
 			mtime_ns = stat_mtime_ns(&st);
 			size = st.st_size;
 			if (have_main_stat && st.st_dev == main_stat.st_dev && st.st_ino == main_stat.st_ino)
 				is_main = 1;
 		}
+
 		if (!is_main)
 			cache_candidates++;
+
 		sqlite3_reset(insert);
 		sqlite3_clear_bindings(insert);
-		if (bind_text(insert, 1, fingerprint->file) < 0 ||
-			sqlite3_bind_int64(insert, 2, mtime_ns) != SQLITE_OK ||
-			sqlite3_bind_int64(insert, 3, size) != SQLITE_OK ||
-			sqlite3_bind_int(insert, 4, is_main) != SQLITE_OK ||
-			sqlite3_bind_int64(insert, 5, i) != SQLITE_OK ||
-			(is_main ? sqlite3_bind_null(insert, 6)
-				 : sqlite3_bind_blob(insert, 6, fingerprint->data, sizeof(fingerprint->data),
-					   SQLITE_STATIC)) != SQLITE_OK ||
-			sqlite3_step(insert) != SQLITE_DONE)
+
+		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(insert, 1, fingerprint->file));
+		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int64(insert, 2, mtime_ns));
+		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int64(insert, 3, size));
+		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int(insert, 4, is_main));
+		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int64(insert, 5, i));
+
+		if (is_main)
+			SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_null(insert, 6));
+		else
+			SEMINDEX_SQLITE_BIND_OR_GOTO(out,
+				semindex_sqlite_bind_blob64_static(insert, 6, fingerprint->data,
+					sizeof(fingerprint->data)));
+
+		if (sqlite3_step(insert) != SQLITE_DONE)
 			goto out;
 	}
+
 	if (main_file) {
 		sqlite3_stmt *main_insert = NULL;
 		long long mtime_ns = have_main_stat ? stat_mtime_ns(&main_stat) : 0;
@@ -466,17 +582,27 @@ static int stage_files(sqlite3 *db, semindex_t *s, const char *main_file, const 
 			    " size = excluded.size, is_main = 1, fingerprint = NULL",
 			    &main_insert) < 0)
 			goto out;
-		if (bind_text(main_insert, 1, main_file) < 0 ||
-			sqlite3_bind_int64(main_insert, 2, mtime_ns) != SQLITE_OK ||
-			sqlite3_bind_int64(main_insert, 3, size) != SQLITE_OK ||
-			sqlite3_step(main_insert) != SQLITE_DONE) {
-			sqlite3_finalize(main_insert);
-			goto out;
+
+		SEMINDEX_SQLITE_BIND_OR_GOTO(main_out, semindex_sqlite_bind_text(main_insert, 1, main_file));
+		SEMINDEX_SQLITE_BIND_OR_GOTO(main_out, semindex_sqlite_bind_int64(main_insert, 2, mtime_ns));
+		SEMINDEX_SQLITE_BIND_OR_GOTO(main_out, semindex_sqlite_bind_int64(main_insert, 3, size));
+
+		if (sqlite3_step(main_insert) != SQLITE_DONE) {
+			goto main_out;
 		}
+
+		goto main_done;
+
+main_out:
+		sqlite3_finalize(main_insert);
+		goto out;
+
+main_done:
 		sqlite3_finalize(main_insert);
 	}
 
 	*items_in = cache_candidates;
+
 	if (!cache_candidates) {
 		ret = 0;
 		goto out;
@@ -489,25 +615,32 @@ static int stage_files(sqlite3 *db, semindex_t *s, const char *main_file, const 
 				" AND files.mtime_ns = staging_files.mtime_ns AND files.size = staging_files.size"
 				" AND file_fingerprints.fingerprint = staging_files.fingerprint)",
 			variant);
+
 	if (!cache_sql || exec_sql(db, cache_sql) < 0) {
 		sqlite3_free(cache_sql);
 		cache_sql = NULL;
 		goto out;
 	}
+
 	sqlite3_free(cache_sql);
 	cache_sql = NULL;
+
 	sqlite3_finalize(select);
 	select = NULL;
+
 	if (prepare(db, "SELECT ordinal FROM staging_files WHERE cached = 1", &select) < 0)
 		goto out;
+
 	while ((step = sqlite3_step(select)) == SQLITE_ROW) {
 		sqlite3_int64 ordinal = sqlite3_column_int64(select, 0);
 
 		if (ordinal < 0 || (uint64_t)ordinal >= cached_count)
 			goto out;
+
 		cached[ordinal] = 1;
 		(*items_out)++;
 	}
+
 	if (step != SQLITE_DONE)
 		goto out;
 
@@ -516,6 +649,7 @@ out:
 	sqlite3_free(cache_sql);
 	sqlite3_finalize(insert);
 	sqlite3_finalize(select);
+
 	return ret;
 }
 
@@ -530,9 +664,14 @@ static int cached_files_valid(sqlite3 *db, const char *variant)
 	int step;
 	int ret = -1;
 
-	if (prepare(db, sql, &stmt) < 0 || bind_text(stmt, 1, variant) < 0)
+	if (prepare(db, sql, &stmt) < 0)
 		goto out;
+
+	if (semindex_sqlite_bind_text(stmt, 1, variant) < 0)
+		goto out;
+
 	step = sqlite3_step(stmt);
+
 	if (step == SQLITE_DONE)
 		ret = 1;
 	else if (step == SQLITE_ROW)
@@ -541,6 +680,7 @@ static int cached_files_valid(sqlite3 *db, const char *variant)
 		fprintf(stderr, "semindex: sqlite: %s\n", sqlite3_errmsg(db));
 out:
 	sqlite3_finalize(stmt);
+
 	return ret;
 }
 
@@ -597,17 +737,23 @@ static int merge_staging(sqlite3 *db, const char *variant, uint64_t staged_recor
 				   " ON files.path = staging_files.path AND files.variant = %Q"
 				   " WHERE staging_files.fingerprint IS NOT NULL",
 		variant);
+
 	for (i = 0; i < sizeof(merge) / sizeof(merge[0]); i++) {
 		if (!merge[i])
 			goto out;
 	}
+
 	if (trace_exec_sql(db, "BEGIN IMMEDIATE", trace, "db.merge.begin") < 0)
 		goto out;
+
 	valid = cached_files_valid(db, variant);
+
 	if (valid < 0)
 		goto rollback;
+
 	if (!valid)
 		goto stale;
+
 	for (i = 0; i < sizeof(merge) / sizeof(merge[0]); i++) {
 		if (i == 4 || i == 5) {
 			semindex_trace_time_t start = semindex_trace_begin(trace);
@@ -616,12 +762,15 @@ static int merge_staging(sqlite3 *db, const char *variant, uint64_t staged_recor
 			uint64_t attempted = i == 4 ? staged_records : fingerprint_attempts;
 
 			semindex_trace_end_counted(trace, phases[i], start, attempted, inserted);
+
 			if (merge_ret < 0)
 				goto rollback;
+
 		} else if (trace_exec_sql(db, merge[i], trace, phases[i]) < 0) {
 			goto rollback;
 		}
 	}
+
 	if (trace_exec_sql(db, "COMMIT", trace, "db.merge.commit") < 0)
 		goto out;
 
@@ -655,61 +804,85 @@ int index_db_store(const char *path, semindex_t *s, const char *main_file, const
 
 	if (!path || !s || !variant || !variant[0])
 		return -1;
+
 	cached_count = semindex_file_fingerprint_count(s);
+
 	if (cached_count) {
 		cached = calloc(cached_count, sizeof(*cached));
 		if (!cached)
 			return -1;
 	}
+
 	if (open_writer(path, &db, trace) < 0)
 		goto out;
+
 	start = semindex_trace_begin(trace);
+
 	if (create_staging(db) < 0) {
 		semindex_trace_end(trace, "db.staging_schema", start);
 		goto out;
 	}
+
 	semindex_trace_end(trace, "db.staging_schema", start);
+
 	if (trace_exec_sql(db, "BEGIN", trace, "db.staging_begin") < 0)
 		goto out;
+
 	start = semindex_trace_begin(trace);
+
 	if (stage_files(db, s, main_file, variant, include_local, cached, cached_count, &files_in, &files_cached) < 0) {
 		semindex_trace_end_counted(trace, "db.stage_files", start, files_in, files_cached);
 		exec_sql(db, "ROLLBACK");
 		goto out;
 	}
+
 	semindex_trace_end_counted(trace, "db.stage_files", start, files_in, files_cached);
+
 	start = semindex_trace_begin(trace);
+
 	if (stage_records(db, s, include_local, cached, cached_count, &records_in, &records_staged) < 0) {
 		semindex_trace_end_counted(trace, "db.stage_records", start, records_in, records_staged);
 		exec_sql(db, "ROLLBACK");
 		goto out;
 	}
+
 	semindex_trace_end_counted(trace, "db.stage_records", start, records_in, records_staged);
+
 	if (trace_exec_sql(db, "COMMIT", trace, "db.staging_commit") < 0)
 		goto out;
+
 	merge_ret = merge_staging(db, variant, records_staged, files_in, trace);
+
 	if (merge_ret < 0)
 		goto out;
+
 	if (merge_ret > 0) {
 		uint64_t retry_in;
 		uint64_t retry_staged;
 
 		if (cached_count)
 			memset(cached, 0, cached_count);
+
 		if (trace_exec_sql(db, "BEGIN", trace, "db.staging_retry_begin") < 0)
 			goto out;
+
 		if (exec_sql(db, "UPDATE staging_files SET cached = 0") < 0) {
 			exec_sql(db, "ROLLBACK");
 			goto out;
 		}
+
 		start = semindex_trace_begin(trace);
+
 		if (stage_records(db, s, include_local, cached, cached_count, &retry_in, &retry_staged) < 0) {
 			semindex_trace_end_counted(trace, "db.stage_records_retry", start, retry_in, retry_staged);
 			exec_sql(db, "ROLLBACK");
 			goto out;
 		}
+
 		semindex_trace_end_counted(trace, "db.stage_records_retry", start, retry_in, retry_staged);
+
 		records_staged += retry_staged;
+
 		if (trace_exec_sql(db, "COMMIT", trace, "db.staging_retry_commit") < 0 ||
 			merge_staging(db, variant, records_staged, files_in, trace) != 0)
 			goto out;
@@ -722,6 +895,7 @@ out:
 		sqlite3_close(db);
 		semindex_trace_end(trace, "db.close", start);
 	}
+
 	free(cached);
 	return ret;
 }
@@ -761,6 +935,7 @@ static int open_reader(const char *path, sqlite3 **db)
 			*db ? sqlite3_errmsg(*db) : "unknown error");
 		return -1;
 	}
+
 	if (sqlite3_busy_timeout(*db, INT_MAX) != SQLITE_OK)
 		return -1;
 
@@ -779,13 +954,18 @@ int index_db_search(const char *path, const index_db_search_options_t *opts, FIL
 
 	if (!path || !out)
 		return -1;
+
 	if (!opts)
 		opts = &defaults;
+
 	if (semindex_db_open(path, &db) < 0)
 		goto out;
+
 	output.formatter = output_search_create(out, opts->format ? opts->format : OUTPUT_SEARCH_DEFAULT_FORMAT);
+
 	if (!output.formatter)
 		goto out;
+
 	query.symbol = opts->pattern;
 	query.path = opts->path;
 	query.variant = opts->variant;
@@ -793,18 +973,22 @@ int index_db_search(const char *path, const index_db_search_options_t *opts, FIL
 	query.kind = opts->kind;
 	query.has_mode = opts->has_mode && !opts->mode_definition;
 	query.has_kind = opts->has_kind;
+
 	if (opts->mode_definition)
 		query.record = SEMINDEX_DB_RECORD_DEFINITION;
 	else if (opts->record == INDEX_DB_RECORD_SYMBOL)
 		query.record = SEMINDEX_DB_RECORD_SYMBOL;
 	else if (opts->record == INDEX_DB_RECORD_USE)
 		query.record = SEMINDEX_DB_RECORD_REFERENCE;
+
 	ret = semindex_db_query(db, &query, print_search_result, &output);
+
 	if (!ret && ferror(out))
 		ret = -1;
 out:
 	output_search_destroy(output.formatter);
 	semindex_db_close(db);
+
 	return ret;
 }
 
@@ -816,6 +1000,7 @@ static int print_callgraph_results(sqlite3 *db, const char *sql, int show_id, FI
 
 	if (prepare(db, sql, &stmt) < 0)
 		return -1;
+
 	while ((step = sqlite3_step(stmt)) == SQLITE_ROW) {
 		const char *variant = (const char *)sqlite3_column_text(stmt, 0);
 		const char *caller = (const char *)sqlite3_column_text(stmt, 1);
@@ -834,6 +1019,7 @@ static int print_callgraph_results(sqlite3 *db, const char *sql, int show_id, FI
 			goto out;
 		}
 	}
+
 	if (step != SQLITE_DONE) {
 		fprintf(stderr, "semindex: sqlite: %s\n", sqlite3_errmsg(db));
 		goto out;
@@ -842,6 +1028,7 @@ static int print_callgraph_results(sqlite3 *db, const char *sql, int show_id, FI
 	ret = ferror(out) ? -1 : 0;
 out:
 	sqlite3_finalize(stmt);
+
 	return ret;
 }
 
@@ -866,8 +1053,10 @@ int index_db_callgraph(const char *path, const index_db_callgraph_options_t *opt
 		"FROM records JOIN files ON files.id = records.file_id "
 		"WHERE records.record = %d AND records.action = %d AND records.kind = %d",
 		STORED_RECORD_USE, SEMINDEX_USE_CALL, SEMINDEX_SYMBOL_FUNCTION);
+
 	if (opts->direction == INDEX_DB_CALLGRAPH_CALLERS) {
 		sqlite3_str_appendf(query, " AND records.symbol = %Q", opts->function);
+
 		if (opts->has_id)
 			sqlite3_str_appendf(query, " AND records.usr_id = 0x%016llx", opts->id);
 	} else {
@@ -875,27 +1064,36 @@ int index_db_callgraph(const char *path, const index_db_callgraph_options_t *opt
 		if (opts->has_id)
 			sqlite3_str_appendf(query, " AND records.context_usr_id = 0x%016llx", opts->id);
 	}
+
 	if (opts->path)
 		sqlite3_str_appendf(query, " AND files.path %s %Q", pattern_uses_glob(opts->path) ? "GLOB" : "=",
 			opts->path);
+
 	if (opts->variant)
 		sqlite3_str_appendf(query, " AND files.variant %s %Q", pattern_uses_glob(opts->variant) ? "GLOB" : "=",
 			opts->variant);
+
 	sqlite3_str_appendall(query,
 		" ORDER BY files.variant, records.context, records.symbol, files.path, records.line, records.column");
+
 	if (sqlite3_str_errcode(query) != SQLITE_OK)
 		goto out;
 
 	sql = sqlite3_str_finish(query);
 	query = NULL;
+
 	if (!sql)
 		goto out;
+
 	ret = print_callgraph_results(db, sql, opts->show_id, out);
 out:
 	if (query)
 		sqlite3_str_finish(query);
+
 	sqlite3_free(sql);
+
 	if (db)
 		sqlite3_close(db);
+
 	return ret;
 }

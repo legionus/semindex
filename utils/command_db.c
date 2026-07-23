@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 
 #include "command_db.h"
+#include "sqlite.h"
 
 #define COMMAND_SCHEMA_VERSION 1
 
@@ -279,11 +280,12 @@ int command_db_store(const char *path, const char *variant, const char *director
 		goto out;
 	if (open_writer(path, &db) < 0 || prepare(db, sql, &stmt) < 0)
 		goto out;
-	if (sqlite3_bind_text(stmt, 1, variant, -1, SQLITE_TRANSIENT) != SQLITE_OK ||
-		sqlite3_bind_text(stmt, 2, abs_file, -1, SQLITE_TRANSIENT) != SQLITE_OK ||
-		sqlite3_bind_text(stmt, 3, abs_directory, -1, SQLITE_TRANSIENT) != SQLITE_OK ||
-		sqlite3_bind_blob64(stmt, 4, arguments, blob_size, SQLITE_TRANSIENT) != SQLITE_OK ||
-		sqlite3_step(stmt) != SQLITE_DONE) {
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 1, variant));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 2, abs_file));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 3, abs_directory));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_blob64(stmt, 4, arguments, blob_size));
+
+	if (sqlite3_step(stmt) != SQLITE_DONE) {
 		fprintf(stderr, "semindex: command database: %s\n", sqlite3_errmsg(db));
 		goto out;
 	}
@@ -348,9 +350,9 @@ int command_db_load(const char *path, const char *variant, const char *file, com
 		goto out;
 	if (open_reader(path, &db) < 0 || prepare(db, sql, &stmt) < 0)
 		goto out;
-	if (sqlite3_bind_text(stmt, 1, variant, -1, SQLITE_TRANSIENT) != SQLITE_OK ||
-		sqlite3_bind_text(stmt, 2, abs_file, -1, SQLITE_TRANSIENT) != SQLITE_OK)
-		goto out;
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 1, variant));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 2, abs_file));
+
 	step = sqlite3_step(stmt);
 	if (step == SQLITE_DONE) {
 		ret = 1;
@@ -494,8 +496,8 @@ int command_db_export(const char *path, const char *variant, FILE *out)
 		return -1;
 	if (open_reader(path, &db) < 0 || prepare(db, sql, &stmt) < 0)
 		goto out;
-	if (sqlite3_bind_text(stmt, 1, variant, -1, SQLITE_TRANSIENT) != SQLITE_OK)
-		goto out;
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 1, variant));
+
 	if (fputs("[\n", out) == EOF)
 		goto out;
 	while ((step = sqlite3_step(stmt)) == SQLITE_ROW) {
