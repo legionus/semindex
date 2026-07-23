@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "symbols": [
+    {"kind":"struct","name":"OuterArray","owner":null,"type":null,"usr":"c:@S@OuterArray","usr_id":null,"context":null,"file":"tests/test17.c","line":2,"column":8,"local":false,"definition":true},
+    {"kind":"struct","name":"InnerArray","owner":null,"type":null,"usr":"c:@S@InnerArray","usr_id":null,"context":null,"file":"tests/test17.c","line":3,"column":9,"local":false,"definition":true},
+    {"kind":"field","name":"values","owner":"InnerArray","type":"int[2]","usr":"c:@S@InnerArray@FI@values","usr_id":null,"context":null,"file":"tests/test17.c","line":4,"column":7,"local":false,"definition":true},
+    {"kind":"field","name":"items","owner":"OuterArray","type":"struct InnerArray[2][2]","usr":"c:@S@OuterArray@FI@items","usr_id":null,"context":null,"file":"tests/test17.c","line":5,"column":4,"local":false,"definition":true},
+    {"kind":"variable","name":"arrays","owner":null,"type":"struct OuterArray","usr":"c:@arrays","usr_id":null,"context":null,"file":"tests/test17.c","line":8,"column":19,"local":false,"definition":true}
+  ],
+  "uses": [
+    {"kind":"write","symbol_kind":"variable","mode":"-w-","mode_bits":8,"name":"arrays","owner":null,"type":"struct OuterArray","usr":"c:@arrays","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test17.c","line":8,"column":19,"local":false},
+    {"kind":"read","symbol_kind":"struct","mode":"-r-","mode_bits":4,"name":"OuterArray","owner":null,"type":null,"usr":"c:@S@OuterArray","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test17.c","line":8,"column":8,"local":false},
+    {"kind":"write","symbol_kind":"field","mode":"-w-","mode_bits":8,"name":"items","owner":"OuterArray","type":"struct InnerArray[2][2]","usr":"c:@S@OuterArray@FI@items","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test17.c","line":9,"column":3,"local":false},
+    {"kind":"write","symbol_kind":"field","mode":"-w-","mode_bits":8,"name":"values","owner":"InnerArray","type":"int[2]","usr":"c:@S@InnerArray@FI@values","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test17.c","line":9,"column":15,"local":false}
+  ]
+}

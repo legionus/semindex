@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "symbols": [
+    {"kind":"struct","name":"S","owner":null,"type":null,"usr":"c:@S@S","usr_id":null,"context":null,"file":"tests/test12.c","line":2,"column":8,"local":false,"definition":true},
+    {"kind":"field","name":"x","owner":"S","type":"int","usr":"c:@S@S@FI@x","usr_id":null,"context":null,"file":"tests/test12.c","line":3,"column":6,"local":false,"definition":true},
+    {"kind":"typedef","name":"T","owner":null,"type":"int","usr":"c:test12.c@T@T","usr_id":null,"context":null,"file":"tests/test12.c","line":6,"column":13,"local":false,"definition":true},
+    {"kind":"variable","name":"g","owner":null,"type":"int","usr":"c:@g","usr_id":null,"context":null,"file":"tests/test12.c","line":7,"column":5,"local":false,"definition":true},
+    {"kind":"function","name":"f","owner":null,"type":"int (int)","usr":"c:@F@f","usr_id":"8267508a470db1ad","context":null,"file":"tests/test12.c","line":9,"column":5,"local":false,"definition":true},
+    {"kind":"variable","name":"x","owner":null,"type":"int","usr":"c:test12.c@97@F@f@x","usr_id":null,"context":"f","file":"tests/test12.c","line":9,"column":11,"local":true,"definition":true},
+    {"kind":"variable","name":"a","owner":null,"type":"int","usr":"c:test12.c@107@F@f@a","usr_id":null,"context":"f","file":"tests/test12.c","line":11,"column":6,"local":true,"definition":true},
+    {"kind":"variable","name":"b","owner":null,"type":"int","usr":"c:test12.c@127@F@f@b","usr_id":null,"context":"f","file":"tests/test12.c","line":12,"column":6,"local":true,"definition":true},
+    {"kind":"variable","name":"c","owner":null,"type":"int","usr":"c:test12.c@154@F@f@c","usr_id":null,"context":"f","file":"tests/test12.c","line":13,"column":6,"local":true,"definition":true},
+    {"kind":"variable","name":"d","owner":null,"type":"int","usr":"c:test12.c@174@F@f@d","usr_id":null,"context":"f","file":"tests/test12.c","line":14,"column":6,"local":true,"definition":true},
+    {"kind":"variable","name":"e","owner":null,"type":"int","usr":"c:test12.c@196@F@f@e","usr_id":null,"context":"f","file":"tests/test12.c","line":15,"column":6,"local":true,"definition":true},
+    {"kind":"variable","name":"y","owner":null,"type":"typeof (x)","usr":"c:test12.c@238@F@f@y","usr_id":null,"context":"f","file":"tests/test12.c","line":16,"column":16,"local":true,"definition":true}
+  ],
+  "uses": [
+    {"kind":"write","symbol_kind":"variable","mode":"-w-","mode_bits":8,"name":"a","owner":null,"type":"int","usr":"c:test12.c@107@F@f@a","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test12.c","line":11,"column":6,"local":true},
+    {"kind":"read","symbol_kind":"variable","mode":"-r-","mode_bits":4,"name":"x","owner":null,"type":"int","usr":"c:test12.c@97@F@f@x","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test12.c","line":11,"column":17,"local":true},
+    {"kind":"write","symbol_kind":"variable","mode":"-w-","mode_bits":8,"name":"b","owner":null,"type":"int","usr":"c:test12.c@127@F@f@b","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test12.c","line":12,"column":6,"local":true},
+    {"kind":"read","symbol_kind":"struct","mode":"-r-","mode_bits":4,"name":"S","owner":null,"type":null,"usr":"c:@S@S","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test12.c","line":12,"column":24,"local":true},
+    {"kind":"write","symbol_kind":"variable","mode":"-w-","mode_bits":8,"name":"c","owner":null,"type":"int","usr":"c:test12.c@154@F@f@c","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test12.c","line":13,"column":6,"local":true},
+    {"kind":"read","symbol_kind":"typedef","mode":"-r-","mode_bits":4,"name":"T","owner":null,"type":"int","usr":"c:test12.c@T@T","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test12.c","line":13,"column":17,"local":true},
+    {"kind":"write","symbol_kind":"variable","mode":"-w-","mode_bits":8,"name":"d","owner":null,"type":"int","usr":"c:test12.c@174@F@f@d","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test12.c","line":14,"column":6,"local":true},
+    {"kind":"read","symbol_kind":"typedef","mode":"-r-","mode_bits":4,"name":"T","owner":null,"type":"int","usr":"c:test12.c@T@T","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test12.c","line":14,"column":19,"local":true},
+    {"kind":"write","symbol_kind":"variable","mode":"-w-","mode_bits":8,"name":"e","owner":null,"type":"int","usr":"c:test12.c@196@F@f@e","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test12.c","line":15,"column":6,"local":true},
+    {"kind":"read","symbol_kind":"variable","mode":"-r-","mode_bits":4,"name":"x","owner":null,"type":"int","usr":"c:test12.c@97@F@f@x","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test12.c","line":15,"column":19,"local":true},
+    {"kind":"read","symbol_kind":"variable","mode":"-r-","mode_bits":4,"name":"g","owner":null,"type":"int","usr":"c:@g","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test12.c","line":15,"column":27,"local":false},
+    {"kind":"write","symbol_kind":"variable","mode":"-w-","mode_bits":8,"name":"y","owner":null,"type":"typeof (x)","usr":"c:test12.c@238@F@f@y","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test12.c","line":16,"column":16,"local":true},
+    {"kind":"read","symbol_kind":"variable","mode":"-r-","mode_bits":4,"name":"x","owner":null,"type":"int","usr":"c:test12.c@97@F@f@x","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test12.c","line":16,"column":13,"local":true},
+    {"kind":"read","symbol_kind":"variable","mode":"-r-","mode_bits":4,"name":"g","owner":null,"type":"int","usr":"c:@g","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test12.c","line":16,"column":20,"local":false},
+    {"kind":"read","symbol_kind":"variable","mode":"-r-","mode_bits":4,"name":"a","owner":null,"type":"int","usr":"c:test12.c@107@F@f@a","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test12.c","line":18,"column":9,"local":true},
+    {"kind":"read","symbol_kind":"variable","mode":"-r-","mode_bits":4,"name":"b","owner":null,"type":"int","usr":"c:test12.c@127@F@f@b","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test12.c","line":18,"column":13,"local":true},
+    {"kind":"read","symbol_kind":"variable","mode":"-r-","mode_bits":4,"name":"c","owner":null,"type":"int","usr":"c:test12.c@154@F@f@c","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test12.c","line":18,"column":17,"local":true},
+    {"kind":"read","symbol_kind":"variable","mode":"-r-","mode_bits":4,"name":"d","owner":null,"type":"int","usr":"c:test12.c@174@F@f@d","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test12.c","line":18,"column":21,"local":true},
+    {"kind":"read","symbol_kind":"variable","mode":"-r-","mode_bits":4,"name":"e","owner":null,"type":"int","usr":"c:test12.c@196@F@f@e","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test12.c","line":18,"column":25,"local":true},
+    {"kind":"read","symbol_kind":"variable","mode":"-r-","mode_bits":4,"name":"y","owner":null,"type":"typeof (x)","usr":"c:test12.c@238@F@f@y","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test12.c","line":18,"column":29,"local":true}
+  ]
+}

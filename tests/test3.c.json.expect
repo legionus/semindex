@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "symbols": [
+    {"kind":"variable","name":"g","owner":null,"type":"int","usr":"c:@g","usr_id":null,"context":null,"file":"tests/test3.c","line":2,"column":5,"local":false,"definition":true},
+    {"kind":"function","name":"f","owner":null,"type":"int (void)","usr":"c:@F@f","usr_id":"8267508a470db1ad","context":null,"file":"tests/test3.c","line":4,"column":5,"local":false,"definition":true},
+    {"kind":"variable","name":"x","owner":null,"type":"int","usr":"c:test3.c@68@F@f@x","usr_id":null,"context":"f","file":"tests/test3.c","line":6,"column":6,"local":true,"definition":true},
+    {"kind":"variable","name":"p","owner":null,"type":"int *","usr":"c:test3.c@80@F@f@p","usr_id":null,"context":"f","file":"tests/test3.c","line":7,"column":7,"local":true,"definition":true}
+  ],
+  "uses": [
+    {"kind":"write","symbol_kind":"variable","mode":"-w-","mode_bits":8,"name":"x","owner":null,"type":"int","usr":"c:test3.c@68@F@f@x","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test3.c","line":6,"column":6,"local":true},
+    {"kind":"write","symbol_kind":"variable","mode":"-w-","mode_bits":8,"name":"p","owner":null,"type":"int *","usr":"c:test3.c@80@F@f@p","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test3.c","line":9,"column":2,"local":true},
+    {"kind":"address","symbol_kind":"variable","mode":"m--","mode_bits":3,"name":"g","owner":null,"type":"int","usr":"c:@g","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test3.c","line":9,"column":7,"local":false},
+    {"kind":"write","symbol_kind":"variable","mode":"-w-","mode_bits":8,"name":"x","owner":null,"type":"int","usr":"c:test3.c@68@F@f@x","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test3.c","line":10,"column":2,"local":true},
+    {"kind":"read","symbol_kind":"variable","mode":"--r","mode_bits":16,"name":"p","owner":null,"type":"int *","usr":"c:test3.c@80@F@f@p","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test3.c","line":10,"column":7,"local":true},
+    {"kind":"read","symbol_kind":"variable","mode":"-r-","mode_bits":4,"name":"x","owner":null,"type":"int","usr":"c:test3.c@68@F@f@x","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test3.c","line":11,"column":9,"local":true}
+  ]
+}

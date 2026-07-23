@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "symbols": [
+    {"kind":"enum","name":"Color","owner":null,"type":null,"usr":"c:@E@Color","usr_id":null,"context":null,"file":"tests/test9.c","line":2,"column":6,"local":false,"definition":true},
+    {"kind":"enumerator","name":"RED","owner":null,"type":"int","usr":"c:@E@Color@RED","usr_id":null,"context":null,"file":"tests/test9.c","line":3,"column":2,"local":false,"definition":true},
+    {"kind":"enumerator","name":"GREEN","owner":null,"type":"int","usr":"c:@E@Color@GREEN","usr_id":null,"context":null,"file":"tests/test9.c","line":4,"column":2,"local":false,"definition":true},
+    {"kind":"variable","name":"color","owner":null,"type":"enum Color","usr":"c:@color","usr_id":null,"context":null,"file":"tests/test9.c","line":7,"column":12,"local":false,"definition":true},
+    {"kind":"variable","name":"x","owner":null,"type":"int","usr":"c:@x","usr_id":null,"context":null,"file":"tests/test9.c","line":8,"column":5,"local":false,"definition":true}
+  ],
+  "uses": [
+    {"kind":"write","symbol_kind":"variable","mode":"-w-","mode_bits":8,"name":"color","owner":null,"type":"enum Color","usr":"c:@color","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test9.c","line":7,"column":12,"local":false},
+    {"kind":"read","symbol_kind":"enum","mode":"-r-","mode_bits":4,"name":"Color","owner":null,"type":null,"usr":"c:@E@Color","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test9.c","line":7,"column":6,"local":false},
+    {"kind":"read","symbol_kind":"enumerator","mode":"-r-","mode_bits":4,"name":"RED","owner":null,"type":"int","usr":"c:@E@Color@RED","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test9.c","line":7,"column":20,"local":false},
+    {"kind":"write","symbol_kind":"variable","mode":"-w-","mode_bits":8,"name":"x","owner":null,"type":"int","usr":"c:@x","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test9.c","line":8,"column":5,"local":false},
+    {"kind":"read","symbol_kind":"enumerator","mode":"-r-","mode_bits":4,"name":"GREEN","owner":null,"type":"int","usr":"c:@E@Color@GREEN","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test9.c","line":8,"column":9,"local":false}
+  ]
+}

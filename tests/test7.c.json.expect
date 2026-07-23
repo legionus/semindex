@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "symbols": [
+    {"kind":"macro","name":"FOO","owner":null,"type":null,"usr":"macro:FOO","usr_id":null,"context":null,"file":"tests/test7.c","line":2,"column":9,"local":false,"definition":true},
+    {"kind":"macro","name":"BAR","owner":null,"type":null,"usr":"macro:BAR","usr_id":null,"context":null,"file":"tests/test7.c","line":3,"column":9,"local":false,"definition":true},
+    {"kind":"variable","name":"v","owner":null,"type":"int","usr":"c:@v","usr_id":null,"context":null,"file":"tests/test7.c","line":5,"column":5,"local":false,"definition":true}
+  ],
+  "uses": [
+    {"kind":"read","symbol_kind":"macro","mode":"-r-","mode_bits":4,"name":"BAR","owner":null,"type":null,"usr":"macro:BAR","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test7.c","line":5,"column":9,"local":false},
+    {"kind":"read","symbol_kind":"macro","mode":"-r-","mode_bits":4,"name":"FOO","owner":null,"type":null,"usr":"macro:FOO","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test7.c","line":3,"column":23,"local":false},
+    {"kind":"write","symbol_kind":"variable","mode":"-w-","mode_bits":8,"name":"v","owner":null,"type":"int","usr":"c:@v","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test7.c","line":5,"column":5,"local":false}
+  ]
+}

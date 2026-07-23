@@ -38,5 +38,5 @@ fi
 tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT
 
-run_scope file tests/scope/use.c.file.expect "$tmpdir/file.out" "$tmpdir/file.err"
-run_scope project tests/scope/use.c.project.expect "$tmpdir/project.out" "$tmpdir/project.err"
+run_scope file tests/scope/use.c.file.dissect.expect "$tmpdir/file.out" "$tmpdir/file.err"
+run_scope project tests/scope/use.c.project.dissect.expect "$tmpdir/project.out" "$tmpdir/project.err"

@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "symbols": [
+    {"kind":"typedef","name":"counter_t","owner":null,"type":"int","usr":"c:test8.c@T@counter_t","usr_id":null,"context":null,"file":"tests/test8.c","line":2,"column":13,"local":false,"definition":true},
+    {"kind":"struct","name":"Pair","owner":null,"type":null,"usr":"c:@S@Pair","usr_id":null,"context":null,"file":"tests/test8.c","line":4,"column":8,"local":false,"definition":true},
+    {"kind":"field","name":"x","owner":"Pair","type":"int","usr":"c:@S@Pair@FI@x","usr_id":null,"context":null,"file":"tests/test8.c","line":5,"column":6,"local":false,"definition":true},
+    {"kind":"typedef","name":"pair_t","owner":null,"type":"struct Pair","usr":"c:test8.c@T@pair_t","usr_id":null,"context":null,"file":"tests/test8.c","line":7,"column":21,"local":false,"definition":true},
+    {"kind":"struct","name":":anon_t","owner":null,"type":null,"usr":"c:@SA@anon_t","usr_id":null,"context":null,"file":"tests/test8.c","line":9,"column":16,"local":false,"definition":true},
+    {"kind":"field","name":"y","owner":":anon_t","type":"int","usr":"c:@SA@anon_t@FI@y","usr_id":null,"context":null,"file":"tests/test8.c","line":10,"column":13,"local":false,"definition":true},
+    {"kind":"typedef","name":"anon_t","owner":null,"type":"struct :anon_t","usr":"c:@T@anon_t","usr_id":null,"context":null,"file":"tests/test8.c","line":11,"column":3,"local":false,"definition":true},
+    {"kind":"variable","name":"c","owner":null,"type":"counter_t","usr":"c:@c","usr_id":null,"context":null,"file":"tests/test8.c","line":13,"column":11,"local":false,"definition":true},
+    {"kind":"variable","name":"p","owner":null,"type":"pair_t","usr":"c:@p","usr_id":null,"context":null,"file":"tests/test8.c","line":14,"column":8,"local":false,"definition":true},
+    {"kind":"variable","name":"a","owner":null,"type":"anon_t","usr":"c:@a","usr_id":null,"context":null,"file":"tests/test8.c","line":15,"column":8,"local":false,"definition":true}
+  ],
+  "uses": [
+    {"kind":"read","symbol_kind":"struct","mode":"-r-","mode_bits":4,"name":"Pair","owner":null,"type":null,"usr":"c:@S@Pair","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test8.c","line":7,"column":16,"local":false},
+    {"kind":"read","symbol_kind":"typedef","mode":"-r-","mode_bits":4,"name":"counter_t","owner":null,"type":"int","usr":"c:test8.c@T@counter_t","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test8.c","line":13,"column":1,"local":false},
+    {"kind":"read","symbol_kind":"typedef","mode":"-r-","mode_bits":4,"name":"pair_t","owner":null,"type":"struct Pair","usr":"c:test8.c@T@pair_t","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test8.c","line":14,"column":1,"local":false},
+    {"kind":"read","symbol_kind":"typedef","mode":"-r-","mode_bits":4,"name":"anon_t","owner":null,"type":"struct :anon_t","usr":"c:@T@anon_t","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test8.c","line":15,"column":1,"local":false}
+  ]
+}

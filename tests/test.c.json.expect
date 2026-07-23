@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "symbols": [
+    {"kind":"struct","name":"S","owner":null,"type":null,"usr":"c:@S@S","usr_id":null,"context":null,"file":"tests/test.c","line":1,"column":8,"local":false,"definition":true},
+    {"kind":"field","name":"x","owner":"S","type":"int","usr":"c:@S@S@FI@x","usr_id":null,"context":null,"file":"tests/test.c","line":2,"column":6,"local":false,"definition":true},
+    {"kind":"variable","name":"g","owner":null,"type":"int","usr":"c:@g","usr_id":null,"context":null,"file":"tests/test.c","line":5,"column":5,"local":false,"definition":true},
+    {"kind":"function","name":"main","owner":null,"type":"int ()","usr":"c:@F@main","usr_id":"c123e84e5c531562","context":null,"file":"tests/test.c","line":7,"column":5,"local":false,"definition":true},
+    {"kind":"variable","name":"s","owner":null,"type":"struct S","usr":"c:test.c@45@F@main@s","usr_id":null,"context":"main","file":"tests/test.c","line":9,"column":11,"local":true,"definition":true}
+  ],
+  "uses": [
+    {"kind":"read","symbol_kind":"struct","mode":"-r-","mode_bits":4,"name":"S","owner":null,"type":null,"usr":"c:@S@S","usr_id":null,"context":"main","context_usr":null,"context_usr_id":null,"file":"tests/test.c","line":9,"column":9,"local":true},
+    {"kind":"write","symbol_kind":"field","mode":"-w-","mode_bits":8,"name":"x","owner":"S","type":"int","usr":"c:@S@S@FI@x","usr_id":null,"context":"main","context_usr":null,"context_usr_id":null,"file":"tests/test.c","line":10,"column":4,"local":false},
+    {"kind":"read","symbol_kind":"variable","mode":"-r-","mode_bits":4,"name":"s","owner":null,"type":"struct S","usr":"c:test.c@45@F@main@s","usr_id":null,"context":"main","context_usr":null,"context_usr_id":null,"file":"tests/test.c","line":10,"column":2,"local":true},
+    {"kind":"read","symbol_kind":"variable","mode":"-r-","mode_bits":4,"name":"g","owner":null,"type":"int","usr":"c:@g","usr_id":null,"context":"main","context_usr":null,"context_usr_id":null,"file":"tests/test.c","line":10,"column":8,"local":false}
+  ]
+}

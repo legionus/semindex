@@ -130,6 +130,31 @@ run_format_case()
 	fi
 }
 
+run_json_escape_case()
+{
+	source=$tmpdir/'json"\source.c'
+	out=$tmpdir/json-escape.out
+	db=$tmpdir/json-escape/.semindex/semindex.db
+
+	printf '%s\n' 'int json_value;' >"$source"
+	if ! "$SEMINDEX" compiler --format json --no-store-command \
+	     --database "$db" -- cc "$source" >"$out"; then
+		fail "compiler JSON escaping case failed"
+	fi
+	if ! "$PYTHON" - "$out" "$source" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    document = json.load(stream)
+if document["symbols"][0]["file"] != sys.argv[2]:
+    raise SystemExit("JSON source path did not round-trip")
+PY
+	then
+		fail "compiler produced invalid escaped JSON"
+	fi
+}
+
 run_kernel_flags_case()
 {
 	db=$tmpdir/kernel/.semindex/semindex.db
@@ -204,8 +229,8 @@ run_preprocessed_assembly_case()
 }
 
 if [ -z "${SEMINDEX:-}" ] || [ -z "${SOURCE_DIR:-}" ] || \
-   [ -z "${COMPILE_COMMANDS:-}" ]; then
-	fail "SEMINDEX, SOURCE_DIR, and COMPILE_COMMANDS must be set"
+   [ -z "${COMPILE_COMMANDS:-}" ] || [ -z "${PYTHON:-}" ]; then
+	fail "SEMINDEX, SOURCE_DIR, COMPILE_COMMANDS, and PYTHON must be set"
 fi
 
 tmpdir=$(mktemp -d)
@@ -215,8 +240,9 @@ run_quiet_case
 run_no_store_command_case
 run_index_command_case
 run_no_include_local_case
-run_format_case default tests/test.c.expect
 run_format_case dissect tests/test.c.dissect.expect
+run_format_case json tests/test.c.json.expect
+run_json_escape_case
 run_kernel_flags_case
 run_target_builtin_case
 run_preprocessed_assembly_case

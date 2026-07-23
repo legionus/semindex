@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "symbols": [
+    {"kind":"function","name":"foo","owner":null,"type":"int (int)","usr":"c:@F@foo","usr_id":"714f6634d9b767a4","context":null,"file":"tests/test2.c","line":3,"column":5,"local":false,"definition":true},
+    {"kind":"variable","name":"x","owner":null,"type":"int","usr":"c:test2.c@54@F@foo@x","usr_id":null,"context":"foo","file":"tests/test2.c","line":3,"column":13,"local":true,"definition":true},
+    {"kind":"function","name":"main","owner":null,"type":"int (void)","usr":"c:@F@main","usr_id":"c123e84e5c531562","context":null,"file":"tests/test2.c","line":8,"column":5,"local":false,"definition":true},
+    {"kind":"variable","name":"y","owner":null,"type":"int","usr":"c:test2.c@99@F@main@y","usr_id":null,"context":"main","file":"tests/test2.c","line":10,"column":6,"local":true,"definition":true}
+  ],
+  "uses": [
+    {"kind":"read","symbol_kind":"variable","mode":"-r-","mode_bits":4,"name":"x","owner":null,"type":"int","usr":"c:test2.c@54@F@foo@x","usr_id":null,"context":"foo","context_usr":null,"context_usr_id":null,"file":"tests/test2.c","line":5,"column":9,"local":true},
+    {"kind":"write","symbol_kind":"variable","mode":"-w-","mode_bits":8,"name":"y","owner":null,"type":"int","usr":"c:test2.c@99@F@main@y","usr_id":null,"context":"main","context_usr":null,"context_usr_id":null,"file":"tests/test2.c","line":10,"column":6,"local":true},
+    {"kind":"call","symbol_kind":"function","mode":"--r","mode_bits":16,"name":"foo","owner":null,"type":"int (int)","usr":"c:@F@foo","usr_id":"714f6634d9b767a4","context":"main","context_usr":"c:@F@main","context_usr_id":"c123e84e5c531562","file":"tests/test2.c","line":10,"column":10,"local":false},
+    {"kind":"read","symbol_kind":"variable","mode":"-r-","mode_bits":4,"name":"y","owner":null,"type":"int","usr":"c:test2.c@99@F@main@y","usr_id":null,"context":"main","context_usr":null,"context_usr_id":null,"file":"tests/test2.c","line":11,"column":9,"local":true}
+  ]
+}

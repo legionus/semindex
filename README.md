@@ -86,11 +86,12 @@ cmake --build build -j"$(nproc)"
 A compilation database is required by `semindex index`; it is not required to
 build semindex or to use `semindex compiler`.
 
-The CLI can print either the default prototype output or a Sparse
-`test-dissect`-style view:
+The CLI prints a Sparse `test-dissect`-style view by default and can emit a
+versioned JSON document for tooling:
 
 ```sh
-semindex index --format=dissect --compile-commands build/compile_commands.json path/to/file.c
+semindex index --compile-commands build/compile_commands.json path/to/file.c
+semindex index --format=json --compile-commands build/compile_commands.json path/to/file.c
 ```
 
 The CLI can also index a single compile command directly:

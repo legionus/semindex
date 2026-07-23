@@ -1,0 +1,19 @@
+
+FILE: tests/scope/use.c
+
+   2:10                   -r-   i tests/scope/api.h
+
+FILE: tests/scope/api.h
+
+   2:8                    def   s ScopeS
+   3:6                    def   m ScopeS.x                         int
+
+FILE: tests/scope/use.c
+
+   4:5                    def   f scope_f                          int (struct ScopeS *)
+   4:28  scope_f          def . v p                                struct ScopeS *
+   4:20  scope_f          -r- . s ScopeS
+   6:5   scope_f          -w-   m ScopeS.x                         int
+   6:2   scope_f          --r . v p                                struct ScopeS *
+   7:12  scope_f          -r-   m ScopeS.x                         int
+   7:9   scope_f          --r . v p                                struct ScopeS *

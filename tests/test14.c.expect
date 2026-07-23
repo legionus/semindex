@@ -1,9 +1,0 @@
-SYMBOLS:
-tests/include/test14.h:2:9 defined  macro    TEST14_VALUE
-tests/test14.c:5:5 defined  var      include_value int
-
-USES:
-tests/test14.c:2:10 READ  file:tests/include/test14.h
-tests/test14.c:3:10 READ  file:<stddef.h>
-tests/test14.c:5:21 READ  macro:TEST14_VALUE
-tests/test14.c:5:5 WRITE c:@include_value

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "symbols": [
+    {"kind":"struct","name":"P","owner":null,"type":null,"usr":"c:@S@P","usr_id":null,"context":null,"file":"tests/test4.c","line":2,"column":8,"local":false,"definition":true},
+    {"kind":"field","name":"x","owner":"P","type":"int","usr":"c:@S@P@FI@x","usr_id":null,"context":null,"file":"tests/test4.c","line":3,"column":6,"local":false,"definition":true},
+    {"kind":"field","name":"y","owner":"P","type":"int","usr":"c:@S@P@FI@y","usr_id":null,"context":null,"file":"tests/test4.c","line":4,"column":6,"local":false,"definition":true},
+    {"kind":"function","name":"f","owner":null,"type":"int (struct P *)","usr":"c:@F@f","usr_id":"8267508a470db1ad","context":null,"file":"tests/test4.c","line":7,"column":5,"local":false,"definition":true},
+    {"kind":"variable","name":"p","owner":null,"type":"struct P *","usr":"c:test4.c@82@F@f@p","usr_id":null,"context":"f","file":"tests/test4.c","line":7,"column":17,"local":true,"definition":true}
+  ],
+  "uses": [
+    {"kind":"read","symbol_kind":"struct","mode":"-r-","mode_bits":4,"name":"P","owner":null,"type":null,"usr":"c:@S@P","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test4.c","line":7,"column":14,"local":true},
+    {"kind":"read","symbol_kind":"field","mode":"-r-","mode_bits":4,"name":"x","owner":"P","type":"int","usr":"c:@S@P@FI@x","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test4.c","line":9,"column":12,"local":false},
+    {"kind":"read","symbol_kind":"variable","mode":"--r","mode_bits":16,"name":"p","owner":null,"type":"struct P *","usr":"c:test4.c@82@F@f@p","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test4.c","line":9,"column":9,"local":true},
+    {"kind":"read","symbol_kind":"field","mode":"-r-","mode_bits":4,"name":"y","owner":"P","type":"int","usr":"c:@S@P@FI@y","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test4.c","line":9,"column":19,"local":false},
+    {"kind":"read","symbol_kind":"variable","mode":"--r","mode_bits":16,"name":"p","owner":null,"type":"struct P *","usr":"c:test4.c@82@F@f@p","usr_id":null,"context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test4.c","line":9,"column":16,"local":true}
+  ]
+}

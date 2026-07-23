@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "symbols": [
+    {"kind":"macro","name":"CALL_TARGET","owner":null,"type":null,"usr":"macro:CALL_TARGET","usr_id":null,"context":null,"file":"tests/test18.c","line":4,"column":9,"local":false,"definition":true},
+    {"kind":"function","name":"target","owner":null,"type":"int (int)","usr":"c:@F@target","usr_id":"b1066826d0948452","context":null,"file":"tests/test18.c","line":2,"column":5,"local":false,"definition":false},
+    {"kind":"function","name":"invoke","owner":null,"type":"int (int)","usr":"c:@F@invoke","usr_id":"2c0399085e4bb9f3","context":null,"file":"tests/test18.c","line":6,"column":5,"local":false,"definition":true},
+    {"kind":"variable","name":"value","owner":null,"type":"int","usr":"c:test18.c@116@F@invoke@value","usr_id":null,"context":"invoke","file":"tests/test18.c","line":6,"column":16,"local":true,"definition":true}
+  ],
+  "uses": [
+    {"kind":"read","symbol_kind":"macro","mode":"-r-","mode_bits":4,"name":"CALL_TARGET","owner":null,"type":null,"usr":"macro:CALL_TARGET","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test18.c","line":8,"column":9,"local":false},
+    {"kind":"call","symbol_kind":"function","mode":"--r","mode_bits":16,"name":"target","owner":null,"type":"int (int)","usr":"c:@F@target","usr_id":"b1066826d0948452","context":"invoke","context_usr":"c:@F@invoke","context_usr_id":"2c0399085e4bb9f3","file":"tests/test18.c","line":4,"column":28,"local":false},
+    {"kind":"read","symbol_kind":"variable","mode":"-r-","mode_bits":4,"name":"value","owner":null,"type":"int","usr":"c:test18.c@116@F@invoke@value","usr_id":null,"context":"invoke","context_usr":null,"context_usr_id":null,"file":"tests/test18.c","line":8,"column":21,"local":true}
+  ]
+}

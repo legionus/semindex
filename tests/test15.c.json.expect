@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "symbols": [
+    {"kind":"macro","name":"WRITE_ONCE","owner":null,"type":null,"usr":"macro:WRITE_ONCE","usr_id":null,"context":null,"file":"tests/test15.c","line":2,"column":9,"local":false,"definition":true},
+    {"kind":"struct","name":"task_struct","owner":null,"type":null,"usr":"c:@S@task_struct","usr_id":null,"context":null,"file":"tests/test15.c","line":7,"column":8,"local":false,"definition":true},
+    {"kind":"field","name":"pid","owner":"task_struct","type":"int","usr":"c:@S@task_struct@FI@pid","usr_id":null,"context":null,"file":"tests/test15.c","line":8,"column":6,"local":false,"definition":true},
+    {"kind":"function","name":"set_pid","owner":null,"type":"void (struct task_struct *, int)","usr":"c:@F@set_pid","usr_id":"7d6920c3c07fbb45","context":null,"file":"tests/test15.c","line":11,"column":6,"local":false,"definition":true},
+    {"kind":"variable","name":"task","owner":null,"type":"struct task_struct *","usr":"c:test15.c@263@F@set_pid@task","usr_id":null,"context":"set_pid","file":"tests/test15.c","line":11,"column":34,"local":true,"definition":true},
+    {"kind":"variable","name":"pid","owner":null,"type":"int","usr":"c:test15.c@289@F@set_pid@pid","usr_id":null,"context":"set_pid","file":"tests/test15.c","line":11,"column":44,"local":true,"definition":true}
+  ],
+  "uses": [
+    {"kind":"read","symbol_kind":"macro","mode":"-r-","mode_bits":4,"name":"WRITE_ONCE","owner":null,"type":null,"usr":"macro:WRITE_ONCE","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test15.c","line":13,"column":2,"local":false},
+    {"kind":"read","symbol_kind":"struct","mode":"-r-","mode_bits":4,"name":"task_struct","owner":null,"type":null,"usr":"c:@S@task_struct","usr_id":null,"context":"set_pid","context_usr":null,"context_usr_id":null,"file":"tests/test15.c","line":11,"column":21,"local":true},
+    {"kind":"read","symbol_kind":"field","mode":"-r-","mode_bits":4,"name":"pid","owner":"task_struct","type":"int","usr":"c:@S@task_struct@FI@pid","usr_id":null,"context":"set_pid","context_usr":null,"context_usr_id":null,"file":"tests/test15.c","line":13,"column":19,"local":false},
+    {"kind":"read","symbol_kind":"variable","mode":"--r","mode_bits":16,"name":"task","owner":null,"type":"struct task_struct *","usr":"c:test15.c@263@F@set_pid@task","usr_id":null,"context":"set_pid","context_usr":null,"context_usr_id":null,"file":"tests/test15.c","line":13,"column":13,"local":true},
+    {"kind":"address","symbol_kind":"field","mode":"m--","mode_bits":3,"name":"pid","owner":"task_struct","type":"int","usr":"c:@S@task_struct@FI@pid","usr_id":null,"context":"set_pid","context_usr":null,"context_usr_id":null,"file":"tests/test15.c","line":13,"column":19,"local":false},
+    {"kind":"read","symbol_kind":"variable","mode":"--r","mode_bits":16,"name":"task","owner":null,"type":"struct task_struct *","usr":"c:test15.c@263@F@set_pid@task","usr_id":null,"context":"set_pid","context_usr":null,"context_usr_id":null,"file":"tests/test15.c","line":13,"column":13,"local":true},
+    {"kind":"read","symbol_kind":"variable","mode":"-r-","mode_bits":4,"name":"pid","owner":null,"type":"int","usr":"c:test15.c@289@F@set_pid@pid","usr_id":null,"context":"set_pid","context_usr":null,"context_usr_id":null,"file":"tests/test15.c","line":13,"column":24,"local":true}
+  ]
+}

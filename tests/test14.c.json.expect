@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "symbols": [
+    {"kind":"macro","name":"TEST14_VALUE","owner":null,"type":null,"usr":"macro:TEST14_VALUE","usr_id":null,"context":null,"file":"tests/include/test14.h","line":2,"column":9,"local":false,"definition":true},
+    {"kind":"variable","name":"include_value","owner":null,"type":"int","usr":"c:@include_value","usr_id":null,"context":null,"file":"tests/test14.c","line":5,"column":5,"local":false,"definition":true}
+  ],
+  "uses": [
+    {"kind":"read","symbol_kind":"file","mode":"-r-","mode_bits":4,"name":"tests/include/test14.h","owner":null,"type":null,"usr":"file:tests/include/test14.h","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test14.c","line":2,"column":10,"local":false},
+    {"kind":"read","symbol_kind":"file","mode":"-r-","mode_bits":4,"name":"<stddef.h>","owner":null,"type":null,"usr":"file:<stddef.h>","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test14.c","line":3,"column":10,"local":false},
+    {"kind":"read","symbol_kind":"macro","mode":"-r-","mode_bits":4,"name":"TEST14_VALUE","owner":null,"type":null,"usr":"macro:TEST14_VALUE","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test14.c","line":5,"column":21,"local":false},
+    {"kind":"write","symbol_kind":"variable","mode":"-w-","mode_bits":8,"name":"include_value","owner":null,"type":"int","usr":"c:@include_value","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test14.c","line":5,"column":5,"local":false}
+  ]
+}

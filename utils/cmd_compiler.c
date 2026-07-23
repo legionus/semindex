@@ -26,8 +26,8 @@ static void compiler_help(void)
 	       "Commands with exactly one .c or .S source file are indexed.\n"
 	       "\n"
 	       "Options:\n"
-	       "  -f, --format=FORMAT        print index using selected format: default,\n"
-	       "                             dissect\n"
+	       "  -f, --format=FORMAT        print index using selected format: dissect,\n"
+	       "                             json\n"
 	       "  -s, --scope=SCOPE          select indexed source scope: file, project, all\n"
 	       "                             (default: project)\n"
 	       "  -d, --database=PATH        path to the semindex database\n"
@@ -167,7 +167,7 @@ int cmd_compiler(int argc, char **argv)
 		{ "help", no_argument, NULL, 'h' },
 		{ NULL, 0, NULL, 0 },
 	};
-	enum output_format format = FORMAT_DEFAULT;
+	enum output_format format = FORMAT_DISSECT;
 	semindex_scope_t scope = SEMINDEX_SCOPE_PROJECT;
 	const char *database = ".semindex/semindex.db";
 	const char *commands_database = NULL;

@@ -1,9 +1,0 @@
-SYMBOLS:
-tests/test10.c:2:5 declared function declared   int (int)
-tests/test10.c:3:5 declared function defined    int (int)
-tests/test10.c:5:17 defined  var      x          int
-tests/test10.c:10:5 defined  function call       int (void)
-
-USES:
-tests/test10.c:7:9 READ  c:test10.c@97@F@defined@x
-tests/test10.c:12:9 CALL  c:@F@defined

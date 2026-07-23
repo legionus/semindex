@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "symbols": [
+    {"kind":"function","name":"declared","owner":null,"type":"int (int)","usr":"c:@F@declared","usr_id":"28c14db4c5d7b6e7","context":null,"file":"tests/test10.c","line":2,"column":5,"local":false,"definition":false},
+    {"kind":"function","name":"defined","owner":null,"type":"int (int)","usr":"c:@F@defined","usr_id":"a2bf396938d7e248","context":null,"file":"tests/test10.c","line":3,"column":5,"local":false,"definition":false},
+    {"kind":"variable","name":"x","owner":null,"type":"int","usr":"c:test10.c@97@F@defined@x","usr_id":null,"context":"defined","file":"tests/test10.c","line":5,"column":17,"local":true,"definition":true},
+    {"kind":"function","name":"call","owner":null,"type":"int (void)","usr":"c:@F@call","usr_id":"2acd5e6b70bd8a2d","context":null,"file":"tests/test10.c","line":10,"column":5,"local":false,"definition":true}
+  ],
+  "uses": [
+    {"kind":"read","symbol_kind":"variable","mode":"-r-","mode_bits":4,"name":"x","owner":null,"type":"int","usr":"c:test10.c@97@F@defined@x","usr_id":null,"context":"defined","context_usr":null,"context_usr_id":null,"file":"tests/test10.c","line":7,"column":9,"local":true},
+    {"kind":"call","symbol_kind":"function","mode":"--r","mode_bits":16,"name":"defined","owner":null,"type":"int (int)","usr":"c:@F@defined","usr_id":"a2bf396938d7e248","context":"call","context_usr":"c:@F@call","context_usr_id":"2acd5e6b70bd8a2d","file":"tests/test10.c","line":12,"column":9,"local":false}
+  ]
+}

@@ -24,9 +24,8 @@ static void index_help(void)
 	       "  SOURCE                     .c or .S source file to index\n"
 	       "\n"
 	       "Options:\n"
-	       "  -f, --format=FORMAT        select output format: default, "
-	       "dissect\n"
-	       "                             (default: default)\n"
+	       "  -f, --format=FORMAT        select output format: dissect, json\n"
+	       "                             (default: dissect)\n"
 	       "  -s, --scope=SCOPE          select indexed source scope: "
 	       "file, project, all\n"
 	       "                             (default: project)\n"
@@ -65,7 +64,7 @@ int cmd_index(int argc, char **argv)
 		{ "help", no_argument, NULL, 'h' },
 		{ NULL, 0, NULL, 0 },
 	};
-	enum output_format format = FORMAT_DEFAULT;
+	enum output_format format = FORMAT_DISSECT;
 	semindex_scope_t scope = SEMINDEX_SCOPE_PROJECT;
 	const char *source_file = NULL;
 	const char *compile_commands = ".";

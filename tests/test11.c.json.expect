@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "symbols": [
+    {"kind":"struct","name":"Inner","owner":null,"type":null,"usr":"c:@S@Inner","usr_id":null,"context":null,"file":"tests/test11.c","line":2,"column":8,"local":false,"definition":true},
+    {"kind":"field","name":"x","owner":"Inner","type":"int","usr":"c:@S@Inner@FI@x","usr_id":null,"context":null,"file":"tests/test11.c","line":3,"column":6,"local":false,"definition":true},
+    {"kind":"struct","name":"Outer","owner":null,"type":null,"usr":"c:@S@Outer","usr_id":null,"context":null,"file":"tests/test11.c","line":6,"column":8,"local":false,"definition":true},
+    {"kind":"field","name":"inner","owner":"Outer","type":"struct Inner","usr":"c:@S@Outer@FI@inner","usr_id":null,"context":null,"file":"tests/test11.c","line":7,"column":15,"local":false,"definition":true},
+    {"kind":"field","name":"y","owner":"Outer","type":"int","usr":"c:@S@Outer@FI@y","usr_id":null,"context":null,"file":"tests/test11.c","line":8,"column":6,"local":false,"definition":true},
+    {"kind":"field","name":"z","owner":"Outer","type":"int[2]","usr":"c:@S@Outer@FI@z","usr_id":null,"context":null,"file":"tests/test11.c","line":9,"column":6,"local":false,"definition":true},
+    {"kind":"variable","name":"o","owner":null,"type":"struct Outer","usr":"c:@o","usr_id":null,"context":null,"file":"tests/test11.c","line":12,"column":14,"local":false,"definition":true}
+  ],
+  "uses": [
+    {"kind":"read","symbol_kind":"struct","mode":"-r-","mode_bits":4,"name":"Inner","owner":null,"type":null,"usr":"c:@S@Inner","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test11.c","line":7,"column":9,"local":false},
+    {"kind":"write","symbol_kind":"variable","mode":"-w-","mode_bits":8,"name":"o","owner":null,"type":"struct Outer","usr":"c:@o","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test11.c","line":12,"column":14,"local":false},
+    {"kind":"read","symbol_kind":"struct","mode":"-r-","mode_bits":4,"name":"Outer","owner":null,"type":null,"usr":"c:@S@Outer","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test11.c","line":12,"column":8,"local":false},
+    {"kind":"write","symbol_kind":"field","mode":"-w-","mode_bits":8,"name":"inner","owner":"Outer","type":"struct Inner","usr":"c:@S@Outer@FI@inner","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test11.c","line":13,"column":3,"local":false},
+    {"kind":"write","symbol_kind":"field","mode":"-w-","mode_bits":8,"name":"x","owner":"Inner","type":"int","usr":"c:@S@Inner@FI@x","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test11.c","line":13,"column":9,"local":false},
+    {"kind":"write","symbol_kind":"field","mode":"-w-","mode_bits":8,"name":"y","owner":"Outer","type":"int","usr":"c:@S@Outer@FI@y","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test11.c","line":14,"column":3,"local":false},
+    {"kind":"write","symbol_kind":"field","mode":"-w-","mode_bits":8,"name":"z","owner":"Outer","type":"int[2]","usr":"c:@S@Outer@FI@z","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test11.c","line":15,"column":3,"local":false}
+  ]
+}

@@ -18,7 +18,7 @@ run_case()
 	format=$5
 
 	set -- --compile-commands "$COMPILE_COMMANDS" --database "$tmpdir/semindex.db"
-	if [ "$format" != "default" ]; then
+	if [ -n "$format" ]; then
 		set -- "$@" --format "$format"
 	fi
 
@@ -26,6 +26,9 @@ run_case()
 		cat "$err" >&2
 		cat "$out" >&2
 		fail "$src did not index successfully"
+	fi
+	if [ "$format" = json ] && ! "$PYTHON" -m json.tool "$out" >/dev/null; then
+		fail "$src produced invalid JSON"
 	fi
 
 	sed "s|$SOURCE_DIR/||g" "$out" >"$out.normalized"
@@ -35,8 +38,8 @@ run_case()
 }
 
 if [ -z "${SEMINDEX:-}" ] || [ -z "${COMPILE_COMMANDS:-}" ] ||
-   [ -z "${SOURCE_DIR:-}" ]; then
-	fail "SEMINDEX, COMPILE_COMMANDS, and SOURCE_DIR must be set"
+   [ -z "${SOURCE_DIR:-}" ] || [ -z "${PYTHON:-}" ]; then
+	fail "SEMINDEX, COMPILE_COMMANDS, SOURCE_DIR, and PYTHON must be set"
 fi
 
 if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
@@ -46,4 +49,4 @@ fi
 tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT
 
-run_case "$1" "$2" "$tmpdir/test.out" "$tmpdir/test.err" "${3:-default}"
+run_case "$1" "$2" "$tmpdir/test.out" "$tmpdir/test.err" "${3:-}"

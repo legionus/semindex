@@ -65,8 +65,8 @@ set(SEMINDEX_FORMAT_SOURCES
 	utils/index_db_reader.c
 	utils/output.h
 	utils/output_common.c
-	utils/output_default.c
 	utils/output_dissect.c
+	utils/output_json.c
 	utils/output_search.c
 	utils/perf_trace.c
 	utils/perf_trace.h
@@ -189,8 +189,8 @@ add_executable(semindex
 	utils/cmd_callgraph.c
 	utils/cmd_index.c
 	utils/cmd_search.c
-	utils/output_default.c
 	utils/output_dissect.c
+	utils/output_json.c
 	utils/semindex.c
 )
 
@@ -228,15 +228,17 @@ if(BUILD_TESTING)
 	)
 		get_filename_component(test_name ${test_source} NAME)
 		add_test(
-			NAME semindex-${test_name}
+			NAME semindex-json-${test_name}
 			COMMAND
 				${CMAKE_COMMAND} -E env
 				SEMINDEX=$<TARGET_FILE:semindex>
 				COMPILE_COMMANDS=${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
 				SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+				PYTHON=${Python3_EXECUTABLE}
 				sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-output-tests.sh
 					${test_source}
-					${test_source}.expect
+					${test_source}.json.expect
+					json
 		)
 		add_test(
 			NAME semindex-dissect-${test_name}
@@ -245,10 +247,10 @@ if(BUILD_TESTING)
 				SEMINDEX=$<TARGET_FILE:semindex>
 				COMPILE_COMMANDS=${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
 				SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+				PYTHON=${Python3_EXECUTABLE}
 				sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-output-tests.sh
 					${test_source}
 					${test_source}.dissect.expect
-					dissect
 		)
 	endforeach()
 	add_test(
@@ -267,6 +269,7 @@ if(BUILD_TESTING)
 			SEMINDEX=$<TARGET_FILE:semindex>
 			COMPILE_COMMANDS=${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+			PYTHON=${Python3_EXECUTABLE}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-compiler-tests.sh
 	)
 	add_test(

@@ -34,10 +34,10 @@ void semindex_help(void)
 
 int parse_format(const char *value, enum output_format *format)
 {
-	if (!strcmp(value, "default"))
-		*format = FORMAT_DEFAULT;
-	else if (!strcmp(value, "dissect"))
+	if (!strcmp(value, "dissect"))
 		*format = FORMAT_DISSECT;
+	else if (!strcmp(value, "json"))
+		*format = FORMAT_JSON;
 	else
 		return -1;
 
@@ -60,10 +60,10 @@ int parse_scope(const char *value, semindex_scope_t *scope)
 
 int output_index(enum output_format format, semindex_t *s)
 {
-	if (format == FORMAT_DISSECT)
-		return output_dissect(stdout, s);
+	if (format == FORMAT_JSON)
+		return output_json(stdout, s);
 
-	return output_default(stdout, s);
+	return output_dissect(stdout, s);
 }
 
 int main(int argc, char **argv)

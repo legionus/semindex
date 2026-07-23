@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "symbols": [
+    {"kind":"macro","name":"FOO","owner":null,"type":null,"usr":"macro:FOO","usr_id":null,"context":null,"file":"tests/test13.c","line":2,"column":9,"local":false,"definition":true},
+    {"kind":"macro","name":"BAZ","owner":null,"type":null,"usr":"macro:BAZ","usr_id":null,"context":null,"file":"tests/test13.c","line":3,"column":9,"local":false,"definition":true},
+    {"kind":"variable","name":"a","owner":null,"type":"int","usr":"c:@a","usr_id":null,"context":null,"file":"tests/test13.c","line":6,"column":5,"local":false,"definition":true},
+    {"kind":"variable","name":"b","owner":null,"type":"int","usr":"c:@b","usr_id":null,"context":null,"file":"tests/test13.c","line":10,"column":5,"local":false,"definition":true},
+    {"kind":"variable","name":"c","owner":null,"type":"int","usr":"c:@c","usr_id":null,"context":null,"file":"tests/test13.c","line":14,"column":5,"local":false,"definition":true},
+    {"kind":"variable","name":"d","owner":null,"type":"int","usr":"c:@d","usr_id":null,"context":null,"file":"tests/test13.c","line":18,"column":5,"local":false,"definition":true}
+  ],
+  "uses": [
+    {"kind":"read","symbol_kind":"macro","mode":"-r-","mode_bits":4,"name":"FOO","owner":null,"type":null,"usr":"macro:FOO","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test13.c","line":5,"column":8,"local":false},
+    {"kind":"read","symbol_kind":"macro","mode":"-r-","mode_bits":4,"name":"BAR","owner":null,"type":null,"usr":"macro:BAR","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test13.c","line":9,"column":9,"local":false},
+    {"kind":"read","symbol_kind":"macro","mode":"-r-","mode_bits":4,"name":"BAZ","owner":null,"type":null,"usr":"macro:BAZ","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test13.c","line":13,"column":13,"local":false},
+    {"kind":"read","symbol_kind":"macro","mode":"-r-","mode_bits":4,"name":"__GNUC__","owner":null,"type":null,"usr":"macro:__GNUC__","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test13.c","line":17,"column":13,"local":false}
+  ]
+}

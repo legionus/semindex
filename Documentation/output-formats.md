@@ -4,62 +4,13 @@ The `semindex` command can print indexed records in more than one textual
 format.  Select the format with `--format=FORMAT`.
 
 ```sh
-semindex index --format=default --compile-commands build/compile_commands.json file.c
 semindex index --format=dissect --compile-commands build/compile_commands.json file.c
-semindex compiler --format=dissect -- -Iinclude -c file.c -o file.o
+semindex index --format=json --compile-commands build/compile_commands.json file.c
+semindex compiler --format=json -- -Iinclude -c file.c -o file.o
 ```
 
-If `--format` is omitted, `default` is used.
-
-## default
-
-The default format is a simple prototype format intended for tests and manual
-inspection.  It is split into two sections:
-
-```text
-SYMBOLS:
-file:line:column action kind name [type]
-
-USES:
-file:line:column use-kind usr
-```
-
-Example:
-
-```text
-SYMBOLS:
-tests/test6.c:2:8 defined  struct   :var
-tests/test6.c:4:21 defined  field    x          int
-tests/test6.c:6:3 defined  var      var        struct :var
-
-USES:
-tests/test6.c:6:3 WRITE c:@var
-```
-
-Symbol fields are:
-
-* `file`, `line`, `column`: source location reported by Clang;
-* `action`: `defined` or `declared`;
-* `kind`: symbol kind;
-* `name`: symbol name;
-* `type`: textual type, present only when known and non-empty.
-
-Use fields are:
-
-* `file`, `line`, `column`: source location of the reference;
-* `use-kind`: `READ`, `WRITE`, `ADDR`, or `CALL`;
-* `usr`: Clang USR of the referenced symbol, or a semindex-generated stable
-  identifier for entities such as macros and include files.
-
-Current symbol kinds are:
-
-```text
-var field struct union enum enumerator typedef function macro file
-```
-
-The default format intentionally exposes less information than the internal
-record model.  For example, it does not print access mode bits, owner names, or
-the current function context for each record.
+If `--format` is omitted, `dissect` is used. `semindex compiler` remains quiet
+unless `--format` is specified.
 
 ## dissect
 
@@ -140,6 +91,64 @@ Consecutive duplicate use records in the same file are suppressed when their
 printed dissect identity is the same.  This mirrors the compact style expected
 from dissect-like output.
 
+## JSON
+
+The `json` format is the machine-readable representation of one indexing
+result. It is a single JSON document written incrementally without creating a
+second buffered copy of the index:
+
+```json
+{
+  "version": 1,
+  "symbols": [
+    {
+      "kind": "field",
+      "name": "x",
+      "owner": "S",
+      "type": "int",
+      "usr": "c:@S@S@FI@x",
+      "usr_id": null,
+      "context": null,
+      "file": "file.c",
+      "line": 2,
+      "column": 6,
+      "local": false,
+      "definition": true
+    }
+  ],
+  "uses": [
+    {
+      "kind": "write",
+      "symbol_kind": "field",
+      "mode": "-w-",
+      "mode_bits": 8,
+      "name": "x",
+      "owner": "S",
+      "type": "int",
+      "usr": "c:@S@S@FI@x",
+      "usr_id": null,
+      "context": "update",
+      "context_usr": null,
+      "context_usr_id": null,
+      "file": "file.c",
+      "line": 8,
+      "column": 4,
+      "local": false
+    }
+  ]
+}
+```
+
+`symbols` contains declarations and definitions. `uses` keeps the explicit
+`read`, `write`, `address`, or `call` classification as well as the dissect
+mode string and its numeric bitmask. Optional strings and unavailable stable
+IDs are `null`. Function and call identities are hexadecimal strings rather
+than JSON numbers so all 64 bits remain exact.
+
+Consumers must check `version` before interpreting the document. New optional
+fields may be added without changing the version; incompatible structural or
+semantic changes require a new version.
+
 ## Search output
 
 `semindex search` uses the same configurable output style as `semind search`.
@@ -205,10 +214,10 @@ symbol definitions.
 
 ## Stability
 
-The text formats are currently project interfaces for tests and development,
-not a finalized machine-readable API.  Source locations, type spelling, and
-USR strings come from Clang and may change when the indexed source, compiler
-version, or compile flags change.
+The dissect and search text formats are project interfaces for tests and
+development, not machine-readable APIs. The JSON structure is versioned, but
+source locations, type spelling, and USR strings still come from Clang and may
+change with the indexed source, compiler version, or compile flags.
 
-For tooling that needs a stable programmatic interface, prefer the C API in
-`include/semindex.h` over parsing command output.
+In-process tooling can use the C API in `include/semindex.h` instead of parsing
+command output.

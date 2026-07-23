@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "symbols": [
+    {"kind":"struct","name":":var","owner":null,"type":null,"usr":"c:test6.c@S@test6.c@45","usr_id":null,"context":null,"file":"tests/test6.c","line":2,"column":8,"local":false,"definition":true},
+    {"kind":"field","name":"x","owner":":var","type":"int","usr":"c:test6.c@S@test6.c@45@Ua@FI@x","usr_id":null,"context":null,"file":"tests/test6.c","line":4,"column":21,"local":false,"definition":true},
+    {"kind":"variable","name":"var","owner":null,"type":"struct :var","usr":"c:@var","usr_id":null,"context":null,"file":"tests/test6.c","line":6,"column":3,"local":false,"definition":true}
+  ],
+  "uses": [
+    {"kind":"write","symbol_kind":"variable","mode":"-w-","mode_bits":8,"name":"var","owner":null,"type":"struct :var","usr":"c:@var","usr_id":null,"context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test6.c","line":6,"column":3,"local":false}
+  ]
+}

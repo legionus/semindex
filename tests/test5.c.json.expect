@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "symbols": [
+    {"kind":"function","name":"foo","owner":null,"type":"int (void)","usr":"c:@F@foo","usr_id":"714f6634d9b767a4","context":null,"file":"tests/test5.c","line":2,"column":5,"local":false,"definition":true},
+    {"kind":"function","name":"call","owner":null,"type":"int (int (*)(void))","usr":"c:@F@call","usr_id":"2acd5e6b70bd8a2d","context":null,"file":"tests/test5.c","line":7,"column":5,"local":false,"definition":true},
+    {"kind":"variable","name":"fn","owner":null,"type":"int (*)(void)","usr":"c:test5.c@84@F@call@fn","usr_id":null,"context":"call","file":"tests/test5.c","line":7,"column":16,"local":true,"definition":true}
+  ],
+  "uses": [
+    {"kind":"read","symbol_kind":"variable","mode":"--r","mode_bits":16,"name":"fn","owner":null,"type":"int (*)(void)","usr":"c:test5.c@84@F@call@fn","usr_id":null,"context":"call","context_usr":null,"context_usr_id":null,"file":"tests/test5.c","line":9,"column":9,"local":true},
+    {"kind":"call","symbol_kind":"variable","mode":"--r","mode_bits":16,"name":"fn","owner":null,"type":"int (*)(void)","usr":"c:test5.c@84@F@call@fn","usr_id":null,"context":"call","context_usr":null,"context_usr_id":null,"file":"tests/test5.c","line":9,"column":9,"local":true}
+  ]
+}

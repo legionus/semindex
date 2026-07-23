@@ -7,8 +7,8 @@
 #include "semindex.h"
 
 enum output_format {
-	FORMAT_DEFAULT,
 	FORMAT_DISSECT,
+	FORMAT_JSON,
 };
 
 #define OUTPUT_SEARCH_DEFAULT_FORMAT "(%m) %F\\t%l\\t%c\\t%C\\t%s"
@@ -28,8 +28,8 @@ typedef struct {
 	const char *context;
 } output_search_record_t;
 
-int output_default(FILE *out, semindex_t *s);
 int output_dissect(FILE *out, semindex_t *s);
+int output_json(FILE *out, semindex_t *s);
 char output_symbol_kind_char(semindex_symbol_kind_t kind);
 void output_mode_string(unsigned mode, char str[4]);
 output_search_t *output_search_create(FILE *out, const char *format);
