@@ -1,10 +1,16 @@
 cmake_minimum_required(VERSION 3.13)
 project(semindex C CXX)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
 	set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
 endif()
 
+include(GNUInstallDirs)
 include(CTest)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -103,78 +109,59 @@ if(NOT TARGET SQLite3::SQLite3 AND TARGET SQLite::SQLite3)
 	add_library(SQLite3::SQLite3 ALIAS SQLite::SQLite3)
 endif()
 
-add_library(semindex_database STATIC
+find_package(LLVM REQUIRED CONFIG)
+find_package(Clang REQUIRED CONFIG)
+
+# libsemindex_database
+add_library(libsemindex_database SHARED
 	utils/index_db_reader.c
 )
-target_include_directories(semindex_database PUBLIC
-	${CMAKE_CURRENT_SOURCE_DIR}/include
-	${CMAKE_CURRENT_SOURCE_DIR}/utils
+target_include_directories(libsemindex_database PUBLIC
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
 )
-target_link_libraries(semindex_database PUBLIC SQLite3::SQLite3)
+target_link_libraries(libsemindex_database PRIVATE SQLite3::SQLite3)
 
-add_library(semindex_storage STATIC
+# # libsemindex_storage
+add_library(libsemindex_storage SHARED
 	utils/command_db.c
 	utils/index_db.c
 	utils/output_common.c
 	utils/output_search.c
 	utils/perf_trace.c
 )
-target_include_directories(semindex_storage PUBLIC
-	${CMAKE_CURRENT_SOURCE_DIR}/include
-	${CMAKE_CURRENT_SOURCE_DIR}/utils
+target_include_directories(libsemindex_storage PUBLIC
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
 )
-target_link_libraries(semindex_storage PUBLIC semindex_database SQLite3::SQLite3)
-
-# LLVM paths from llvm-config
-execute_process(
-	COMMAND llvm-config --includedir
-	OUTPUT_VARIABLE LLVM_INCLUDEDIR
-	OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-
-execute_process(
-	COMMAND llvm-config --libdir
-	OUTPUT_VARIABLE LLVM_LIBDIR
-	OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-
-execute_process(
-	COMMAND llvm-config --cxxflags
-	OUTPUT_VARIABLE LLVM_CXXFLAGS
-	OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-
-execute_process(
-	COMMAND llvm-config --ldflags
-	OUTPUT_VARIABLE LLVM_LDFLAGS
-	OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-
-execute_process(
-	COMMAND llvm-config --libs --system-libs
-	OUTPUT_VARIABLE LLVM_LIBS
-	OUTPUT_STRIP_TRAILING_WHITESPACE
+target_link_libraries(libsemindex_storage
+	PUBLIC libsemindex_database
+	PRIVATE SQLite3::SQLite3
 )
 
 # libsemindex (C++)
-add_library(semindex_parser SHARED
+add_library(libsemindex SHARED
 	src/index_ast.cpp
 	src/index_context.cpp
 	src/index_pp.cpp
 	src/semindex.cpp
 )
-set_target_properties(semindex_parser PROPERTIES OUTPUT_NAME semindex)
+set_target_properties(libsemindex PROPERTIES OUTPUT_NAME semindex)
 
-target_include_directories(semindex_parser PUBLIC
-	${CMAKE_CURRENT_SOURCE_DIR}/include
-	${LLVM_INCLUDEDIR}
+target_include_directories(libsemindex PUBLIC
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 
 # Compile flags
-separate_arguments(LLVM_CXXFLAGS)
-target_compile_options(semindex_parser PRIVATE ${LLVM_CXXFLAGS})
-target_link_directories(semindex_parser PRIVATE ${LLVM_LIBDIR})
-target_link_libraries(semindex_parser PRIVATE clang-cpp ${LLVM_LIBS})
+target_include_directories(libsemindex PRIVATE
+	${LLVM_INCLUDE_DIRS}
+	${CLANG_INCLUDE_DIRS}
+)
+target_compile_definitions(libsemindex PRIVATE ${LLVM_DEFINITIONS})
+target_link_libraries(libsemindex PRIVATE
+	clang-cpp
+	LLVM
+)
 
 add_executable(semindex_lsp
 	src/lsp_call_hierarchy.cpp
@@ -186,15 +173,20 @@ add_executable(semindex_lsp
 	utils/semindex_lsp.cpp
 )
 set_target_properties(semindex_lsp PROPERTIES OUTPUT_NAME semindex-lsp)
+
 target_include_directories(semindex_lsp PRIVATE
 	${CMAKE_CURRENT_SOURCE_DIR}/src
-	${LLVM_INCLUDEDIR}
+	${LLVM_INCLUDE_DIRS}
+	${CLANG_INCLUDE_DIRS}
 )
-target_compile_options(semindex_lsp PRIVATE ${LLVM_CXXFLAGS})
-target_link_directories(semindex_lsp PRIVATE ${LLVM_LIBDIR})
-target_link_libraries(semindex_lsp PRIVATE semindex_parser semindex_storage ${LLVM_LIBS})
+target_compile_definitions(semindex_lsp PRIVATE ${LLVM_DEFINITIONS})
+target_link_libraries(semindex_lsp PRIVATE
+	libsemindex
+	libsemindex_storage
+	LLVM
+)
 
-add_executable(semindex
+add_executable(semindex_cli
 	utils/cmd_compiler.c
 	utils/cmd_compile_commands.c
 	utils/cmd_callgraph.c
@@ -204,9 +196,15 @@ add_executable(semindex
 	utils/output_json.c
 	utils/semindex.c
 )
+set_target_properties(semindex_cli PROPERTIES OUTPUT_NAME semindex)
+target_include_directories(semindex_cli PRIVATE include)
+target_link_libraries(semindex_cli PRIVATE libsemindex libsemindex_storage)
 
-target_include_directories(semindex PRIVATE include)
-target_link_libraries(semindex PRIVATE semindex_parser semindex_storage)
+install(TARGETS semindex_cli semindex_lsp libsemindex libsemindex_database libsemindex_storage
+	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+	ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
 
 if(BUILD_TESTING)
 	find_package(Python3 COMPONENTS Interpreter REQUIRED)
@@ -225,12 +223,12 @@ if(BUILD_TESTING)
 	add_executable(semindex_database_api_test
 		tests/database-api.c
 	)
-	target_link_libraries(semindex_database_api_test PRIVATE semindex_database)
+	target_link_libraries(semindex_database_api_test PRIVATE libsemindex_database)
 
 	add_executable(semindex_partial_index_test
 		tests/partial-index.cpp
 	)
-	target_link_libraries(semindex_partial_index_test PRIVATE semindex_parser)
+	target_link_libraries(semindex_partial_index_test PRIVATE libsemindex)
 
 	foreach(test_source IN ITEMS
 		tests/test.c
@@ -258,7 +256,7 @@ if(BUILD_TESTING)
 			NAME semindex-json-${test_name}
 			COMMAND
 				${CMAKE_COMMAND} -E env
-				SEMINDEX=$<TARGET_FILE:semindex>
+				SEMINDEX=$<TARGET_FILE:semindex_cli>
 				COMPILE_COMMANDS=${SEMINDEX_TEST_COMPILE_COMMANDS}
 				SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 				PYTHON=${Python3_EXECUTABLE}
@@ -271,7 +269,7 @@ if(BUILD_TESTING)
 			NAME semindex-dissect-${test_name}
 			COMMAND
 				${CMAKE_COMMAND} -E env
-				SEMINDEX=$<TARGET_FILE:semindex>
+				SEMINDEX=$<TARGET_FILE:semindex_cli>
 				COMPILE_COMMANDS=${SEMINDEX_TEST_COMPILE_COMMANDS}
 				SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 				PYTHON=${Python3_EXECUTABLE}
@@ -284,7 +282,7 @@ if(BUILD_TESTING)
 		NAME semindex-scope
 		COMMAND
 			${CMAKE_COMMAND} -E env
-			SEMINDEX=$<TARGET_FILE:semindex>
+			SEMINDEX=$<TARGET_FILE:semindex_cli>
 			COMPILE_COMMANDS=${SEMINDEX_TEST_COMPILE_COMMANDS}
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-scope-tests.sh
@@ -293,7 +291,7 @@ if(BUILD_TESTING)
 		NAME semindex-compiler
 		COMMAND
 			${CMAKE_COMMAND} -E env
-			SEMINDEX=$<TARGET_FILE:semindex>
+			SEMINDEX=$<TARGET_FILE:semindex_cli>
 			COMPILE_COMMANDS=${SEMINDEX_TEST_COMPILE_COMMANDS}
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			PYTHON=${Python3_EXECUTABLE}
@@ -303,7 +301,7 @@ if(BUILD_TESTING)
 		NAME semindex-search
 		COMMAND
 			${CMAKE_COMMAND} -E env
-			SEMINDEX=$<TARGET_FILE:semindex>
+			SEMINDEX=$<TARGET_FILE:semindex_cli>
 			COMPILE_COMMANDS=${SEMINDEX_TEST_COMPILE_COMMANDS}
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-search-tests.sh
@@ -312,14 +310,14 @@ if(BUILD_TESTING)
 		NAME semindex-database
 		COMMAND
 			${CMAKE_COMMAND} -E env
-			SEMINDEX=$<TARGET_FILE:semindex>
+			SEMINDEX=$<TARGET_FILE:semindex_cli>
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-database-tests.sh
 	)
 	add_test(
 		NAME semindex-database-api
 		COMMAND
 			${CMAKE_COMMAND} -E env
-			SEMINDEX=$<TARGET_FILE:semindex>
+			SEMINDEX=$<TARGET_FILE:semindex_cli>
 			DATABASE_API_TEST=$<TARGET_FILE:semindex_database_api_test>
 			COMPILE_COMMANDS=${SEMINDEX_TEST_COMPILE_COMMANDS}
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
@@ -336,7 +334,7 @@ if(BUILD_TESTING)
 		NAME semindex-command-database
 		COMMAND
 			${CMAKE_COMMAND} -E env
-			SEMINDEX=$<TARGET_FILE:semindex>
+			SEMINDEX=$<TARGET_FILE:semindex_cli>
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-command-db-tests.sh
 	)
@@ -344,7 +342,7 @@ if(BUILD_TESTING)
 		NAME semindex-callgraph
 		COMMAND
 			${CMAKE_COMMAND} -E env
-			SEMINDEX=$<TARGET_FILE:semindex>
+			SEMINDEX=$<TARGET_FILE:semindex_cli>
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-callgraph-tests.sh
 	)
@@ -352,7 +350,7 @@ if(BUILD_TESTING)
 		NAME semindex-trace
 		COMMAND
 			${CMAKE_COMMAND} -E env
-			SEMINDEX=$<TARGET_FILE:semindex>
+			SEMINDEX=$<TARGET_FILE:semindex_cli>
 			COMPILE_COMMANDS=${SEMINDEX_TEST_COMPILE_COMMANDS}
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-trace-tests.sh
@@ -362,6 +360,6 @@ if(BUILD_TESTING)
 		COMMAND
 			${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-lsp-tests.py
 				$<TARGET_FILE:semindex_lsp>
-				$<TARGET_FILE:semindex>
+				$<TARGET_FILE:semindex_cli>
 	)
 endif()

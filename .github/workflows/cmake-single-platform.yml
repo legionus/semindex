@@ -24,7 +24,8 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y \
           build-essential time cmake python3 pkg-config sqlite3 libsqlite3-dev \
-          clang libclang-dev libclang-cpp-dev llvm-dev clang-tools clang-format
+          clang libclang-dev libclang-cpp-dev llvm-dev clang-tools clang-format \
+          libclang-22-dev
 
     - name: Configure CMake
       run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
