@@ -2,8 +2,14 @@
 
 The read-only database interface is declared in
 `include/semindex_database.h` and provided by the
-`semindex_database` library. It lets applications query a semindex SQLite
+`libsemindex_database.so` library. It lets applications query a semindex SQLite
 database without linking the Clang-based parser.
+
+This library and `libsemindex.so` are the project's public libraries. Their
+installed headers are `semindex_database.h` and `semindex.h`, respectively.
+The storage, query-adapter, and indexing-pipeline libraries are internal static
+implementation details; they are neither installed nor covered by the public
+ABI. `libsemindex_database.so` depends on SQLite, but not on Clang or LLVM.
 
 Open a database with `semindex_db_open()` and close it with
 `semindex_db_close()`.

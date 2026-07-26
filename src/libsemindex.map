@@ -1,0 +1,24 @@
+{
+	global:
+		semindex_build_file_fingerprints;
+		semindex_create;
+		semindex_destroy;
+		semindex_diagnostic_count;
+		semindex_file_fingerprint_count;
+		semindex_get_compile_command;
+		semindex_get_diagnostic;
+		semindex_get_file_fingerprint;
+		semindex_get_index_result;
+		semindex_get_symbol;
+		semindex_get_use;
+		semindex_index_command;
+		semindex_index_file;
+		semindex_set_details;
+		semindex_set_include_local;
+		semindex_set_scope;
+		semindex_symbol_count;
+		semindex_use_count;
+
+	local:
+		*;
+};

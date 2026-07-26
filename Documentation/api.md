@@ -2,6 +2,9 @@
 
 The public parser interface is declared in `include/semindex.h` and exported by
 `libsemindex.so`. It is a C interface and can be used from both C and C++.
+Only declarations marked with `SEMINDEX_API` are part of the exported ABI.
+The library's C++ implementation symbols are hidden and are not an interface
+for applications.
 
 ## Lifetime
 

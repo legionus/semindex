@@ -59,7 +59,9 @@ The project is split into two layers.
           +----------------------+
 ```
 
-Only the implementation library is written in C++. All public interfaces are exposed through a plain C API.
+Only the parser implementation library is written in C++. Public parser and
+database interfaces are exposed through plain C APIs; their C++ and internal
+storage implementation symbols are hidden.
 
 ## Future work
 

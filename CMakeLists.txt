@@ -17,6 +17,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(SEMINDEX_FORMAT_SOURCES
 	include/semindex.h
 	include/semindex_database.h
+	include/semindex_export.h
 	src/index_ast.cpp
 	src/index_context.cpp
 	src/lsp_call_hierarchy.cpp
@@ -127,16 +128,35 @@ endif()
 find_package(LLVM REQUIRED CONFIG)
 find_package(Clang REQUIRED CONFIG)
 
+# Internal SQLite helpers
+add_library(semindex_sqlite STATIC
+	utils/sqlite.c
+)
+set_target_properties(semindex_sqlite PROPERTIES
+	C_VISIBILITY_PRESET hidden
+	POSITION_INDEPENDENT_CODE YES
+)
+target_include_directories(semindex_sqlite PUBLIC
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
+)
+target_link_libraries(semindex_sqlite PUBLIC SQLite3::SQLite3)
+
 # Streaming database reader
 add_library(semindex_database SHARED
 	utils/index_db_reader.c
-	utils/sqlite.c
+)
+set_target_properties(semindex_database PROPERTIES
+	C_VISIBILITY_PRESET hidden
+	LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/utils/libsemindex_database.map
+)
+target_link_options(semindex_database PRIVATE
+	-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/utils/libsemindex_database.map
 )
 target_include_directories(semindex_database PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
 )
-target_link_libraries(semindex_database PRIVATE SQLite3::SQLite3)
+target_link_libraries(semindex_database PRIVATE semindex_sqlite)
 
 # SQLite query adapters
 add_library(semindex_query STATIC
@@ -155,7 +175,7 @@ target_include_directories(semindex_query PUBLIC
 )
 target_link_libraries(semindex_query
 	PUBLIC semindex_database
-	PRIVATE SQLite3::SQLite3
+	PRIVATE semindex_sqlite
 )
 
 # SQLite storage adapters
@@ -171,7 +191,7 @@ target_include_directories(semindex_storage PUBLIC
 )
 target_link_libraries(semindex_storage
 	PUBLIC semindex_query
-	PRIVATE SQLite3::SQLite3
+	PRIVATE semindex_sqlite
 )
 
 # Clang parser and index construction
@@ -181,7 +201,15 @@ add_library(semindex_parser SHARED
 	src/index_pp.cpp
 	src/semindex.cpp
 )
-set_target_properties(semindex_parser PROPERTIES OUTPUT_NAME semindex)
+set_target_properties(semindex_parser PROPERTIES
+	CXX_VISIBILITY_PRESET hidden
+	LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/libsemindex.map
+	OUTPUT_NAME semindex
+	VISIBILITY_INLINES_HIDDEN YES
+)
+target_link_options(semindex_parser PRIVATE
+	-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/src/libsemindex.map
+)
 
 target_include_directories(semindex_parser PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -274,6 +302,9 @@ install(TARGETS semindex_dispatcher semindex_compiler semindex_index semindex_se
 	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 	ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
+install(FILES include/semindex.h include/semindex_database.h include/semindex_export.h
+	DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
 if(BUILD_TESTING)
@@ -407,6 +438,22 @@ if(BUILD_TESTING)
 			COMPILE_COMMANDS=${SEMINDEX_TEST_COMPILE_COMMANDS}
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-database-api-tests.sh
+	)
+	add_test(
+		NAME semindex-parser-exports
+		COMMAND
+			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-export-tests.sh
+				${CMAKE_NM}
+				$<TARGET_FILE:semindex_parser>
+				${CMAKE_CURRENT_SOURCE_DIR}/tests/libsemindex.exports
+	)
+	add_test(
+		NAME semindex-database-exports
+		COMMAND
+			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-export-tests.sh
+				${CMAKE_NM}
+				$<TARGET_FILE:semindex_database>
+				${CMAKE_CURRENT_SOURCE_DIR}/tests/libsemindex_database.exports
 	)
 	add_test(
 		NAME semindex-partial-index

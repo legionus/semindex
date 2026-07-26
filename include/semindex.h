@@ -4,6 +4,8 @@
 
 #include <stddef.h>
 
+#include "semindex_export.h"
+
 #define SEMINDEX_FILE_FINGERPRINT_SIZE 32
 
 #ifdef __cplusplus
@@ -129,36 +131,37 @@ typedef struct {
 } semindex_file_fingerprint_t;
 
 /* lifecycle */
-semindex_t *semindex_create(void);
-void semindex_destroy(semindex_t *s);
-void semindex_set_scope(semindex_t *s, semindex_scope_t scope);
-void semindex_set_details(semindex_t *s, int enabled);
-void semindex_set_include_local(semindex_t *s, int enabled);
+SEMINDEX_API semindex_t *semindex_create(void);
+SEMINDEX_API void semindex_destroy(semindex_t *s);
+SEMINDEX_API void semindex_set_scope(semindex_t *s, semindex_scope_t scope);
+SEMINDEX_API void semindex_set_details(semindex_t *s, int enabled);
+SEMINDEX_API void semindex_set_include_local(semindex_t *s, int enabled);
 
 /* indexing */
-int semindex_index_command(semindex_t *s, const semindex_compile_command_t *cmd);
-int semindex_index_file(semindex_t *s, const char *compile_commands_json, const char *source_file);
-int semindex_build_file_fingerprints(semindex_t *s);
+SEMINDEX_API int semindex_index_command(semindex_t *s, const semindex_compile_command_t *cmd);
+SEMINDEX_API int semindex_index_file(semindex_t *s, const char *compile_commands_json, const char *source_file);
+SEMINDEX_API int semindex_build_file_fingerprints(semindex_t *s);
 /* returned pointer is valid until the next index operation or destroy */
-const semindex_index_result_t *semindex_get_index_result(const semindex_t *s);
-size_t semindex_diagnostic_count(const semindex_t *s);
+SEMINDEX_API const semindex_index_result_t *semindex_get_index_result(const semindex_t *s);
+SEMINDEX_API size_t semindex_diagnostic_count(const semindex_t *s);
 /* returned pointer is valid until the next index operation or destroy */
-const semindex_diagnostic_t *semindex_get_diagnostic(const semindex_t *s, size_t idx);
+SEMINDEX_API const semindex_diagnostic_t *semindex_get_diagnostic(const semindex_t *s, size_t idx);
 /* returned pointers are valid until the next index operation or destroy */
-const semindex_compile_command_t *semindex_get_compile_command(const semindex_t *s);
+SEMINDEX_API const semindex_compile_command_t *semindex_get_compile_command(const semindex_t *s);
 
 /* queries */
-size_t semindex_symbol_count(const semindex_t *s);
+SEMINDEX_API size_t semindex_symbol_count(const semindex_t *s);
 /* returned pointer is valid until the next index operation or destroy */
-const semindex_symbol_t *semindex_get_symbol(const semindex_t *s, size_t idx);
+SEMINDEX_API const semindex_symbol_t *semindex_get_symbol(const semindex_t *s, size_t idx);
 
-size_t semindex_use_count(const semindex_t *s);
+SEMINDEX_API size_t semindex_use_count(const semindex_t *s);
 /* returned pointer is valid until the next index operation or destroy */
-const semindex_use_t *semindex_get_use(const semindex_t *s, size_t idx);
+SEMINDEX_API const semindex_use_t *semindex_get_use(const semindex_t *s, size_t idx);
 
-size_t semindex_file_fingerprint_count(const semindex_t *s);
+SEMINDEX_API size_t semindex_file_fingerprint_count(const semindex_t *s);
 /* returned pointer is valid until the next index operation or destroy */
-const semindex_file_fingerprint_t *semindex_get_file_fingerprint(const semindex_t *s, size_t idx, int include_local);
+SEMINDEX_API const semindex_file_fingerprint_t *semindex_get_file_fingerprint(const semindex_t *s, size_t idx,
+	int include_local);
 
 #ifdef __cplusplus
 }

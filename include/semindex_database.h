@@ -77,21 +77,21 @@ typedef struct {
 /* Record strings remain valid only until the callback returns. */
 typedef int (*semindex_db_record_callback_t)(void *data, const semindex_db_record_t *record);
 
-int semindex_db_open(const char *path, semindex_db_t **result);
-void semindex_db_close(semindex_db_t *db);
+SEMINDEX_API int semindex_db_open(const char *path, semindex_db_t **result);
+SEMINDEX_API void semindex_db_close(semindex_db_t *db);
 
 /* A nonzero callback result stops iteration and is returned to the caller. */
-int semindex_db_query(semindex_db_t *db, const semindex_db_query_options_t *opts,
+SEMINDEX_API int semindex_db_query(semindex_db_t *db, const semindex_db_query_options_t *opts,
 	semindex_db_record_callback_t callback, void *data);
 
 /* Line and column are one-based source byte positions. */
-int semindex_db_find_at(semindex_db_t *db, const char *path, const char *variant, unsigned line, unsigned column,
+SEMINDEX_API int semindex_db_find_at(semindex_db_t *db, const char *path, const char *variant, unsigned line,
+	unsigned column, semindex_db_record_callback_t callback, void *data);
+
+SEMINDEX_API int semindex_db_query_calls(semindex_db_t *db, const semindex_db_call_options_t *opts,
 	semindex_db_record_callback_t callback, void *data);
 
-int semindex_db_query_calls(semindex_db_t *db, const semindex_db_call_options_t *opts,
-	semindex_db_record_callback_t callback, void *data);
-
-int semindex_db_query_functions(semindex_db_t *db, const semindex_db_function_t *functions, size_t count,
+SEMINDEX_API int semindex_db_query_functions(semindex_db_t *db, const semindex_db_function_t *functions, size_t count,
 	semindex_db_record_callback_t callback, void *data);
 
 #ifdef __cplusplus
