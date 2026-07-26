@@ -5,6 +5,9 @@ millions of symbol records, repeated header parsing, concurrent database
 writers, and interactive search queries.  A change that is insignificant on a
 single test file can make indexing a Linux kernel tree unusable.
 
+The latest full profiling report is recorded in
+[performance-results.md](performance-results.md).
+
 ## When measurements are required
 
 Measure performance before and after changes to:
