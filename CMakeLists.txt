@@ -127,19 +127,19 @@ endif()
 find_package(LLVM REQUIRED CONFIG)
 find_package(Clang REQUIRED CONFIG)
 
-# libsemindex_database
-add_library(libsemindex_database SHARED
+# Streaming database reader
+add_library(semindex_database SHARED
 	utils/index_db_reader.c
 	utils/sqlite.c
 )
-target_include_directories(libsemindex_database PUBLIC
+target_include_directories(semindex_database PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
 )
-target_link_libraries(libsemindex_database PRIVATE SQLite3::SQLite3)
+target_link_libraries(semindex_database PRIVATE SQLite3::SQLite3)
 
-# libsemindex_query
-add_library(libsemindex_query SHARED
+# SQLite query adapters
+add_library(semindex_query STATIC
 	utils/command_db.c
 	utils/command_db_export.c
 	utils/command_db_reader.c
@@ -149,65 +149,66 @@ add_library(libsemindex_query SHARED
 	utils/output_search.c
 	utils/repository.c
 )
-target_include_directories(libsemindex_query PUBLIC
+target_include_directories(semindex_query PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
 )
-target_link_libraries(libsemindex_query
-	PUBLIC libsemindex_database
+target_link_libraries(semindex_query
+	PUBLIC semindex_database
 	PRIVATE SQLite3::SQLite3
 )
 
-# libsemindex_storage
-add_library(libsemindex_storage SHARED
+# SQLite storage adapters
+add_library(semindex_storage STATIC
 	utils/command_db_writer.c
 	utils/filesystem.c
 	utils/index_db_writer.c
 	utils/perf_trace.c
 )
-target_include_directories(libsemindex_storage PUBLIC
+target_include_directories(semindex_storage PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
 )
-target_link_libraries(libsemindex_storage
-	PUBLIC libsemindex_query
+target_link_libraries(semindex_storage
+	PUBLIC semindex_query
 	PRIVATE SQLite3::SQLite3
 )
 
-# libsemindex (C++)
-add_library(libsemindex SHARED
+# Clang parser and index construction
+add_library(semindex_parser SHARED
 	src/index_ast.cpp
 	src/index_context.cpp
 	src/index_pp.cpp
 	src/semindex.cpp
 )
-set_target_properties(libsemindex PROPERTIES OUTPUT_NAME semindex)
+set_target_properties(semindex_parser PROPERTIES OUTPUT_NAME semindex)
 
-target_include_directories(libsemindex PUBLIC
+target_include_directories(semindex_parser PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 
 # Compile flags
-target_include_directories(libsemindex PRIVATE
+target_include_directories(semindex_parser PRIVATE
 	${LLVM_INCLUDE_DIRS}
 	${CLANG_INCLUDE_DIRS}
 )
-target_compile_definitions(libsemindex PRIVATE ${LLVM_DEFINITIONS})
-target_link_libraries(libsemindex PRIVATE
+target_compile_definitions(semindex_parser PRIVATE ${LLVM_DEFINITIONS})
+target_link_libraries(semindex_parser PRIVATE
 	clang-cpp
 	LLVM
 )
 
-add_library(libsemindex_pipeline SHARED
+# Indexing orchestration
+add_library(semindex_pipeline STATIC
 	utils/index_pipeline.c
 )
-target_include_directories(libsemindex_pipeline PUBLIC
+target_include_directories(semindex_pipeline PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
 )
-target_link_libraries(libsemindex_pipeline PUBLIC
-	libsemindex
-	libsemindex_storage
+target_link_libraries(semindex_pipeline PUBLIC
+	semindex_parser
+	semindex_storage
 )
 
 add_executable(semindex_lsp
@@ -228,7 +229,7 @@ target_include_directories(semindex_lsp PRIVATE
 )
 target_compile_definitions(semindex_lsp PRIVATE ${LLVM_DEFINITIONS})
 target_link_libraries(semindex_lsp PRIVATE
-	libsemindex_pipeline
+	semindex_pipeline
 	LLVM
 )
 
@@ -238,7 +239,7 @@ add_library(semindex_cli_common STATIC
 	utils/output_json.c
 )
 target_include_directories(semindex_cli_common PRIVATE include)
-target_link_libraries(semindex_cli_common PUBLIC libsemindex)
+target_link_libraries(semindex_cli_common PUBLIC semindex_parser)
 
 function(add_semindex_command target command source)
 	add_executable(${target}
@@ -253,24 +254,23 @@ add_executable(semindex_dispatcher utils/semindex.c)
 set_target_properties(semindex_dispatcher PROPERTIES OUTPUT_NAME semindex)
 
 add_semindex_command(semindex_compiler compiler utils/cmd_compiler.c)
-target_link_libraries(semindex_compiler PRIVATE semindex_cli_common libsemindex_pipeline)
+target_link_libraries(semindex_compiler PRIVATE semindex_cli_common semindex_pipeline)
 
 add_semindex_command(semindex_index index utils/cmd_index.c)
-target_link_libraries(semindex_index PRIVATE semindex_cli_common libsemindex_pipeline)
+target_link_libraries(semindex_index PRIVATE semindex_cli_common semindex_pipeline)
 
 add_semindex_command(semindex_search search utils/cmd_search.c)
-target_link_libraries(semindex_search PRIVATE libsemindex_query)
+target_link_libraries(semindex_search PRIVATE semindex_query)
 
 add_semindex_command(semindex_callgraph callgraph utils/cmd_callgraph.c)
-target_link_libraries(semindex_callgraph PRIVATE libsemindex_query)
+target_link_libraries(semindex_callgraph PRIVATE semindex_query)
 
 add_semindex_command(semindex_compile_commands compile_commands utils/cmd_compile_commands.c)
 set_target_properties(semindex_compile_commands PROPERTIES OUTPUT_NAME semindex-compile-commands)
-target_link_libraries(semindex_compile_commands PRIVATE libsemindex_query)
+target_link_libraries(semindex_compile_commands PRIVATE semindex_query)
 
 install(TARGETS semindex_dispatcher semindex_compiler semindex_index semindex_search semindex_callgraph
-	semindex_compile_commands semindex_lsp libsemindex libsemindex_database libsemindex_query libsemindex_storage
-	libsemindex_pipeline
+	semindex_compile_commands semindex_lsp semindex_parser semindex_database
 	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 	ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -293,12 +293,12 @@ if(BUILD_TESTING)
 	add_executable(semindex_database_api_test
 		tests/database-api.c
 	)
-	target_link_libraries(semindex_database_api_test PRIVATE libsemindex_database)
+	target_link_libraries(semindex_database_api_test PRIVATE semindex_database)
 
 	add_executable(semindex_partial_index_test
 		tests/partial-index.cpp
 	)
-	target_link_libraries(semindex_partial_index_test PRIVATE libsemindex)
+	target_link_libraries(semindex_partial_index_test PRIVATE semindex_parser)
 
 	foreach(test_source IN ITEMS
 		tests/test.c

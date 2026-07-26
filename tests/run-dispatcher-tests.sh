@@ -69,3 +69,9 @@ for binary in "$dispatcher" "$3" "$4" "$5"; do
 		fail "query-only executable links against Clang or LLVM: $binary"
 	fi
 done
+
+for binary in "$dispatcher" "$@"; do
+	if ldd "$binary" | grep -q 'liblibsemindex_'; then
+		fail "executable links against an internal shared library: $binary"
+	fi
+done
