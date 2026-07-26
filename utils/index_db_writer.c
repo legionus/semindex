@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <sqlite3.h>
-#include <errno.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 
+#include "filesystem.h"
 #include "index_db.h"
 #include "output.h"
 #include "repository.h"
@@ -203,54 +203,6 @@ out:
 	return ret;
 }
 
-static int mkdir_one(const char *path)
-{
-	errno = 0;
-
-	if (mkdir(path, 0777) == 0 || errno == EEXIST)
-		return 0;
-
-	fprintf(stderr, "semindex: failed to create directory '%s': %s\n", path, strerror(errno));
-	return -1;
-}
-
-static int ensure_parent_directory(const char *path)
-{
-	char *dir, *p;
-	const char *slash;
-	int ret = -1;
-
-	slash = strrchr(path, '/');
-
-	if (!slash || slash == path)
-		return 0;
-
-	if (!(dir = strdup(path)))
-		goto fail;
-
-	dir[slash - path] = '\0';
-
-	for (p = dir + 1; *p; p++) {
-		if (*p != '/')
-			continue;
-
-		*p = '\0';
-
-		if (mkdir_one(dir) < 0)
-			goto fail;
-
-		*p = '/';
-	}
-
-	if (mkdir_one(dir) < 0)
-		goto fail;
-
-	ret = 0;
-fail:
-	free(dir);
-	return ret;
-}
-
 static int init_schema(sqlite3 *db)
 {
 	static const char *schema[] = {
@@ -339,7 +291,7 @@ static int open_writer(const char *path, sqlite3 **db, semindex_trace_t *trace)
 {
 	semindex_trace_time_t start = semindex_trace_begin(trace);
 
-	if (ensure_parent_directory(path) < 0) {
+	if (semindex_ensure_parent_directory(path) < 0) {
 		semindex_trace_end(trace, "db.mkdir", start);
 		return -1;
 	}

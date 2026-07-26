@@ -81,6 +81,8 @@ set(SEMINDEX_FORMAT_SOURCES
 	utils/command_db_internal.h
 	utils/command_db_reader.c
 	utils/command_db_writer.c
+	utils/filesystem.c
+	utils/filesystem.h
 	utils/index_db_callgraph.c
 	utils/index_db.h
 	utils/index_db_reader.c
@@ -96,6 +98,7 @@ set(SEMINDEX_FORMAT_SOURCES
 	utils/repository.c
 	utils/perf_trace.c
 	utils/perf_trace.h
+	utils/sqlite.c
 	utils/sqlite.h
 	utils/semindex.c
 	utils/semindex_cli.h
@@ -127,6 +130,7 @@ find_package(Clang REQUIRED CONFIG)
 # libsemindex_database
 add_library(libsemindex_database SHARED
 	utils/index_db_reader.c
+	utils/sqlite.c
 )
 target_include_directories(libsemindex_database PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -157,6 +161,7 @@ target_link_libraries(libsemindex_query
 # libsemindex_storage
 add_library(libsemindex_storage SHARED
 	utils/command_db_writer.c
+	utils/filesystem.c
 	utils/index_db_writer.c
 	utils/perf_trace.c
 )

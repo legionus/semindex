@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <sqlite3.h>
-#include <errno.h>
 #include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
 
 #include "command_db.h"
 #include "command_db_internal.h"
+#include "filesystem.h"
 #include "sqlite.h"
 
 static int exec_sql(sqlite3 *db, const char *sql)
@@ -34,58 +33,6 @@ static int exec_sql(sqlite3 *db, const char *sql)
 	}
 
 	return 0;
-}
-
-static int mkdir_one(const char *path)
-{
-	if (mkdir(path, 0777) == 0 || errno == EEXIST)
-		return 0;
-
-	fprintf(stderr, "semindex: failed to create directory '%s': %s\n", path, strerror(errno));
-
-	return -1;
-}
-
-static int ensure_parent_directory(const char *path)
-{
-	const char *slash = strrchr(path, '/');
-
-	char *dir;
-	char *p;
-
-	if (!slash || slash == path)
-		return 0;
-
-	dir = strdup(path);
-
-	if (!dir)
-		return -1;
-
-	dir[slash - path] = '\0';
-
-	for (p = dir + 1; *p; p++) {
-		if (*p != '/')
-			continue;
-
-		*p = '\0';
-
-		if (mkdir_one(dir) < 0)
-			goto fail;
-
-		*p = '/';
-	}
-
-	if (mkdir_one(dir) < 0)
-		goto fail;
-
-	free(dir);
-
-	return 0;
-
-fail:
-	free(dir);
-
-	return -1;
 }
 
 static int init_schema(sqlite3 *db)
@@ -135,7 +82,7 @@ rollback:
 
 static int open_writer(const char *path, sqlite3 **db)
 {
-	if (ensure_parent_directory(path) < 0)
+	if (semindex_ensure_parent_directory(path) < 0)
 		return -1;
 
 	if (sqlite3_open_v2(path, db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL) != SQLITE_OK) {

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <sqlite3.h>
-#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,16 +22,7 @@ struct semindex_db {
 
 static int prepare(semindex_db_t *db, const char *sql, sqlite3_stmt **stmt)
 {
-	int ret;
-
-	ret = sqlite3_prepare_v3(db->handle, sql, -1, SQLITE_PREPARE_PERSISTENT, stmt, NULL);
-
-	if (ret != SQLITE_OK) {
-		fprintf(stderr, "semindex: sqlite: %s\n", sqlite3_errmsg(db->handle));
-		return -1;
-	}
-
-	return 0;
+	return semindex_sqlite_prepare(db->handle, sql, stmt);
 }
 
 static int pattern_uses_glob(const char *pattern)
@@ -119,16 +109,11 @@ int semindex_db_open(const char *path, semindex_db_t **result)
 	if (!db)
 		return -1;
 
-	if (sqlite3_open_v2(path, &db->handle, SQLITE_OPEN_READONLY, NULL) != SQLITE_OK) {
-		fprintf(stderr, "semindex: failed to open database '%s': %s\n", path,
-			db->handle ? sqlite3_errmsg(db->handle) : "unknown error");
+	if (semindex_sqlite_open_readonly(path, &db->handle) < 0) {
 		semindex_db_close(db);
 		return -1;
 	}
-	if (sqlite3_busy_timeout(db->handle, INT_MAX) != SQLITE_OK) {
-		semindex_db_close(db);
-		return -1;
-	}
+
 	*result = db;
 	return 0;
 }

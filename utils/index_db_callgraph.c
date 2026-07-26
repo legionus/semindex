@@ -1,39 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <sqlite3.h>
-#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "index_db.h"
-
-static int prepare(sqlite3 *db, const char *sql, sqlite3_stmt **stmt)
-{
-	if (sqlite3_prepare_v3(db, sql, -1, SQLITE_PREPARE_PERSISTENT, stmt, NULL) == SQLITE_OK)
-		return 0;
-
-	fprintf(stderr, "semindex: sqlite: %s\n", sqlite3_errmsg(db));
-
-	return -1;
-}
+#include "sqlite.h"
 
 static int pattern_uses_glob(const char *pattern)
 {
 	return pattern && strpbrk(pattern, "*?[]");
-}
-
-static int open_reader(const char *path, sqlite3 **db)
-{
-	if (sqlite3_open_v2(path, db, SQLITE_OPEN_READONLY, NULL) != SQLITE_OK) {
-		fprintf(stderr, "semindex: failed to open database '%s': %s\n", path,
-			*db ? sqlite3_errmsg(*db) : "unknown error");
-
-		return -1;
-	}
-
-	if (sqlite3_busy_timeout(*db, INT_MAX) != SQLITE_OK)
-		return -1;
-
-	return 0;
 }
 
 static int print_callgraph_results(sqlite3 *db, const char *sql, int show_id, FILE *out)
@@ -42,7 +17,7 @@ static int print_callgraph_results(sqlite3 *db, const char *sql, int show_id, FI
 	int step;
 	int ret = -1;
 
-	if (prepare(db, sql, &stmt) < 0)
+	if (semindex_sqlite_prepare(db, sql, &stmt) < 0)
 		return -1;
 
 	while ((step = sqlite3_step(stmt)) == SQLITE_ROW) {
@@ -87,7 +62,7 @@ int index_db_callgraph(const char *path, const index_db_callgraph_options_t *opt
 	if (!path || !opts || !opts->function || !opts->function[0] || !out)
 		return -1;
 
-	if (open_reader(path, &db) < 0)
+	if (semindex_sqlite_open_readonly(path, &db) < 0)
 		goto out;
 
 	query = sqlite3_str_new(db);

@@ -4,6 +4,9 @@
 
 #include <sqlite3.h>
 
+int semindex_sqlite_prepare(sqlite3 *db, const char *sql, sqlite3_stmt **stmt);
+int semindex_sqlite_open_readonly(const char *path, sqlite3 **db);
+
 static inline int semindex_sqlite_bind_text(sqlite3_stmt *stmt, int index, const char *value)
 {
 	return sqlite3_bind_text(stmt, index, value ? value : "", -1, SQLITE_TRANSIENT) == SQLITE_OK ? 0 : -1;
