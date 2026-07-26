@@ -24,8 +24,8 @@ static void index_help(void)
 	       "  SOURCE                     .c or .S source file to index\n"
 	       "\n"
 	       "Options:\n"
-	       "  -f, --format=FORMAT        select output format: dissect, json\n"
-	       "                             (default: dissect)\n"
+	       "  -f, --format=FORMAT        print index without storing it using selected\n"
+	       "                             format: dissect, json\n"
 	       "  -s, --scope=SCOPE          select indexed source scope: "
 	       "file, project, all\n"
 	       "                             (default: project)\n"
@@ -85,6 +85,8 @@ int cmd_index(int argc, char **argv)
 	int ret = 1;
 	int include_local = 1;
 	int store_command = 1;
+	int output_only = 0;
+	int command_ret;
 	int opt;
 
 	optind = 1;
@@ -111,6 +113,7 @@ int cmd_index(int argc, char **argv)
 				fprintf(stderr, "semindex: unknown format: %s\n", optarg);
 				return 1;
 			}
+			output_only = 1;
 			break;
 		case 's':
 			if (parse_scope(optarg, &scope) < 0) {
@@ -150,7 +153,7 @@ int cmd_index(int argc, char **argv)
 		fprintf(stderr, "semindex: variant name must not be empty\n");
 		return 1;
 	}
-	if (store_command && !commands_database) {
+	if (!output_only && store_command && !commands_database) {
 		default_commands_database = command_db_default_path(database);
 
 		if (!default_commands_database) {
@@ -183,33 +186,42 @@ int cmd_index(int argc, char **argv)
 		goto out;
 	}
 	semindex_trace_end(trace, "parse", phase_start);
-	phase_start = semindex_trace_begin(trace);
-
-	if (semindex_build_file_fingerprints(s) < 0) {
-		semindex_trace_end(trace, "fingerprint", phase_start);
-		fprintf(stderr, "semindex: failed to fingerprint '%s'\n", source_file);
-		goto out;
-	}
-	semindex_trace_end(trace, "fingerprint", phase_start);
-	phase_start = semindex_trace_begin(trace);
-
-	if (index_db_store(database, s, source_file, variant, include_local, trace) < 0) {
-		semindex_trace_end(trace, "symbol_database", phase_start);
-		goto out;
-	}
-	semindex_trace_end(trace, "symbol_database", phase_start);
-	cmd = semindex_get_compile_command(s);
-
-	if (store_command) {
+	if (!output_only) {
 		phase_start = semindex_trace_begin(trace);
 
-		if (!cmd ||
-			command_db_store(commands_database, variant, cmd->directory, cmd->file, cmd->argc, cmd->argv) <
-				0) {
-			semindex_trace_end(trace, "command_database", phase_start);
+		if (semindex_build_file_fingerprints(s) < 0) {
+			semindex_trace_end(trace, "fingerprint", phase_start);
+			fprintf(stderr, "semindex: failed to fingerprint '%s'\n", source_file);
 			goto out;
 		}
-		semindex_trace_end(trace, "command_database", phase_start);
+		semindex_trace_end(trace, "fingerprint", phase_start);
+		phase_start = semindex_trace_begin(trace);
+
+		if (index_db_store(database, s, source_file, variant, include_local, trace) < 0) {
+			semindex_trace_end(trace, "symbol_database", phase_start);
+			goto out;
+		}
+		semindex_trace_end(trace, "symbol_database", phase_start);
+		cmd = semindex_get_compile_command(s);
+
+		if (store_command) {
+			phase_start = semindex_trace_begin(trace);
+
+			if (!cmd) {
+				semindex_trace_end(trace, "command_database", phase_start);
+				goto out;
+			}
+
+			command_ret = command_db_store(commands_database, variant, cmd->directory, cmd->file, cmd->argc,
+				cmd->argv);
+
+			if (command_ret < 0) {
+				semindex_trace_end(trace, "command_database", phase_start);
+				goto out;
+			}
+
+			semindex_trace_end(trace, "command_database", phase_start);
+		}
 	}
 
 	phase_start = semindex_trace_begin(trace);

@@ -10,7 +10,9 @@ semindex compiler --format=json -- -Iinclude -c file.c -o file.o
 ```
 
 If `--format` is omitted, `dissect` is used. `semindex compiler` remains quiet
-unless `--format` is specified.
+unless `--format` is specified. In both indexing commands, explicitly selecting
+a format prints the in-memory index without creating or updating symbol and
+compiler-command databases.
 
 ## dissect
 

@@ -6,6 +6,9 @@ semantic records. Compiler commands are stored separately in
 `.semindex/commands.db`. Local symbols and their uses are stored by default;
 indexing with `--no-include-local` omits them.
 
+An explicit `--format=FORMAT` selects output-only inspection mode for either
+indexing command and does not create or update either database.
+
 ## Layout
 
 The `records` table stores declarations, definitions, and uses together. Its

@@ -110,7 +110,9 @@ semindex compiler -- -Iinclude -DDEBUG -c path/to/file.c -o file.o
 After a clean frontend result, the indexing commands replace the source's
 index records in `.semindex/semindex.db`. Partial or failed results make the
 command fail without replacing the last clean records. `compiler` is quiet
-unless `--format` is specified. Selected compiler arguments are stored
+unless `--format` is specified. For either indexing command, explicitly
+selecting a format prints the in-memory index without creating either database.
+Selected compiler arguments are stored
 separately in `.semindex/commands.db`; use
 `--no-store-command` to disable this. Local symbols and their uses are included
 by default; use `--no-include-local` to omit them. A compiler name may be

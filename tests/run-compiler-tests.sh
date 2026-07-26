@@ -99,6 +99,24 @@ run_index_command_case()
 	fi
 }
 
+run_index_format_case()
+{
+	db=$tmpdir/index-format/.semindex/semindex.db
+	commands_db=$tmpdir/index-format/.semindex/commands.db
+	out=$tmpdir/index-format.out
+
+	if ! "$SEMINDEX" index --format=dissect --database "$db" \
+	     --compile-commands "$COMPILE_COMMANDS" "$SOURCE_DIR/tests/test.c" >"$out"; then
+		fail "index --format=dissect failed"
+	fi
+	if [ ! -s "$out" ]; then
+		fail "index --format=dissect produced no output"
+	fi
+	if [ -e "$db" ] || [ -e "$commands_db" ]; then
+		fail "index --format=dissect created a database"
+	fi
+}
+
 run_no_include_local_case()
 {
 	db=$tmpdir/no-local/.semindex/semindex.db
@@ -120,6 +138,7 @@ run_format_case()
 	out=$tmpdir/$format.out
 	err=$tmpdir/$format.err
 	db=$tmpdir/$format/.semindex/semindex.db
+	commands_db=$tmpdir/$format/.semindex/commands.db
 
 	if ! "$SEMINDEX" compiler --format "$format" --database "$db" -- \
 	     cc --no-default-config -I"$SOURCE_DIR/tests/include" -c \
@@ -130,6 +149,9 @@ run_format_case()
 	sed "s|$SOURCE_DIR/||g" "$out" >"$out.normalized"
 	if ! diff -u "$SOURCE_DIR/$expect" "$out.normalized"; then
 		fail "compiler output differs from $expect"
+	fi
+	if [ -e "$db" ] || [ -e "$commands_db" ]; then
+		fail "compiler --format=$format created a database"
 	fi
 }
 
@@ -242,6 +264,7 @@ trap 'rm -rf "$tmpdir"' EXIT
 run_quiet_case
 run_no_store_command_case
 run_index_command_case
+run_index_format_case
 run_no_include_local_case
 run_format_case dissect tests/test.c.dissect.expect
 run_format_case json tests/test.c.json.expect

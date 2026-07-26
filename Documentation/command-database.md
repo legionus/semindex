@@ -15,6 +15,9 @@ command database and `--no-store-command` to disable command storage.  Commands
 are keyed by index variant and canonical source path, so indexing the same
 source again replaces its command only within that variant.
 
+An indexing command with an explicit `--format=FORMAT` does not store its
+compiler command because the option selects output-only inspection mode.
+
 The database is deliberately separate from `semindex.db`.  Large compiler
 argument vectors therefore do not enlarge the symbol lookup database or alter
 its query plans.

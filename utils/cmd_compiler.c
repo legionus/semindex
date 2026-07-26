@@ -26,8 +26,8 @@ static void compiler_help(void)
 	       "Commands with exactly one .c or .S source file are indexed.\n"
 	       "\n"
 	       "Options:\n"
-	       "  -f, --format=FORMAT        print index using selected format: dissect,\n"
-	       "                             json\n"
+	       "  -f, --format=FORMAT        print index without storing it using selected\n"
+	       "                             format: dissect, json\n"
 	       "  -s, --scope=SCOPE          select indexed source scope: file, project, all\n"
 	       "                             (default: project)\n"
 	       "  -d, --database=PATH        path to the semindex database\n"
@@ -274,7 +274,7 @@ int cmd_compiler(int argc, char **argv)
 		free(default_argv);
 		return 1;
 	}
-	if (store_command && !commands_database) {
+	if (!print_output && store_command && !commands_database) {
 		default_commands_database = command_db_default_path(database);
 
 		if (!default_commands_database) {
@@ -314,31 +314,33 @@ int cmd_compiler(int argc, char **argv)
 		goto out;
 	}
 	semindex_trace_end(trace, "parse", phase_start);
-	phase_start = semindex_trace_begin(trace);
-
-	if (semindex_build_file_fingerprints(s) < 0) {
-		semindex_trace_end(trace, "fingerprint", phase_start);
-		fprintf(stderr, "semindex: failed to fingerprint '%s'\n", source_file);
-		goto out;
-	}
-	semindex_trace_end(trace, "fingerprint", phase_start);
-	phase_start = semindex_trace_begin(trace);
-
-	if (index_db_store(database, s, source_file, variant, include_local, trace) < 0) {
-		semindex_trace_end(trace, "symbol_database", phase_start);
-		goto out;
-	}
-	semindex_trace_end(trace, "symbol_database", phase_start);
-
-	if (store_command) {
+	if (!print_output) {
 		phase_start = semindex_trace_begin(trace);
 
-		if (command_db_store(commands_database, variant, cmd.directory, source_file, compiler_argc,
-			    (const char *const *)compiler_argv) < 0) {
-			semindex_trace_end(trace, "command_database", phase_start);
+		if (semindex_build_file_fingerprints(s) < 0) {
+			semindex_trace_end(trace, "fingerprint", phase_start);
+			fprintf(stderr, "semindex: failed to fingerprint '%s'\n", source_file);
 			goto out;
 		}
-		semindex_trace_end(trace, "command_database", phase_start);
+		semindex_trace_end(trace, "fingerprint", phase_start);
+		phase_start = semindex_trace_begin(trace);
+
+		if (index_db_store(database, s, source_file, variant, include_local, trace) < 0) {
+			semindex_trace_end(trace, "symbol_database", phase_start);
+			goto out;
+		}
+		semindex_trace_end(trace, "symbol_database", phase_start);
+
+		if (store_command) {
+			phase_start = semindex_trace_begin(trace);
+
+			if (command_db_store(commands_database, variant, cmd.directory, source_file, compiler_argc,
+				    (const char *const *)compiler_argv) < 0) {
+				semindex_trace_end(trace, "command_database", phase_start);
+				goto out;
+			}
+			semindex_trace_end(trace, "command_database", phase_start);
+		}
 	}
 
 	phase_start = semindex_trace_begin(trace);
