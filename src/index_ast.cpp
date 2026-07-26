@@ -186,7 +186,7 @@ static unsigned accessModeForUse(semindex_use_kind_t kind, const Expr *E, ASTCon
 		return SEMINDEX_MODE_R_PTR;
 
 	case SEMINDEX_USE_READ:
-		if (isCallCallee(E, ctx) || isPointerReadOperand(E, ctx))
+		if (E->getType()->isFunctionType() || isCallCallee(E, ctx) || isPointerReadOperand(E, ctx))
 			return SEMINDEX_MODE_R_PTR;
 
 		return SEMINDEX_MODE_R_VAL;
@@ -197,7 +197,7 @@ static unsigned accessModeForUse(semindex_use_kind_t kind, const Expr *E, ASTCon
 
 static semindex_symbol_kind_t symbolKindForDecl(const ValueDecl *D)
 {
-	if (isa<FieldDecl>(D))
+	if (isa<FieldDecl>(D) || isa<IndirectFieldDecl>(D))
 		return SEMINDEX_SYMBOL_FIELD;
 
 	if (isa<EnumConstantDecl>(D))
@@ -211,12 +211,10 @@ static semindex_symbol_kind_t symbolKindForDecl(const ValueDecl *D)
 
 static std::string getOwnerName(const Decl *D)
 {
-	const auto *FD = dyn_cast<FieldDecl>(D);
-
-	if (!FD)
+	if (!isa<FieldDecl>(D) && !isa<IndirectFieldDecl>(D))
 		return "";
 
-	const auto *RD = FD->getParent();
+	const auto *RD = dyn_cast<RecordDecl>(D->getDeclContext());
 
 	if (!RD)
 		return "";
@@ -411,6 +409,7 @@ public:
 		s.definition = true;
 
 		index.addSymbolInScope(std::move(s), D->getLocation());
+
 		return true;
 	}
 
@@ -500,12 +499,30 @@ public:
 
 		semindex_use_kind_t kind = classifyUse(E, ctx);
 
+		if (const auto *field = dyn_cast<FieldDecl>(D)) {
+			if (getName(field).empty())
+				return true;
+
+			if (isAnonymousRecord(field->getParent())) {
+				const RecordDecl *baseRecord = memberBaseRecord(E);
+				const IndirectFieldDecl *indirect = promotedFieldFor(field, baseRecord);
+
+				if (indirect) {
+					addValueUse(indirect, kind, accessModeForUse(kind, E, ctx), currentFunction,
+						E->getExprLoc(), false);
+					return true;
+				}
+			}
+		}
+
 		addValueUse(D, kind, accessModeForUse(kind, E, ctx), currentFunction, E->getExprLoc(), false);
 		return true;
 	}
 
 	bool VisitDesignatedInitExpr(DesignatedInitExpr *E)
 	{
+		const RecordDecl *initializedRecord = initializedRecordFor(E);
+
 		for (const auto &designator : E->designators()) {
 			if (!designator.isFieldDesignator())
 				continue;
@@ -514,8 +531,13 @@ public:
 
 			if (!D)
 				continue;
-			addValueUse(D, SEMINDEX_USE_WRITE, SEMINDEX_MODE_W_VAL, currentFunction,
-				designator.getFieldLoc(), false);
+
+			if (!isAnonymousRecord(D->getParent()))
+				addValueUse(D, SEMINDEX_USE_WRITE, SEMINDEX_MODE_W_VAL, currentFunction,
+					designator.getFieldLoc(), false);
+
+			if (initializedRecord)
+				addPromotedFieldUses(D, initializedRecord, designator.getFieldLoc());
 		}
 
 		return true;
@@ -543,6 +565,12 @@ public:
 		s.definition = true;
 
 		index.addSymbolInScope(std::move(s), D->getLocation());
+
+		for (Decl *member : D->decls()) {
+			if (auto *indirect = dyn_cast<IndirectFieldDecl>(member))
+				addIndirectField(indirect);
+		}
+
 		return true;
 	}
 
@@ -593,6 +621,9 @@ public:
 	bool VisitFunctionDecl(FunctionDecl *D)
 	{
 		if (!D->isThisDeclarationADefinition() && !D->hasPrototype())
+			return true;
+
+		if (!D->isThisDeclarationADefinition() && D->getDefinition())
 			return true;
 
 		if (!functionSymbols.insert(D->getCanonicalDecl()).second)
@@ -752,6 +783,124 @@ private:
 		index.addUseInScope(std::move(u), spelling);
 	}
 
+	const RecordDecl *initializedRecordFor(const DesignatedInitExpr *E) const
+	{
+		DynTypedNode node = DynTypedNode::create(*E);
+
+		for (;;) {
+			auto parents = ctx.getParents(node);
+
+			if (parents.empty())
+				return nullptr;
+
+			node = parents[0];
+
+			if (const auto *D = node.get<VarDecl>())
+				return recordDeclForType(D->getType());
+		}
+	}
+
+	static bool indirectChainIsSuffix(const IndirectFieldDecl *inner, const IndirectFieldDecl *outer)
+	{
+		auto innerChain = inner->chain();
+		auto outerChain = outer->chain();
+
+		if (innerChain.size() > outerChain.size())
+			return false;
+
+		size_t offset = outerChain.size() - innerChain.size();
+
+		for (size_t i = 0; i < innerChain.size(); i++) {
+			if (innerChain[i] != outerChain[offset + i])
+				return false;
+		}
+
+		return true;
+	}
+
+	bool promotedFieldIsVisible(const IndirectFieldDecl *field, const RecordDecl *initializedRecord)
+	{
+		const auto *owner = dyn_cast<RecordDecl>(field->getDeclContext());
+
+		if (owner == initializedRecord)
+			return true;
+
+		auto [current, end] = indirectFields.equal_range(field->getAnonField());
+
+		for (; current != end; ++current) {
+			const IndirectFieldDecl *outer = current->second;
+
+			if (outer->getDeclContext() == initializedRecord && indirectChainIsSuffix(field, outer))
+				return true;
+		}
+
+		return false;
+	}
+
+	void addPromotedFieldUses(const FieldDecl *field, const RecordDecl *initializedRecord, SourceLocation loc)
+	{
+		auto [current, end] = indirectFields.equal_range(field);
+
+		for (; current != end; ++current) {
+			const IndirectFieldDecl *indirect = current->second;
+
+			if (!promotedFieldIsVisible(indirect, initializedRecord))
+				continue;
+
+			addValueUse(indirect, SEMINDEX_USE_WRITE, SEMINDEX_MODE_W_VAL, currentFunction, loc, false);
+		}
+	}
+
+	const RecordDecl *memberBaseRecord(const MemberExpr *E) const
+	{
+		const Expr *base = E->getBase()->IgnoreParenImpCasts();
+
+		while (const auto *member = dyn_cast<MemberExpr>(base)) {
+			base = member->getBase()->IgnoreParenImpCasts();
+		}
+
+		QualType type = base->getType();
+
+		if (type->isPointerType())
+			type = type->getPointeeType();
+
+		return recordDeclForType(type);
+	}
+
+	const IndirectFieldDecl *promotedFieldFor(const FieldDecl *field, const RecordDecl *owner)
+	{
+		auto [current, end] = indirectFields.equal_range(field);
+
+		for (; current != end; ++current) {
+			const IndirectFieldDecl *indirect = current->second;
+
+			if (indirect->getDeclContext() == owner)
+				return indirect;
+		}
+
+		return nullptr;
+	}
+
+	void addIndirectField(IndirectFieldDecl *D)
+	{
+		const ValueInfo &info = valueInfo(D);
+		SemindexSymbol s;
+
+		indirectFields.emplace(D->getAnonField(), D);
+
+		s.kind = info.kind;
+		s.name = info.name;
+		s.owner = info.owner;
+		s.type = info.type;
+		s.usr = info.usr;
+		s.context = "";
+		s.loc = index.location(D->getLocation());
+		s.local = false;
+		s.definition = true;
+
+		index.addSymbolInScope(std::move(s), D->getLocation());
+	}
+
 	void addAnonymousRecordSymbols(const RecordDecl *D, const std::string &name)
 	{
 		SemindexSymbol s;
@@ -810,6 +959,7 @@ private:
 	unsigned long long currentFunctionUSRId = 0;
 	std::set<std::tuple<const Decl *, unsigned, std::string>> typeUses;
 	std::set<const FunctionDecl *> functionSymbols;
+	std::unordered_multimap<const FieldDecl *, const IndirectFieldDecl *> indirectFields;
 	std::unordered_map<const ValueDecl *, ValueInfo> valueInfoCache;
 	std::unordered_map<const FunctionDecl *, std::string> functionUSRCache;
 };

@@ -12,10 +12,10 @@ char output_symbol_kind_char(semindex_symbol_kind_t kind)
 		return 's';
 
 	case SEMINDEX_SYMBOL_ENUM:
-		return 'e';
+		return 'E';
 
 	case SEMINDEX_SYMBOL_ENUM_CONSTANT:
-		return 'v';
+		return 'e';
 
 	case SEMINDEX_SYMBOL_TYPEDEF:
 		return 't';

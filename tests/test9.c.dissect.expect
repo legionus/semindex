@@ -1,13 +1,13 @@
 
 FILE: tests/test9.c
 
-   2:6                    def   e Color
-   3:2                    def   v RED                              int
-   4:2                    def   v GREEN                            int
+   2:6                    def   E Color
+   3:2                    def   e RED                              int
+   4:2                    def   e GREEN                            int
    7:12                   def   v color                            enum Color
    7:12                   -w-   v color                            enum Color
-   7:6                    -r-   e Color
-   7:20                   -r-   v RED                              int
+   7:6                    -r-   E Color
+   7:20                   -r-   e RED                              int
    8:5                    def   v x                                int
    8:5                    -w-   v x                                int
-   8:9                    -r-   v GREEN                            int
+   8:9                    -r-   e GREEN                            int

@@ -33,6 +33,15 @@ run_case()
 	if [ "$(sqlite3 "$database" "SELECT COUNT(*) FROM records WHERE symbol = 'test_pp_pos'")" != 1 ]; then
 		fail "$command omitted a recovered symbol from the database"
 	fi
+	if [ "$(sqlite3 "$database" "SELECT COUNT(*) FROM records WHERE symbol = 'i_func3' AND record = 0 AND action = 1")" != 1 ]; then
+		fail "$command retained a declaration instead of the recovered definition"
+	fi
+	if [ "$(sqlite3 "$database" "SELECT COUNT(*) FROM records WHERE symbol = 'FMS_O.m1'")" != 2 ]; then
+		fail "$command omitted a promoted field or its initializer use"
+	fi
+	if [ "$(sqlite3 "$database" "SELECT COUNT(*) FROM records WHERE symbol = 'NO_FMS_S.m'")" != 2 ]; then
+		fail "$command omitted an anonymous-union field"
+	fi
 }
 
 if [ -z "${SEMINDEX:-}" ] || [ -z "${SOURCE_DIR:-}" ]; then
@@ -47,12 +56,12 @@ compiler_db=$tmpdir/compiler.db
 index_db=$tmpdir/index.db
 compile_commands=$tmpdir/compile_commands.json
 
-printf '[{"directory":"%s","file":"%s","arguments":["cc","--no-default-config","%s"]}]\n' \
+printf '[{"directory":"%s","file":"%s","arguments":["cc","--no-default-config","-fms-extensions","%s"]}]\n' \
 	"$SOURCE_DIR" "$source" "$source" >"$compile_commands"
 
 run_case compiler "$compiler_db" "$tmpdir/compiler.out" "$tmpdir/compiler.err" \
 	--format=dissect --no-store-command --database "$compiler_db" -- \
-	cc --no-default-config "$source"
+	cc --no-default-config -fms-extensions "$source"
 run_case index "$index_db" "$tmpdir/index.out" "$tmpdir/index.err" \
 	--format=dissect --no-store-command --database "$index_db" \
 	--compile-commands "$compile_commands" "$source"

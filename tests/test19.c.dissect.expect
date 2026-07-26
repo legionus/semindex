@@ -1,0 +1,15 @@
+
+FILE: tests/test19.c
+
+   2:8                    def   s Container
+   4:7                    def   m Container.value                  int
+   8:5                    def   f read_value                       int (struct Container *)
+   8:34  read_value       def . v p                                struct Container *
+   8:23  read_value       -r- . s Container
+  10:12  read_value       -r-   m Container.value                  int
+  10:9   read_value       --r . v p                                struct Container *
+  13:6                    def   f write_value                      void (struct Container *)
+  13:36  write_value      def . v p                                struct Container *
+  13:25  write_value      -r- . s Container
+  15:5   write_value      -w-   m Container.value                  int
+  15:2   write_value      --r . v p                                struct Container *
