@@ -39,7 +39,7 @@ FILE: tests/x_fixes_00.c
   51:19                   -r-   e X_2                              int
   53:8                    def   e X_3                              int
   53:13                   def   e Y_3                              int
-  53:19                   def   v e_3                              enum (unnamed enum at tests/x_fixes_00.c:53:1)
+  53:19                   def   v e_3                              enum (unnamed at tests/x_fixes_00.c:53:1)
   55:8                    def   e X_4                              int
   55:13                   def   e Y_4                              int
   56:13                   def   v e_4                              typeof (X_4)

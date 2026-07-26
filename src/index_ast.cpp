@@ -262,14 +262,40 @@ static std::string typeNameForRecord(const RecordDecl *D, const std::string &nam
 	return std::string(D->isUnion() ? "union " : "struct ") + name;
 }
 
-static std::string typeNameForTypedef(const TypedefNameDecl *D)
+static std::string stableTypeName(QualType type, const ASTContext &ctx)
+{
+	const Type *typePtr = type.getTypePtr();
+
+	if (isa<TypeOfExprType>(typePtr) || isa<TypeOfType>(typePtr) || isa<TypedefType>(typePtr))
+		return type.getAsString();
+
+	const auto *enumType = type->getAs<EnumType>();
+
+	if (!enumType)
+		return type.getAsString();
+
+	const EnumDecl *D = enumType->getDecl();
+
+	if (!D || !getName(D).empty() || D->getTypedefNameForAnonDecl())
+		return type.getAsString();
+
+	PresumedLoc loc = ctx.getSourceManager().getPresumedLoc(D->getLocation());
+
+	if (!loc.isValid())
+		return "enum (unnamed)";
+
+	return "enum (unnamed at " + std::string(loc.getFilename()) + ":" + std::to_string(loc.getLine()) + ":" +
+		std::to_string(loc.getColumn()) + ")";
+}
+
+static std::string typeNameForTypedef(const TypedefNameDecl *D, const ASTContext &ctx)
 {
 	const RecordDecl *anonymousRecord = recordDeclForType(D->getUnderlyingType());
 
 	if (isAnonymousRecord(anonymousRecord))
 		return typeNameForRecord(anonymousRecord, anonymousRecordNameForTypedef(D));
 
-	return D->getUnderlyingType().getAsString();
+	return stableTypeName(D->getUnderlyingType(), ctx);
 }
 
 /* ============================================================
@@ -323,7 +349,7 @@ public:
 				typeName = typeNameForRecord(anonymousRecord, anonymousName);
 			addAnonymousRecordSymbols(anonymousRecord, anonymousName);
 		} else if (details) {
-			typeName = D->getType().getAsString();
+			typeName = stableTypeName(D->getType(), ctx);
 		}
 
 		SemindexSymbol s;
@@ -389,7 +415,7 @@ public:
 
 		const RecordDecl *anonymousRecord = recordDeclForType(D->getUnderlyingType());
 		std::string anonymousName;
-		std::string typeName = details ? typeNameForTypedef(D) : "";
+		std::string typeName = details ? typeNameForTypedef(D, ctx) : "";
 
 		if (isAnonymousRecord(anonymousRecord)) {
 			anonymousName = anonymousRecordNameForTypedef(D);
@@ -417,7 +443,7 @@ public:
 	{
 		const TypedefNameDecl *D = TL.getTypePtr()->getDecl();
 
-		addTypeUse(D, SEMINDEX_SYMBOL_TYPEDEF, TL.getNameLoc(), details ? typeNameForTypedef(D) : "");
+		addTypeUse(D, SEMINDEX_SYMBOL_TYPEDEF, TL.getNameLoc(), details ? typeNameForTypedef(D, ctx) : "");
 		return true;
 	}
 
@@ -607,7 +633,7 @@ public:
 		s.owner = "";
 
 		if (details)
-			s.type = D->getType().getAsString();
+			s.type = stableTypeName(D->getType(), ctx);
 		s.usr = detailedUSR(D);
 		s.context = "";
 		s.loc = index.location(D->getLocation());
@@ -701,7 +727,7 @@ private:
 			entry->second.owner = getOwnerName(D);
 
 			if (details) {
-				entry->second.type = D->getType().getAsString();
+				entry->second.type = stableTypeName(D->getType(), ctx);
 				entry->second.usr = getUSR(D, ctx);
 			}
 		}
@@ -940,7 +966,7 @@ private:
 			s.owner = owner;
 
 			if (details)
-				s.type = field->getType().getAsString();
+				s.type = stableTypeName(field->getType(), ctx);
 			s.usr = detailedUSR(field);
 			s.context = "";
 			s.loc = index.displayLocation(ctx, field->getLocation());
