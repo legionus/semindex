@@ -19,6 +19,7 @@ db=$tmpdir/semindex.db
 commands_db=$tmpdir/commands.db
 source_a=$SOURCE_DIR/tests/callgraph-a.c
 source_b=$SOURCE_DIR/tests/callgraph-b.c
+source_a_path=tests/callgraph-a.c
 
 "$SEMINDEX" compiler --database="$db" --commands-database="$commands_db" -- \
 	cc --no-default-config "$source_a"
@@ -69,7 +70,7 @@ fi
 "$SEMINDEX" compiler --variant=debug --database="$db" --commands-database="$commands_db" -- \
 	cc --no-default-config "$source_a"
 "$SEMINDEX" callgraph --database="$db" --variant=debug --callees=caller >"$tmpdir/variant.out"
-if [ "$(wc -l <"$tmpdir/variant.out")" != 4 ] || grep -qv "debug:$source_a:" "$tmpdir/variant.out"; then
+if [ "$(wc -l <"$tmpdir/variant.out")" != 4 ] || grep -qv "debug:$source_a_path:" "$tmpdir/variant.out"; then
 	cat "$tmpdir/variant.out" >&2
 	fail "variant filter returned unexpected results"
 fi

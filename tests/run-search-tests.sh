@@ -18,6 +18,22 @@ tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT
 db=$tmpdir/.semindex/semindex.db
 
+repo=$tmpdir/repository
+repo_db=$repo/.semindex/semindex.db
+mkdir -p "$repo/.git"
+printf '%s\n' 'int repository_value;' >"$repo/value.c"
+"$SEMINDEX" compiler --database "$repo_db" --no-store-command -- \
+	cc --no-default-config "$repo/value.c"
+if ! (cd "$tmpdir" && "$SEMINDEX" search --database "$repo_db" repository_value) \
+	>"$tmpdir/repository-search.out"; then
+	fail "search did not resolve a repository-relative source path from the database"
+fi
+if ! grep -q 'int repository_value;' "$tmpdir/repository-search.out"; then
+	fail "search omitted the source line for a repository-relative path"
+fi
+
+cd "$SOURCE_DIR"
+
 "$SEMINDEX" index --database "$db" --compile-commands "$COMPILE_COMMANDS" \
 	"$SOURCE_DIR/tests/test11.c" >/dev/null
 "$SEMINDEX" index --database "$db" --compile-commands "$COMPILE_COMMANDS" \

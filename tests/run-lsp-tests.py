@@ -66,7 +66,7 @@ def function_id(database, source, symbol):
             "WHERE files.variant = 'general' AND files.path = ? "
             "AND records.symbol = ? AND records.record = 0 "
             "AND records.action != 0 AND records.kind = 7",
-            (str(source), symbol),
+            (source.name, symbol),
         ).fetchone()
     if not row or row[0] is None:
         fail(f"missing function ID for {source}:{symbol}")
@@ -106,6 +106,7 @@ def main():
 
     with tempfile.TemporaryDirectory() as temporary:
         directory = Path(temporary)
+        (directory / ".git").mkdir()
         source = directory / "navigation.c"
         database = directory / "semindex.db"
         commands_database = directory / "commands.db"
@@ -178,8 +179,11 @@ def main():
         ):
             fail(f"cursor lookup does not use the file index:\n{plan_details}")
 
-        callgraph_a = Path(__file__).resolve().parent / "callgraph-a.c"
-        callgraph_b = Path(__file__).resolve().parent / "callgraph-b.c"
+        fixtures = Path(__file__).resolve().parent
+        callgraph_a = directory / "callgraph-a.c"
+        callgraph_b = directory / "callgraph-b.c"
+        callgraph_a.write_text((fixtures / callgraph_a.name).read_text(encoding="utf-8"), encoding="utf-8")
+        callgraph_b.write_text((fixtures / callgraph_b.name).read_text(encoding="utf-8"), encoding="utf-8")
         for callgraph_source in (callgraph_a, callgraph_b):
             indexed = subprocess.run(
                 [

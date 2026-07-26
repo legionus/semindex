@@ -263,6 +263,11 @@ std::string LspSourceMapper::uri(const char *path) const
 	return uriFromPath(resolve(path));
 }
 
+std::string LspSourceMapper::displayPath(const char *path) const
+{
+	return resolve(path).string();
+}
+
 llvm::json::Value LspSourceMapper::range(const semindex_db_record_t &record, Cache &cache) const
 {
 	std::filesystem::path path = resolve(record.path);

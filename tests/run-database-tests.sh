@@ -17,6 +17,27 @@ tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT
 db=$tmpdir/.semindex/semindex.db
 
+repo=$tmpdir/repository
+repo_db=$tmpdir/repository.db
+mkdir -p "$repo/src" "$repo/include"
+printf '%s\n' 'gitdir: /tmp/example.git' >"$repo/.git"
+printf '%s\n' 'struct repository_local { int member; };' >"$repo/include/local.h"
+printf '%s\n' 'struct repository_external { int member; };' >"$tmpdir/external.h"
+printf '%s\n' '#include "local.h"' '#include "external.h"' \
+	'int repository_read(struct repository_local *local, struct repository_external *external)' \
+	'{' 'return local->member + external->member;' '}' >"$repo/src/main.c"
+"$SEMINDEX" compiler --database "$repo_db" --no-store-command -- \
+	cc --no-default-config -I"$repo/include" -I"$tmpdir" "$repo/src/main.c"
+if [ "$(sqlite3 "$repo_db" "SELECT COUNT(*) FROM files WHERE path = 'src/main.c'")" != 1 ]; then
+	fail "repository source path was not stored relative to the Git root"
+fi
+if [ "$(sqlite3 "$repo_db" "SELECT COUNT(*) FROM files WHERE path = 'include/local.h'")" != 1 ]; then
+	fail "repository header path was not stored relative to the Git root"
+fi
+if [ "$(sqlite3 "$repo_db" "SELECT COUNT(*) FROM files WHERE path = '$tmpdir/external.h'")" != 1 ]; then
+	fail "header outside the repository was stored as a relative path"
+fi
+
 printf '%s\n' 'struct shared { int pid; int other; };' >"$tmpdir/shared.h"
 
 pids=

@@ -19,15 +19,17 @@ trap 'rm -rf "$tmpdir"' EXIT
 db=$tmpdir/semindex.db
 source=$SOURCE_DIR/tests/test11.c
 callgraph_source=$SOURCE_DIR/tests/callgraph-a.c
+source_path=tests/test11.c
+callgraph_path=tests/callgraph-a.c
 
 "$SEMINDEX" index --database="$db" --compile-commands="$COMPILE_COMMANDS" "$source" >/dev/null
 "$SEMINDEX" compiler --database="$db" --no-store-command -- \
 	cc --no-default-config "$callgraph_source"
-"$DATABASE_API_TEST" "$db" "$source" "$callgraph_source"
+"$DATABASE_API_TEST" "$db" "$source_path" "$callgraph_path"
 
 position_plan=$(sqlite3 "$db" "EXPLAIN QUERY PLAN
 SELECT records.symbol FROM files JOIN records ON records.file_id = files.id
-WHERE files.path = '$source' AND files.variant = 'general'
+WHERE files.path = '$source_path' AND files.variant = 'general'
 AND records.line = 6 AND records.column <= 10")
 if ! printf '%s\n' "$position_plan" |
 	grep -q 'SEARCH records USING.*records_file_idx (file_id=?)'; then

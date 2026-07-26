@@ -23,7 +23,8 @@ By default the server queries all variants in the database. Use
 `--variant=NAME` when an editor session should use only one configuration.
 Relative paths stored in the index are resolved against the workspace
 `rootUri` supplied by the client. If `rootUri` is absent or null, the first
-valid URI in `workspaceFolders` is used instead.
+valid URI in `workspaceFolders` is used instead. The workspace root must match
+the Git repository root used when the index was created.
 
 The server reads `Content-Length` framed JSON-RPC messages from standard input
 and writes responses and notifications to standard output.

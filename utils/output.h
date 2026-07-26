@@ -32,7 +32,7 @@ int output_dissect(FILE *out, semindex_t *s);
 int output_json(FILE *out, semindex_t *s);
 char output_symbol_kind_char(semindex_symbol_kind_t kind);
 void output_mode_string(unsigned mode, char str[4]);
-output_search_t *output_search_create(FILE *out, const char *format);
+output_search_t *output_search_create(FILE *out, const char *format, const char *root_hint);
 void output_search_destroy(output_search_t *search);
 int output_search_write(output_search_t *search, const output_search_record_t *record);
 

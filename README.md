@@ -117,6 +117,8 @@ separately in `.semindex/commands.db`; use
 `--no-store-command` to disable this. Local symbols and their uses are included
 by default; use `--no-include-local` to omit them. A compiler name may be
 provided after `--`; when omitted, `cc` is used as the Clang driver name.
+When a `.git` marker is found above the source file, paths inside that
+repository are stored relative to its root.
 
 Export the commands captured for the default variant as a compilation
 database:

@@ -190,7 +190,7 @@ static llvm::json::Value hierarchyItem(const LspSourceMapper &sources, const Fun
 	return llvm::json::Object{
 		{ "name", identity.symbol },
 		{ "kind", FUNCTION_SYMBOL_KIND },
-		{ "detail", record.path },
+		{ "detail", sources.displayPath(record.path.c_str()) },
 		{ "uri", sources.uri(record.path.c_str()) },
 		{ "range", sources.range(view, cache) },
 		{ "selectionRange", sources.range(view, cache) },

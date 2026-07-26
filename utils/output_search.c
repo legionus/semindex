@@ -5,12 +5,14 @@
 #include <string.h>
 
 #include "output.h"
+#include "repository.h"
 
 struct output_search {
 	FILE *out;
 	const char *format;
 
 	char *path;
+	char *root;
 	FILE *source;
 	char *text;
 	size_t capacity;
@@ -32,6 +34,8 @@ static void print_mode(FILE *out, const output_search_record_t *record)
 
 static int open_source(output_search_t *search, const char *path)
 {
+	char *source_path;
+
 	if (search->source && search->path && !strcmp(search->path, path))
 		return 0;
 
@@ -46,7 +50,22 @@ static int open_source(output_search_t *search, const char *path)
 	if (!search->path)
 		return -1;
 
-	search->source = fopen(path, "r");
+	if (path[0] == '/' || !search->root)
+		source_path = strdup(path);
+	else {
+		size_t length = strlen(search->root) + strlen(path) + 2;
+
+		source_path = malloc(length);
+
+		if (source_path)
+			snprintf(source_path, length, "%s/%s", search->root, path);
+	}
+
+	if (!source_path)
+		return -1;
+
+	search->source = fopen(source_path, "r");
+	free(source_path);
 
 	if (!search->source) {
 		fprintf(stderr, "semindex: failed to open source file '%s': %s\n", path, strerror(errno));
@@ -88,7 +107,7 @@ static int print_source_line(output_search_t *search, const char *path, int line
 	return 0;
 }
 
-output_search_t *output_search_create(FILE *out, const char *format)
+output_search_t *output_search_create(FILE *out, const char *format, const char *root_hint)
 {
 	output_search_t *search;
 
@@ -102,6 +121,10 @@ output_search_t *output_search_create(FILE *out, const char *format)
 
 	search->out = out;
 	search->format = format ? format : OUTPUT_SEARCH_DEFAULT_FORMAT;
+	search->root = semindex_repository_root(root_hint);
+
+	if (!search->root)
+		search->root = semindex_repository_root(".");
 
 	return search;
 }
@@ -114,6 +137,7 @@ void output_search_destroy(output_search_t *search)
 	if (search->source)
 		fclose(search->source);
 	free(search->path);
+	free(search->root);
 	free(search->text);
 	free(search);
 }

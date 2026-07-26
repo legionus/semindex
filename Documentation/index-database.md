@@ -53,6 +53,16 @@ the same physical source can have independent records for configurations such
 as `x86-defconfig` and `arm64-defconfig` without repeating the variant string
 in every symbol record.
 
+The indexer searches upward from the main source file for a `.git` directory or
+file. When found, source and header paths inside that repository are stored
+relative to its root. Files outside the repository, including system headers,
+are stored as canonical absolute paths. Path conversion is performed once per
+indexed file rather than once per semantic record.
+
+A symbol database is therefore intended to describe one repository. Relative
+paths are resolved by consumers against that repository root; the LSP uses the
+workspace root supplied by the client.
+
 ## Concurrent writers
 
 Each indexing process first inserts its records into private SQLite TEMP tables.
@@ -91,9 +101,11 @@ rebuilding the index. This is an intentional tradeoff for a reproducible cache.
 
 ## Compatibility
 
-The database is an experimental interface. The current schema does not migrate
-older prototype databases because dropping their tables would leave the original
-multi-gigabyte file allocation in place. Remove an old database before indexing:
+The database is an experimental interface. Schema version 10 uses
+repository-relative paths and does not migrate older databases because mixing
+absolute and relative file keys would retain stale records. Dropping old tables
+in place would also leave their original multi-gigabyte file allocation.
+Remove an old database before indexing:
 
 ```sh
 rm -f .semindex/semindex.db .semindex/semindex.db-shm \

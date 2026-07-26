@@ -83,6 +83,7 @@ set(SEMINDEX_FORMAT_SOURCES
 	utils/output_dissect.c
 	utils/output_json.c
 	utils/output_search.c
+	utils/repository.c
 	utils/perf_trace.c
 	utils/perf_trace.h
 	utils/sqlite.h
@@ -130,6 +131,7 @@ add_library(libsemindex_storage SHARED
 	utils/output_common.c
 	utils/output_search.c
 	utils/perf_trace.c
+	utils/repository.c
 )
 target_include_directories(libsemindex_storage PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

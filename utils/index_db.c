@@ -9,10 +9,11 @@
 
 #include "index_db.h"
 #include "output.h"
+#include "repository.h"
 #include "semindex_database.h"
 #include "sqlite.h"
 
-#define INDEX_SCHEMA_VERSION 9
+#define INDEX_SCHEMA_VERSION 10
 #define STRINGIFY_VALUE(value) #value
 #define STRINGIFY(value) STRINGIFY_VALUE(value)
 
@@ -41,6 +42,75 @@ struct staging_record {
 	struct optional_record_id context_usr_id;
 	int local;
 };
+
+struct stored_paths {
+	char *root;
+	char *main_file;
+	char **files;
+	size_t count;
+};
+
+static void free_stored_paths(struct stored_paths *paths)
+{
+	size_t i;
+
+	for (i = 0; i < paths->count; i++)
+		free(paths->files[i]);
+
+	free(paths->files);
+	free(paths->main_file);
+	free(paths->root);
+}
+
+static int init_stored_paths(struct stored_paths *paths, semindex_t *s, const char *main_file, int include_local)
+{
+	size_t i;
+
+	memset(paths, 0, sizeof(*paths));
+	paths->root = semindex_repository_root(main_file);
+	paths->main_file = semindex_repository_path(paths->root, main_file);
+	paths->count = semindex_file_fingerprint_count(s);
+
+	if (main_file && !paths->main_file)
+		goto fail;
+
+	if (!paths->count)
+		return 0;
+
+	paths->files = calloc(paths->count, sizeof(*paths->files));
+
+	if (!paths->files)
+		goto fail;
+
+	for (i = 0; i < paths->count; i++) {
+		const semindex_file_fingerprint_t *fingerprint;
+
+		fingerprint = semindex_get_file_fingerprint(s, i, include_local);
+
+		if (!fingerprint)
+			goto fail;
+
+		paths->files[i] = semindex_repository_path(paths->root, fingerprint->file);
+
+		if (!paths->files[i])
+			goto fail;
+	}
+
+	return 0;
+
+fail:
+	free_stored_paths(paths);
+	memset(paths, 0, sizeof(*paths));
+	return -1;
+}
+
+static const char *record_path(const struct stored_paths *paths, size_t index, const char *fallback)
+{
+	if (index < paths->count && paths->files[index])
+		return paths->files[index];
+
+	return fallback;
+}
 
 static int exec_sql(sqlite3 *db, const char *sql)
 {
@@ -392,8 +462,8 @@ out:
 	return ret;
 }
 
-static int stage_records(sqlite3 *db, semindex_t *s, int include_local, const unsigned char *cached,
-	size_t cached_count, uint64_t *items_in, uint64_t *items_out)
+static int stage_records(sqlite3 *db, semindex_t *s, const struct stored_paths *paths, int include_local,
+	const unsigned char *cached, size_t cached_count, uint64_t *items_in, uint64_t *items_out)
 {
 	static const char *sql =
 		"INSERT OR IGNORE INTO staging_records(symbol, record, action, kind, mode, path, line, column, "
@@ -432,7 +502,7 @@ static int stage_records(sqlite3 *db, semindex_t *s, int include_local, const un
 			.type = STORED_RECORD_SYMBOL,
 			.action = sym->definition,
 			.symbol_kind = sym->kind,
-			.file = sym->file,
+			.file = record_path(paths, sym->file_index, sym->file),
 			.line = sym->line,
 			.column = sym->column,
 			.owner = sym->owner,
@@ -472,7 +542,7 @@ static int stage_records(sqlite3 *db, semindex_t *s, int include_local, const un
 			.action = use->kind,
 			.symbol_kind = use->symbol_kind,
 			.mode = use->mode,
-			.file = use->file,
+			.file = record_path(paths, use->file_index, use->file),
 			.line = use->line,
 			.column = use->column,
 			.owner = use->owner,
@@ -505,8 +575,9 @@ static long long stat_mtime_ns(const struct stat *st)
 	return (long long)st->st_mtim.tv_sec * 1000000000LL + st->st_mtim.tv_nsec;
 }
 
-static int stage_files(sqlite3 *db, semindex_t *s, const char *main_file, const char *variant, int include_local,
-	unsigned char *cached, size_t cached_count, uint64_t *items_in, uint64_t *items_out)
+static int stage_files(sqlite3 *db, semindex_t *s, const struct stored_paths *paths, const char *main_file,
+	const char *variant, int include_local, unsigned char *cached, size_t cached_count, uint64_t *items_in,
+	uint64_t *items_out)
 {
 	static const char *insert_sql =
 		"INSERT INTO staging_files(path, mtime_ns, size, is_main, ordinal, fingerprint)"
@@ -557,7 +628,7 @@ static int stage_files(sqlite3 *db, semindex_t *s, const char *main_file, const 
 		sqlite3_reset(insert);
 		sqlite3_clear_bindings(insert);
 
-		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(insert, 1, fingerprint->file));
+		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(insert, 1, paths->files[i]));
 		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int64(insert, 2, mtime_ns));
 		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int64(insert, 3, size));
 		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int(insert, 4, is_main));
@@ -586,7 +657,7 @@ static int stage_files(sqlite3 *db, semindex_t *s, const char *main_file, const 
 			    &main_insert) < 0)
 			goto out;
 
-		SEMINDEX_SQLITE_BIND_OR_GOTO(main_out, semindex_sqlite_bind_text(main_insert, 1, main_file));
+		SEMINDEX_SQLITE_BIND_OR_GOTO(main_out, semindex_sqlite_bind_text(main_insert, 1, paths->main_file));
 		SEMINDEX_SQLITE_BIND_OR_GOTO(main_out, semindex_sqlite_bind_int64(main_insert, 2, mtime_ns));
 		SEMINDEX_SQLITE_BIND_OR_GOTO(main_out, semindex_sqlite_bind_int64(main_insert, 3, size));
 
@@ -799,6 +870,7 @@ int index_db_store(const char *path, semindex_t *s, const char *main_file, const
 {
 	sqlite3 *db = NULL;
 	semindex_trace_time_t start;
+	struct stored_paths paths;
 	unsigned char *cached = NULL;
 	size_t cached_count;
 	uint64_t records_in;
@@ -811,13 +883,16 @@ int index_db_store(const char *path, semindex_t *s, const char *main_file, const
 	if (!path || !s || !variant || !variant[0])
 		return -1;
 
+	if (init_stored_paths(&paths, s, main_file, include_local) < 0)
+		return -1;
+
 	cached_count = semindex_file_fingerprint_count(s);
 
 	if (cached_count) {
 		cached = calloc(cached_count, sizeof(*cached));
 
 		if (!cached)
-			return -1;
+			goto out;
 	}
 
 	if (open_writer(path, &db, trace) < 0)
@@ -837,7 +912,8 @@ int index_db_store(const char *path, semindex_t *s, const char *main_file, const
 
 	start = semindex_trace_begin(trace);
 
-	if (stage_files(db, s, main_file, variant, include_local, cached, cached_count, &files_in, &files_cached) < 0) {
+	if (stage_files(db, s, &paths, main_file, variant, include_local, cached, cached_count, &files_in,
+		    &files_cached) < 0) {
 		semindex_trace_end_counted(trace, "db.stage_files", start, files_in, files_cached);
 		exec_sql(db, "ROLLBACK");
 		goto out;
@@ -847,7 +923,7 @@ int index_db_store(const char *path, semindex_t *s, const char *main_file, const
 
 	start = semindex_trace_begin(trace);
 
-	if (stage_records(db, s, include_local, cached, cached_count, &records_in, &records_staged) < 0) {
+	if (stage_records(db, s, &paths, include_local, cached, cached_count, &records_in, &records_staged) < 0) {
 		semindex_trace_end_counted(trace, "db.stage_records", start, records_in, records_staged);
 		exec_sql(db, "ROLLBACK");
 		goto out;
@@ -880,7 +956,7 @@ int index_db_store(const char *path, semindex_t *s, const char *main_file, const
 
 		start = semindex_trace_begin(trace);
 
-		if (stage_records(db, s, include_local, cached, cached_count, &retry_in, &retry_staged) < 0) {
+		if (stage_records(db, s, &paths, include_local, cached, cached_count, &retry_in, &retry_staged) < 0) {
 			semindex_trace_end_counted(trace, "db.stage_records_retry", start, retry_in, retry_staged);
 			exec_sql(db, "ROLLBACK");
 			goto out;
@@ -904,6 +980,7 @@ out:
 	}
 
 	free(cached);
+	free_stored_paths(&paths);
 	return ret;
 }
 
@@ -970,7 +1047,7 @@ int index_db_search(const char *path, const index_db_search_options_t *opts, FIL
 	if (semindex_db_open(path, &db) < 0)
 		goto out;
 
-	output.formatter = output_search_create(out, opts->format ? opts->format : OUTPUT_SEARCH_DEFAULT_FORMAT);
+	output.formatter = output_search_create(out, opts->format ? opts->format : OUTPUT_SEARCH_DEFAULT_FORMAT, path);
 
 	if (!output.formatter)
 		goto out;

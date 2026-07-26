@@ -25,6 +25,7 @@ public:
 	std::optional<std::string> filePath(llvm::StringRef uri) const;
 	std::vector<std::string> databasePaths(llvm::StringRef uri) const;
 	std::optional<unsigned> byteColumn(llvm::StringRef uri, unsigned line, unsigned character) const;
+	std::string displayPath(const char *path) const;
 	std::string uri(const char *path) const;
 	llvm::json::Value range(const semindex_db_record_t &record, Cache &cache) const;
 	llvm::json::Value location(const semindex_db_record_t &record, Cache &cache) const;
