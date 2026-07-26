@@ -55,8 +55,8 @@ Local symbols are included by default. Disable them before indexing with
 
 ## File fingerprints
 
-Call `semindex_build_file_fingerprints()` after a clean index operation to
-derive fingerprints for indexed files. Enumerate them with
+Call `semindex_build_file_fingerprints()` after a clean or partial index
+operation to derive fingerprints for indexed files. Enumerate them with
 `semindex_file_fingerprint_count()` and
 `semindex_get_file_fingerprint()`. A fingerprint includes the semantic
 records attributed to the file and can be used by storage implementations to

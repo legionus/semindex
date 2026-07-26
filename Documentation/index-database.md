@@ -56,10 +56,13 @@ Each indexing process first inserts its records into private SQLite TEMP tables.
 This work does not hold the shared database write lock. Once staging is complete,
 the process performs one short bulk merge into the WAL database.
 
-The main C source is replaced within its variant whenever its translation unit
-is indexed cleanly. A partial or failed frontend run leaves the last clean
-records unchanged. This removes references that changed because of compiler
-options or included headers without affecting other variants of the same source.
+The main C source is replaced within its variant whenever the frontend produces
+index data. This includes partial results recovered from a source file with
+syntax or semantic errors, so the database continues to describe the saved
+file instead of retaining a stale clean index. A failed frontend run that
+produces no index data leaves the previous records unchanged. This removes
+references that changed because of compiler options or included headers without
+affecting other variants of the same source.
 Records from unchanged headers are merged with `INSERT OR IGNORE`, allowing
 different translation units to contribute semantic results without physically
 duplicating identical records. When a physical file's modification time or size

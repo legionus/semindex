@@ -331,6 +331,14 @@ if(BUILD_TESTING)
 			${CMAKE_CURRENT_SOURCE_DIR}/tests/partial
 	)
 	add_test(
+		NAME semindex-partial-cli
+		COMMAND
+			${CMAKE_COMMAND} -E env
+			SEMINDEX=$<TARGET_FILE:semindex_cli>
+			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-partial-cli-tests.sh
+	)
+	add_test(
 		NAME semindex-command-database
 		COMMAND
 			${CMAKE_COMMAND} -E env

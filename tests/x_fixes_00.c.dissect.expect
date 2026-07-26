@@ -1,0 +1,92 @@
+
+FILE: tests/x_fixes_00.c
+
+   3:10                   def   d SD
+   4:12                   -r-   d SD
+   9:9                    def   d SU
+  10:8                    -r-   d SU
+  13:9                    def   d SU
+  14:8                    -r-   d SU
+  19:9                    def   d READ_ONCE
+  20:9                    def   d WRITE_ONCE
+  26:3                    -r-   d WRITE_ONCE
+  28:6                    -r-   d READ_ONCE
+   4:5                    def   v sd_d                             int
+   6:5                    def   v sd_u                             int
+  11:5                    def   v unexpected                       int
+  15:5                    def   v unexpected                       int
+  22:5                    def   v R                                int
+  22:8                    def   v W                                int
+  24:6                    def   f test_pp_pos                      void (void)
+  27:6   test_pp_pos      -w-   v W                                int
+  28:16  test_pp_pos      -r-   v R                                int
+  33:20                   def   f i_func1                          void (void)
+  35:2   i_func1          --r   f unknown                          int ()
+  37:21                   def   f i_func2                          void *(void)
+  39:9   i_func2          -r- . f i_func1                          void (void)
+  42:6                    def   f test_inline                      void (void)
+  44:2   test_inline      --r   f i_func2                          void *(void)
+  48:6                    def   e E_1
+  48:12                   def   v X_1                              int
+  48:17                   def   v Y_1                              int
+  48:24                   def   v e_1                              enum E_1
+  50:6                    def   e E_2
+  50:12                   def   v X_2                              int
+  50:17                   def   v Y_2                              int
+  51:13                   def   v e_2                              typeof (Y_2)
+  51:13                   -w-   v e_2                              typeof (Y_2)
+  51:8                    -r-   v Y_2                              int
+  51:19                   -r-   v X_2                              int
+  53:8                    def   v X_3                              int
+  53:13                   def   v Y_3                              int
+  53:19                   def   v e_3                              enum (unnamed enum at tests/x_fixes_00.c:53:1)
+  55:8                    def   v X_4                              int
+  55:13                   def   v Y_4                              int
+  56:13                   def   v e_4                              typeof (X_4)
+  56:8                    -r-   v X_4                              int
+  60:8                    def   v X_5                              int
+  61:13                   def   v e_4                              typeof (X_5)
+  61:8                    -r-   v X_5                              int
+  64:13                   decl   f i_func3                          void (void)
+  65:6                    def   f caller1                          void (void)
+  65:22  caller1          --r   f i_func3                          void (void)
+  66:29  i_func3          --r   f FUNC3                            int ()
+  68:20                   def   f i_func4                          void (void)
+  68:36  i_func4          --r   f FUNC4                            int ()
+  70:6                    def   f caller2                          void (void)
+  70:22  caller2          --r   f i_func4                          void (void)
+  72:13                   def   f s_func1                          void (void)
+  72:29  s_func1          --r   f FUNC5                            int ()
+  74:6                    def   f caller3                          void (void)
+  74:22  caller3          --r   f s_func1                          void (void)
+  76:13                   decl   f s_func2                          void (void)
+  77:6                    def   f caller4                          void (void)
+  77:22  caller4          --r   f s_func2                          void (void)
+  78:29  s_func2          --r   f FUNC6                            int ()
+  83:8                    def   s AO
+  84:9                    def   s AI
+  84:18                   def   m AI.iary                          int[1]
+  84:29                   def   m AO.oary                          struct AI[1][1]
+  85:3                    def   v av                               struct AO
+  85:3                    -w-   v av                               struct AO
+  86:3                    -w-   m AO.oary                          struct AI[1][1]
+  86:14                   -w-   m AI.iary                          int[1]
+  86:38                   -r-   m AI.iary                          int[1]
+  86:27                   -r-   m AO.oary                          struct AI[1][1]
+  86:24                   -r-   v av                               struct AO
+  92:7                    def   s FMS_U
+  92:19                   def   m FMS_U.m1                         int
+  92:23                   def   m FMS_U.m2                         int
+  94:8                    def   s FMS_S
+  96:6                    def   m FMS_S.m3                         int
+  99:8                    def   s FMS_O
+ 101:3                    def   v fms_o                            struct FMS_O
+ 101:3                    -w-   v fms_o                            struct FMS_O
+ 103:13                   def   v fms_u                            union FMS_U
+ 103:13                   -w-   v fms_u                            union FMS_U
+ 103:7                    -r-   s FMS_U
+ 103:24                   -w-   m FMS_U.m1                         int
+ 107:8                    def   s NO_FMS_S
+ 109:3                    def   v no_fms_s                         struct NO_FMS_S
+ 109:3                    -w-   v no_fms_s                         struct NO_FMS_S
+ 109:17                   -w-   m m                                int

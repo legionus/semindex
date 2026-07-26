@@ -33,8 +33,10 @@ An indexing operation reports a clean, partial, or failed result. Partial
 results contain records recovered by Clang despite frontend errors; failed
 results contain no usable records. Callers of the parser API must inspect
 `semindex_get_index_result()` instead of relying only on the integer return
-value. See [Documentation/api.md](Documentation/api.md) for result semantics,
-diagnostics, record lifetime, and fingerprints.
+value. The `compiler` and `index` commands store clean and partial results so
+the persistent index describes the latest saved source. See
+[Documentation/api.md](Documentation/api.md) for result semantics, diagnostics,
+record lifetime, and fingerprints.
 
 ## Architecture
 

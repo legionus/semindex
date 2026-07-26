@@ -150,15 +150,15 @@ printf '%s\n' 'int compiler_last_clean(void) { return 1; }' >"$last_clean_source
 	cc --no-default-config "$last_clean_source"
 printf '%s\n' 'int compiler_partial_before;' 'int compiler_broken(void)' '{' \
 	'int value = ;' '}' 'int compiler_partial_after;' >"$last_clean_source"
-if "$SEMINDEX" compiler --no-store-command --database "$last_clean_db" -- \
+if ! "$SEMINDEX" compiler --no-store-command --database "$last_clean_db" -- \
 	cc --no-default-config "$last_clean_source" >"$tmpdir/partial.out" 2>"$tmpdir/partial.err"; then
-	fail "compiler accepted a partial index"
+	fail "compiler rejected a partial index"
 fi
-if [ "$(sqlite3 "$last_clean_db" "SELECT COUNT(*) FROM records WHERE symbol = 'compiler_last_clean'")" != 1 ]; then
-	fail "compiler replaced the last clean index after a partial run"
+if [ "$(sqlite3 "$last_clean_db" "SELECT COUNT(*) FROM records WHERE symbol = 'compiler_last_clean'")" != 0 ]; then
+	fail "compiler retained a stale clean index after a partial run"
 fi
-if [ "$(sqlite3 "$last_clean_db" "SELECT COUNT(*) FROM records WHERE symbol GLOB 'compiler_partial_*'")" != 0 ]; then
-	fail "compiler stored records from a partial run"
+if [ "$(sqlite3 "$last_clean_db" "SELECT COUNT(*) FROM records WHERE symbol GLOB 'compiler_partial_*'")" != 2 ]; then
+	fail "compiler omitted records from a partial run"
 fi
 
 last_clean_db=$tmpdir/last-clean-index.db
@@ -170,16 +170,16 @@ printf '[{"directory":"%s","file":"%s","arguments":["cc","--no-default-config","
 	--compile-commands "$compile_commands" "$last_clean_source" >/dev/null
 printf '%s\n' 'int index_partial_before;' 'int index_broken(void)' '{' \
 	'int value = ;' '}' 'int index_partial_after;' >"$last_clean_source"
-if "$SEMINDEX" index --no-store-command --database "$last_clean_db" \
+if ! "$SEMINDEX" index --no-store-command --database "$last_clean_db" \
 	--compile-commands "$compile_commands" "$last_clean_source" \
 	>"$tmpdir/partial-index.out" 2>"$tmpdir/partial-index.err"; then
-	fail "index accepted a partial index"
+	fail "index rejected a partial index"
 fi
-if [ "$(sqlite3 "$last_clean_db" "SELECT COUNT(*) FROM records WHERE symbol = 'index_last_clean'")" != 1 ]; then
-	fail "index replaced the last clean index after a partial run"
+if [ "$(sqlite3 "$last_clean_db" "SELECT COUNT(*) FROM records WHERE symbol = 'index_last_clean'")" != 0 ]; then
+	fail "index retained a stale clean index after a partial run"
 fi
-if [ "$(sqlite3 "$last_clean_db" "SELECT COUNT(*) FROM records WHERE symbol GLOB 'index_partial_*'")" != 0 ]; then
-	fail "index stored records from a partial run"
+if [ "$(sqlite3 "$last_clean_db" "SELECT COUNT(*) FROM records WHERE symbol GLOB 'index_partial_*'")" != 2 ]; then
+	fail "index omitted records from a partial run"
 fi
 
 old_db=$tmpdir/old.db
