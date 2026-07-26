@@ -124,6 +124,10 @@ The checker invocation has this form:
         --commands-database=$BASELINE_STATE/commands.db -- cc"
 ```
 
+Use `semindex-compiler` directly for the kernel checker when measuring the
+indexer itself. `semindex compiler` exercises the installed dispatcher path and
+is useful for separately measuring dispatch overhead.
+
 Run the candidate with equivalent kernel output and state directories.  Ensure
 that both output directories start from equivalent configurations and build
 states.  Alternate the order of complete baseline and candidate runs when more

@@ -83,13 +83,20 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build build -j"$(nproc)"
 ```
 
-The command-line indexer and language server are created as `build/semindex`
-and `build/semindex-lsp`. They can be run directly from the build tree:
+The build creates the `build/semindex` command dispatcher and one
+`build/semindex-*` executable for each command. They can be run through the
+dispatcher or directly:
 
 ```sh
 ./build/semindex --help
+./build/semindex search --help
+./build/semindex-search --help
 ./build/semindex-lsp --help
 ```
+
+The dispatcher resolves helpers beside its own path and then through `PATH`.
+Additional `semindex-COMMAND` executables can therefore provide external
+subcommands without changing the dispatcher.
 
 CMake also writes `build/compile_commands.json`, which can be used to index the
 project itself.

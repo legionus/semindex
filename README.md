@@ -148,6 +148,7 @@ identity, variant filtering, output, and indirect-call limitations.
 Run the language server over standard input and output:
 
 ```sh
+semindex lsp --database=.semindex/semindex.db
 semindex-lsp --database=.semindex/semindex.db
 ```
 

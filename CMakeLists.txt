@@ -73,10 +73,13 @@ set(SEMINDEX_FORMAT_SOURCES
 	utils/cmd_callgraph.c
 	utils/cmd_index.c
 	utils/cmd_search.c
+	utils/cli_common.c
+	utils/command_main.c
 	utils/command_db.c
 	utils/command_db.h
 	utils/index_db.c
 	utils/index_db.h
+	utils/index_db_query.c
 	utils/index_db_reader.c
 	utils/output.h
 	utils/output_common.c
@@ -124,21 +127,34 @@ target_include_directories(libsemindex_database PUBLIC
 )
 target_link_libraries(libsemindex_database PRIVATE SQLite3::SQLite3)
 
-# # libsemindex_storage
-add_library(libsemindex_storage SHARED
+# libsemindex_query
+add_library(libsemindex_query SHARED
 	utils/command_db.c
-	utils/index_db.c
+	utils/index_db_query.c
 	utils/output_common.c
 	utils/output_search.c
-	utils/perf_trace.c
 	utils/repository.c
+)
+target_include_directories(libsemindex_query PUBLIC
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
+)
+target_link_libraries(libsemindex_query
+	PUBLIC libsemindex_database
+	PRIVATE SQLite3::SQLite3
+)
+
+# libsemindex_storage
+add_library(libsemindex_storage SHARED
+	utils/index_db.c
+	utils/perf_trace.c
 )
 target_include_directories(libsemindex_storage PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
 )
 target_link_libraries(libsemindex_storage
-	PUBLIC libsemindex_database
+	PUBLIC libsemindex_query
 	PRIVATE SQLite3::SQLite3
 )
 
@@ -189,21 +205,44 @@ target_link_libraries(semindex_lsp PRIVATE
 	LLVM
 )
 
-add_executable(semindex_cli
-	utils/cmd_compiler.c
-	utils/cmd_compile_commands.c
-	utils/cmd_callgraph.c
-	utils/cmd_index.c
-	utils/cmd_search.c
+add_library(semindex_cli_common STATIC
+	utils/cli_common.c
 	utils/output_dissect.c
 	utils/output_json.c
-	utils/semindex.c
 )
-set_target_properties(semindex_cli PROPERTIES OUTPUT_NAME semindex)
-target_include_directories(semindex_cli PRIVATE include)
-target_link_libraries(semindex_cli PRIVATE libsemindex libsemindex_storage)
+target_include_directories(semindex_cli_common PRIVATE include)
+target_link_libraries(semindex_cli_common PUBLIC libsemindex)
 
-install(TARGETS semindex_cli semindex_lsp libsemindex libsemindex_database libsemindex_storage
+function(add_semindex_command target command source)
+	add_executable(${target}
+		${source}
+		utils/command_main.c
+	)
+	target_compile_definitions(${target} PRIVATE SEMINDEX_COMMAND=cmd_${command})
+	set_target_properties(${target} PROPERTIES OUTPUT_NAME semindex-${command})
+endfunction()
+
+add_executable(semindex_dispatcher utils/semindex.c)
+set_target_properties(semindex_dispatcher PROPERTIES OUTPUT_NAME semindex)
+
+add_semindex_command(semindex_compiler compiler utils/cmd_compiler.c)
+target_link_libraries(semindex_compiler PRIVATE semindex_cli_common libsemindex_storage)
+
+add_semindex_command(semindex_index index utils/cmd_index.c)
+target_link_libraries(semindex_index PRIVATE semindex_cli_common libsemindex_storage)
+
+add_semindex_command(semindex_search search utils/cmd_search.c)
+target_link_libraries(semindex_search PRIVATE libsemindex_query)
+
+add_semindex_command(semindex_callgraph callgraph utils/cmd_callgraph.c)
+target_link_libraries(semindex_callgraph PRIVATE libsemindex_query)
+
+add_semindex_command(semindex_compile_commands compile_commands utils/cmd_compile_commands.c)
+set_target_properties(semindex_compile_commands PROPERTIES OUTPUT_NAME semindex-compile-commands)
+target_link_libraries(semindex_compile_commands PRIVATE libsemindex_query)
+
+install(TARGETS semindex_dispatcher semindex_compiler semindex_index semindex_search semindex_callgraph
+	semindex_compile_commands semindex_lsp libsemindex libsemindex_database libsemindex_query libsemindex_storage
 	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 	ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -260,7 +299,8 @@ if(BUILD_TESTING)
 			NAME semindex-json-${test_name}
 			COMMAND
 				${CMAKE_COMMAND} -E env
-				SEMINDEX=$<TARGET_FILE:semindex_cli>
+				SEMINDEX=$<TARGET_FILE:semindex_dispatcher>
+				SEMINDEX_INDEX=$<TARGET_FILE:semindex_index>
 				COMPILE_COMMANDS=${SEMINDEX_TEST_COMPILE_COMMANDS}
 				SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 				PYTHON=${Python3_EXECUTABLE}
@@ -273,7 +313,8 @@ if(BUILD_TESTING)
 			NAME semindex-dissect-${test_name}
 			COMMAND
 				${CMAKE_COMMAND} -E env
-				SEMINDEX=$<TARGET_FILE:semindex_cli>
+				SEMINDEX=$<TARGET_FILE:semindex_dispatcher>
+				SEMINDEX_INDEX=$<TARGET_FILE:semindex_index>
 				COMPILE_COMMANDS=${SEMINDEX_TEST_COMPILE_COMMANDS}
 				SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 				PYTHON=${Python3_EXECUTABLE}
@@ -283,10 +324,22 @@ if(BUILD_TESTING)
 		)
 	endforeach()
 	add_test(
+		NAME semindex-dispatcher
+		COMMAND
+			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-dispatcher-tests.sh
+				$<TARGET_FILE:semindex_dispatcher>
+				$<TARGET_FILE:semindex_compiler>
+				$<TARGET_FILE:semindex_index>
+				$<TARGET_FILE:semindex_search>
+				$<TARGET_FILE:semindex_callgraph>
+				$<TARGET_FILE:semindex_compile_commands>
+				$<TARGET_FILE:semindex_lsp>
+	)
+	add_test(
 		NAME semindex-scope
 		COMMAND
 			${CMAKE_COMMAND} -E env
-			SEMINDEX=$<TARGET_FILE:semindex_cli>
+			SEMINDEX=$<TARGET_FILE:semindex_dispatcher>
 			COMPILE_COMMANDS=${SEMINDEX_TEST_COMPILE_COMMANDS}
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-scope-tests.sh
@@ -295,7 +348,7 @@ if(BUILD_TESTING)
 		NAME semindex-compiler
 		COMMAND
 			${CMAKE_COMMAND} -E env
-			SEMINDEX=$<TARGET_FILE:semindex_cli>
+			SEMINDEX=$<TARGET_FILE:semindex_dispatcher>
 			COMPILE_COMMANDS=${SEMINDEX_TEST_COMPILE_COMMANDS}
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			PYTHON=${Python3_EXECUTABLE}
@@ -305,7 +358,7 @@ if(BUILD_TESTING)
 		NAME semindex-search
 		COMMAND
 			${CMAKE_COMMAND} -E env
-			SEMINDEX=$<TARGET_FILE:semindex_cli>
+			SEMINDEX=$<TARGET_FILE:semindex_dispatcher>
 			COMPILE_COMMANDS=${SEMINDEX_TEST_COMPILE_COMMANDS}
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-search-tests.sh
@@ -314,14 +367,14 @@ if(BUILD_TESTING)
 		NAME semindex-database
 		COMMAND
 			${CMAKE_COMMAND} -E env
-			SEMINDEX=$<TARGET_FILE:semindex_cli>
+			SEMINDEX=$<TARGET_FILE:semindex_dispatcher>
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-database-tests.sh
 	)
 	add_test(
 		NAME semindex-database-api
 		COMMAND
 			${CMAKE_COMMAND} -E env
-			SEMINDEX=$<TARGET_FILE:semindex_cli>
+			SEMINDEX=$<TARGET_FILE:semindex_dispatcher>
 			DATABASE_API_TEST=$<TARGET_FILE:semindex_database_api_test>
 			COMPILE_COMMANDS=${SEMINDEX_TEST_COMPILE_COMMANDS}
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
@@ -338,7 +391,7 @@ if(BUILD_TESTING)
 		NAME semindex-partial-cli
 		COMMAND
 			${CMAKE_COMMAND} -E env
-			SEMINDEX=$<TARGET_FILE:semindex_cli>
+			SEMINDEX=$<TARGET_FILE:semindex_dispatcher>
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-partial-cli-tests.sh
 	)
@@ -346,7 +399,7 @@ if(BUILD_TESTING)
 		NAME semindex-command-database
 		COMMAND
 			${CMAKE_COMMAND} -E env
-			SEMINDEX=$<TARGET_FILE:semindex_cli>
+			SEMINDEX=$<TARGET_FILE:semindex_dispatcher>
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-command-db-tests.sh
 	)
@@ -354,7 +407,7 @@ if(BUILD_TESTING)
 		NAME semindex-callgraph
 		COMMAND
 			${CMAKE_COMMAND} -E env
-			SEMINDEX=$<TARGET_FILE:semindex_cli>
+			SEMINDEX=$<TARGET_FILE:semindex_dispatcher>
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-callgraph-tests.sh
 	)
@@ -362,7 +415,7 @@ if(BUILD_TESTING)
 		NAME semindex-trace
 		COMMAND
 			${CMAKE_COMMAND} -E env
-			SEMINDEX=$<TARGET_FILE:semindex_cli>
+			SEMINDEX=$<TARGET_FILE:semindex_dispatcher>
 			COMPILE_COMMANDS=${SEMINDEX_TEST_COMPILE_COMMANDS}
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-trace-tests.sh
@@ -372,6 +425,6 @@ if(BUILD_TESTING)
 		COMMAND
 			${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-lsp-tests.py
 				$<TARGET_FILE:semindex_lsp>
-				$<TARGET_FILE:semindex_cli>
+				$<TARGET_FILE:semindex_dispatcher>
 	)
 endif()

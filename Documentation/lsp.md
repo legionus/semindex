@@ -13,9 +13,10 @@ file as text, read, or write highlights. Call hierarchy clients can use
 `textDocument/prepareCallHierarchy`, `callHierarchy/incomingCalls`, and
 `callHierarchy/outgoingCalls`.
 
-Start the server directly from an editor or an LSP client:
+Start the server through the dispatcher or invoke its helper directly:
 
 ```sh
+build/semindex lsp --database=.semindex/semindex.db
 build/semindex-lsp --database=.semindex/semindex.db
 ```
 
