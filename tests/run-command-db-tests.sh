@@ -55,3 +55,23 @@ case "$plan" in
 *"USING PRIMARY KEY"*) ;;
 *) fail "exact compiler command lookup does not use the primary key: $plan" ;;
 esac
+
+pids=
+for worker in 1 2 3 4 5 6 7 8; do
+	"$SEMINDEX" compiler --variant="parallel-$worker" --database "$symbols_db" \
+		--commands-database "$commands_db" -- cc --no-default-config \
+		"$SOURCE_DIR/tests/test.c" >"$tmpdir/parallel-$worker.out" \
+		2>"$tmpdir/parallel-$worker.err" &
+	pids="$pids $!"
+done
+
+for pid in $pids; do
+	if ! wait "$pid"; then
+		cat "$tmpdir"/parallel-*.err >&2
+		fail "parallel compiler command writer failed"
+	fi
+done
+
+if [ "$(sqlite3 "$commands_db" "SELECT count(*) FROM commands WHERE variant GLOB 'parallel-*'")" != 8 ]; then
+	fail "parallel compiler command writers lost records"
+fi
