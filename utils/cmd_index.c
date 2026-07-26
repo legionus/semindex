@@ -4,7 +4,7 @@
 #include <stdlib.h>
 
 #include "command_db.h"
-#include "index_db.h"
+#include "index_pipeline.h"
 #include "perf_trace.h"
 #include "semindex_cli.h"
 
@@ -77,16 +77,15 @@ int cmd_index(int argc, char **argv)
 	semindex_trace_time_t phase_start;
 	semindex_trace_time_t total_start = 0;
 
-	semindex_t *s = NULL;
-	const semindex_index_result_t *index_result;
-	const semindex_compile_command_t *cmd;
+	index_pipeline_request_t request;
+	index_pipeline_result_t result = { 0 };
+	index_pipeline_storage_t storage;
 
 	char *default_commands_database = NULL;
 	int ret = 1;
 	int include_local = 1;
 	int store_command = 1;
 	int output_only = 0;
-	int command_ret;
 	int opt;
 
 	optind = 1;
@@ -172,70 +171,47 @@ int cmd_index(int argc, char **argv)
 		total_start = semindex_trace_begin(trace);
 	}
 
-	s = semindex_create();
-	semindex_set_scope(s, scope);
-	semindex_set_include_local(s, include_local);
+	if (output_only)
+		storage = INDEX_PIPELINE_OUTPUT_ONLY;
+	else if (store_command)
+		storage = INDEX_PIPELINE_STORE_SYMBOLS_AND_COMMAND;
+	else
+		storage = INDEX_PIPELINE_STORE_SYMBOLS;
 
-	phase_start = semindex_trace_begin(trace);
-	semindex_index_file(s, compile_commands, source_file);
-	index_result = semindex_get_index_result(s);
+	request = (index_pipeline_request_t){
+		.input = INDEX_PIPELINE_COMPILE_COMMANDS,
+		.storage = storage,
+		.partial = INDEX_PIPELINE_STORE_PARTIAL,
+		.compile_commands = compile_commands,
+		.source_file = source_file,
+		.symbol_database = database,
+		.commands_database = commands_database,
+		.variant = variant,
+		.scope = scope,
+		.trace = trace,
+		.include_local = include_local,
+		.details = 1,
+	};
 
-	if (!index_result || index_result->status == SEMINDEX_INDEX_FAILED) {
-		semindex_trace_end(trace, "parse", phase_start);
-		fprintf(stderr, "semindex: failed to index '%s' using '%s'\n", source_file, compile_commands);
+	if (index_pipeline_run(&request, &result) < 0) {
+		if (result.failed_stage == INDEX_PIPELINE_STAGE_CREATE)
+			fprintf(stderr, "semindex: failed to create indexer\n");
+		else if (result.failed_stage == INDEX_PIPELINE_STAGE_FRONTEND)
+			fprintf(stderr, "semindex: failed to index '%s' using '%s'\n", source_file, compile_commands);
+		else if (result.failed_stage == INDEX_PIPELINE_STAGE_FINGERPRINT)
+			fprintf(stderr, "semindex: failed to fingerprint '%s'\n", source_file);
+
 		goto out;
 	}
-	semindex_trace_end(trace, "parse", phase_start);
-	if (!output_only) {
-		phase_start = semindex_trace_begin(trace);
-
-		if (semindex_build_file_fingerprints(s) < 0) {
-			semindex_trace_end(trace, "fingerprint", phase_start);
-			fprintf(stderr, "semindex: failed to fingerprint '%s'\n", source_file);
-			goto out;
-		}
-		semindex_trace_end(trace, "fingerprint", phase_start);
-		phase_start = semindex_trace_begin(trace);
-
-		if (index_db_store(database, s, source_file, variant, include_local, trace) < 0) {
-			semindex_trace_end(trace, "symbol_database", phase_start);
-			goto out;
-		}
-		semindex_trace_end(trace, "symbol_database", phase_start);
-		cmd = semindex_get_compile_command(s);
-
-		if (store_command) {
-			phase_start = semindex_trace_begin(trace);
-
-			if (!cmd) {
-				semindex_trace_end(trace, "command_database", phase_start);
-				goto out;
-			}
-
-			command_ret = command_db_store(commands_database, variant, cmd->directory, cmd->file, cmd->argc,
-				cmd->argv);
-
-			if (command_ret < 0) {
-				semindex_trace_end(trace, "command_database", phase_start);
-				goto out;
-			}
-
-			semindex_trace_end(trace, "command_database", phase_start);
-		}
-	}
 
 	phase_start = semindex_trace_begin(trace);
-	ret = output_index(format, s);
+	ret = output_index(format, result.index);
 	semindex_trace_end(trace, "output", phase_start);
 	ret = ret ? 1 : 0;
 
 out:
-	phase_start = semindex_trace_begin(trace);
-
-	if (s)
-		semindex_destroy(s);
+	index_pipeline_result_destroy(&result, trace);
 	free(default_commands_database);
-	semindex_trace_end(trace, "cleanup", phase_start);
 	semindex_trace_end(trace, "total", total_start);
 
 	if (semindex_trace_close(trace) < 0)

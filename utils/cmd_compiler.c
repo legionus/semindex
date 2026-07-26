@@ -5,7 +5,7 @@
 #include <string.h>
 
 #include "command_db.h"
-#include "index_db.h"
+#include "index_pipeline.h"
 #include "perf_trace.h"
 #include "semindex_cli.h"
 
@@ -183,8 +183,9 @@ int cmd_compiler(int argc, char **argv)
 	semindex_trace_time_t phase_start;
 	semindex_trace_time_t total_start = 0;
 
-	semindex_t *s = NULL;
-	const semindex_index_result_t *index_result;
+	index_pipeline_request_t request;
+	index_pipeline_result_t result = { 0 };
+	index_pipeline_storage_t storage;
 	semindex_compile_command_t cmd;
 	int compiler_argc;
 
@@ -294,68 +295,53 @@ int cmd_compiler(int argc, char **argv)
 		total_start = semindex_trace_begin(trace);
 	}
 
-	s = semindex_create();
-	semindex_set_scope(s, scope);
-	semindex_set_details(s, print_output);
-	semindex_set_include_local(s, include_local);
-
 	cmd.directory = ".";
 	cmd.file = source_file;
 	cmd.argc = compiler_argc;
 	cmd.argv = (const char *const *)compiler_argv;
 
-	phase_start = semindex_trace_begin(trace);
-	semindex_index_command(s, &cmd);
-	index_result = semindex_get_index_result(s);
+	if (print_output)
+		storage = INDEX_PIPELINE_OUTPUT_ONLY;
+	else if (store_command)
+		storage = INDEX_PIPELINE_STORE_SYMBOLS_AND_COMMAND;
+	else
+		storage = INDEX_PIPELINE_STORE_SYMBOLS;
 
-	if (!index_result || index_result->status == SEMINDEX_INDEX_FAILED) {
-		semindex_trace_end(trace, "parse", phase_start);
-		fprintf(stderr, "semindex: failed to index compiler command for '%s'\n", source_file);
+	request = (index_pipeline_request_t){
+		.input = INDEX_PIPELINE_COMMAND,
+		.storage = storage,
+		.partial = INDEX_PIPELINE_STORE_PARTIAL,
+		.command = &cmd,
+		.source_file = source_file,
+		.symbol_database = database,
+		.commands_database = commands_database,
+		.variant = variant,
+		.scope = scope,
+		.trace = trace,
+		.include_local = include_local,
+		.details = print_output,
+	};
+
+	if (index_pipeline_run(&request, &result) < 0) {
+		if (result.failed_stage == INDEX_PIPELINE_STAGE_CREATE)
+			fprintf(stderr, "semindex: failed to create indexer\n");
+		else if (result.failed_stage == INDEX_PIPELINE_STAGE_FRONTEND)
+			fprintf(stderr, "semindex: failed to index compiler command for '%s'\n", source_file);
+		else if (result.failed_stage == INDEX_PIPELINE_STAGE_FINGERPRINT)
+			fprintf(stderr, "semindex: failed to fingerprint '%s'\n", source_file);
+
 		goto out;
 	}
-	semindex_trace_end(trace, "parse", phase_start);
-	if (!print_output) {
-		phase_start = semindex_trace_begin(trace);
-
-		if (semindex_build_file_fingerprints(s) < 0) {
-			semindex_trace_end(trace, "fingerprint", phase_start);
-			fprintf(stderr, "semindex: failed to fingerprint '%s'\n", source_file);
-			goto out;
-		}
-		semindex_trace_end(trace, "fingerprint", phase_start);
-		phase_start = semindex_trace_begin(trace);
-
-		if (index_db_store(database, s, source_file, variant, include_local, trace) < 0) {
-			semindex_trace_end(trace, "symbol_database", phase_start);
-			goto out;
-		}
-		semindex_trace_end(trace, "symbol_database", phase_start);
-
-		if (store_command) {
-			phase_start = semindex_trace_begin(trace);
-
-			if (command_db_store(commands_database, variant, cmd.directory, source_file, compiler_argc,
-				    (const char *const *)compiler_argv) < 0) {
-				semindex_trace_end(trace, "command_database", phase_start);
-				goto out;
-			}
-			semindex_trace_end(trace, "command_database", phase_start);
-		}
-	}
 
 	phase_start = semindex_trace_begin(trace);
-	ret = print_output ? output_index(format, s) : 0;
+	ret = print_output ? output_index(format, result.index) : 0;
 	semindex_trace_end(trace, "output", phase_start);
 	ret = ret ? 1 : 0;
 
 out:
-	phase_start = semindex_trace_begin(trace);
-
-	if (s)
-		semindex_destroy(s);
+	index_pipeline_result_destroy(&result, trace);
 	free(default_commands_database);
 	free(default_argv);
-	semindex_trace_end(trace, "cleanup", phase_start);
 	semindex_trace_end(trace, "total", total_start);
 
 	if (semindex_trace_close(trace) < 0)

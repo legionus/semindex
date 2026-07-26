@@ -3,8 +3,7 @@
 
 extern "C" {
 #include "command_db.h"
-#include "index_db.h"
-#include "semindex.h"
+#include "index_pipeline.h"
 }
 
 #include <filesystem>
@@ -19,6 +18,9 @@ LspIndexer::LspIndexer(std::string database, std::string commands_database, std:
 
 static void copyDiagnostics(const semindex_t *index, const char *directory, LspIndexResult &result)
 {
+	if (!index)
+		return;
+
 	for (size_t i = 0; i < semindex_diagnostic_count(index); i++) {
 		const semindex_diagnostic_t *diagnostic = semindex_get_diagnostic(index, i);
 
@@ -42,13 +44,12 @@ LspIndexResult LspIndexer::update(const std::string &file)
 {
 	command_db_command_t *saved = nullptr;
 	const semindex_compile_command_t *command = nullptr;
-	const semindex_index_result_t *index_result = nullptr;
 
-	semindex_t *index = nullptr;
+	index_pipeline_request_t request = {};
+	index_pipeline_result_t pipeline = {};
 	LspIndexResult result;
 	std::error_code fs_error;
 	std::filesystem::path old_directory;
-	int index_ret;
 	int loaded;
 	bool changed_directory = false;
 
@@ -79,40 +80,50 @@ LspIndexResult LspIndexer::update(const std::string &file)
 	}
 	changed_directory = true;
 
-	index = semindex_create();
+	request.input = INDEX_PIPELINE_COMMAND;
+	request.storage = INDEX_PIPELINE_STORE_SYMBOLS;
+	request.partial = INDEX_PIPELINE_RETURN_PARTIAL;
+	request.command = command;
+	request.source_file = command->file;
+	request.symbol_database = database.c_str();
+	request.variant = variant.c_str();
+	request.scope = SEMINDEX_SCOPE_PROJECT;
+	request.include_local = include_local;
+	request.details = 1;
 
-	if (!index) {
-		result.error = "failed to create indexer";
-		goto out;
-	}
-	semindex_set_scope(index, SEMINDEX_SCOPE_PROJECT);
-	semindex_set_include_local(index, include_local);
-	index_ret = semindex_index_command(index, command);
-	index_result = semindex_get_index_result(index);
-	copyDiagnostics(index, command->directory, result);
+	if (index_pipeline_run(&request, &pipeline) < 0) {
+		copyDiagnostics(pipeline.index, command->directory, result);
 
-	if (!index_result || index_result->status == SEMINDEX_INDEX_FAILED) {
-		result.error = "failed to index '" + file + "'";
+		if (pipeline.failed_stage == INDEX_PIPELINE_STAGE_CREATE)
+			result.error = "failed to create indexer";
+		else if (pipeline.failed_stage == INDEX_PIPELINE_STAGE_FINGERPRINT)
+			result.error = "failed to fingerprint '" + file + "'";
+		else if (pipeline.failed_stage == INDEX_PIPELINE_STAGE_SYMBOL_DATABASE)
+			result.error = "failed to store index for '" + file + "'";
+		else
+			result.error = "failed to index '" + file + "'";
+
 		overlays.erase(file);
 		goto out;
 	}
-	if (index_ret != 0 || index_result->status == SEMINDEX_INDEX_PARTIAL) {
+
+	copyDiagnostics(pipeline.index, command->directory, result);
+
+	if (pipeline.frontend_ret != 0 || pipeline.frontend->status == SEMINDEX_INDEX_PARTIAL) {
 		result.status = LspIndexResult::Status::Partial;
-		overlays.replace(file, command->directory, index);
+		overlays.replace(file, command->directory, pipeline.index);
 		goto out;
 	}
-	if (semindex_build_file_fingerprints(index) < 0) {
-		result.error = "failed to fingerprint '" + file + "'";
+
+	if (pipeline.persisted != INDEX_PIPELINE_STORE_SYMBOLS) {
+		result.error = "index for '" + file + "' was not stored";
 		goto out;
 	}
-	if (index_db_store(database.c_str(), index, command->file, variant.c_str(), include_local, nullptr) < 0) {
-		result.error = "failed to store index for '" + file + "'";
-		goto out;
-	}
+
 	overlays.erase(file);
 	result.status = LspIndexResult::Status::Clean;
 out:
-	semindex_destroy(index);
+	index_pipeline_result_destroy(&pipeline, nullptr);
 	command_db_command_free(saved);
 
 	if (changed_directory) {

@@ -81,6 +81,8 @@ set(SEMINDEX_FORMAT_SOURCES
 	utils/index_db.h
 	utils/index_db_query.c
 	utils/index_db_reader.c
+	utils/index_pipeline.c
+	utils/index_pipeline.h
 	utils/output.h
 	utils/output_common.c
 	utils/output_dissect.c
@@ -182,6 +184,18 @@ target_link_libraries(libsemindex PRIVATE
 	LLVM
 )
 
+add_library(libsemindex_pipeline SHARED
+	utils/index_pipeline.c
+)
+target_include_directories(libsemindex_pipeline PUBLIC
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
+)
+target_link_libraries(libsemindex_pipeline PUBLIC
+	libsemindex
+	libsemindex_storage
+)
+
 add_executable(semindex_lsp
 	src/lsp_call_hierarchy.cpp
 	src/lsp_indexer.cpp
@@ -200,8 +214,7 @@ target_include_directories(semindex_lsp PRIVATE
 )
 target_compile_definitions(semindex_lsp PRIVATE ${LLVM_DEFINITIONS})
 target_link_libraries(semindex_lsp PRIVATE
-	libsemindex
-	libsemindex_storage
+	libsemindex_pipeline
 	LLVM
 )
 
@@ -226,10 +239,10 @@ add_executable(semindex_dispatcher utils/semindex.c)
 set_target_properties(semindex_dispatcher PROPERTIES OUTPUT_NAME semindex)
 
 add_semindex_command(semindex_compiler compiler utils/cmd_compiler.c)
-target_link_libraries(semindex_compiler PRIVATE semindex_cli_common libsemindex_storage)
+target_link_libraries(semindex_compiler PRIVATE semindex_cli_common libsemindex_pipeline)
 
 add_semindex_command(semindex_index index utils/cmd_index.c)
-target_link_libraries(semindex_index PRIVATE semindex_cli_common libsemindex_storage)
+target_link_libraries(semindex_index PRIVATE semindex_cli_common libsemindex_pipeline)
 
 add_semindex_command(semindex_search search utils/cmd_search.c)
 target_link_libraries(semindex_search PRIVATE libsemindex_query)
@@ -243,6 +256,7 @@ target_link_libraries(semindex_compile_commands PRIVATE libsemindex_query)
 
 install(TARGETS semindex_dispatcher semindex_compiler semindex_index semindex_search semindex_callgraph
 	semindex_compile_commands semindex_lsp libsemindex libsemindex_database libsemindex_query libsemindex_storage
+	libsemindex_pipeline
 	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 	ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
