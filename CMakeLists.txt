@@ -77,10 +77,11 @@ set(SEMINDEX_FORMAT_SOURCES
 	utils/command_main.c
 	utils/command_db.c
 	utils/command_db.h
-	utils/index_db.c
+	utils/index_db_callgraph.c
 	utils/index_db.h
-	utils/index_db_query.c
 	utils/index_db_reader.c
+	utils/index_db_search.c
+	utils/index_db_writer.c
 	utils/index_pipeline.c
 	utils/index_pipeline.h
 	utils/output.h
@@ -132,7 +133,8 @@ target_link_libraries(libsemindex_database PRIVATE SQLite3::SQLite3)
 # libsemindex_query
 add_library(libsemindex_query SHARED
 	utils/command_db.c
-	utils/index_db_query.c
+	utils/index_db_callgraph.c
+	utils/index_db_search.c
 	utils/output_common.c
 	utils/output_search.c
 	utils/repository.c
@@ -148,7 +150,7 @@ target_link_libraries(libsemindex_query
 
 # libsemindex_storage
 add_library(libsemindex_storage SHARED
-	utils/index_db.c
+	utils/index_db_writer.c
 	utils/perf_trace.c
 )
 target_include_directories(libsemindex_storage PUBLIC

@@ -5,8 +5,6 @@
 #include <string.h>
 
 #include "index_db.h"
-#include "output.h"
-#include "semindex_database.h"
 
 static int prepare(sqlite3 *db, const char *sql, sqlite3_stmt **stmt)
 {
@@ -14,6 +12,7 @@ static int prepare(sqlite3 *db, const char *sql, sqlite3_stmt **stmt)
 		return 0;
 
 	fprintf(stderr, "semindex: sqlite: %s\n", sqlite3_errmsg(db));
+
 	return -1;
 }
 
@@ -22,35 +21,12 @@ static int pattern_uses_glob(const char *pattern)
 	return pattern && strpbrk(pattern, "*?[]");
 }
 
-struct search_output {
-	output_search_t *formatter;
-};
-
-static int print_search_result(void *data, const semindex_db_record_t *record)
-{
-	struct search_output *output = data;
-
-	output_search_record_t result = {
-		.variant = record->variant,
-		.file = record->path,
-		.line = record->line,
-		.column = record->column,
-		.symbol_record = record->record != SEMINDEX_DB_REFERENCE,
-		.definition = record->record == SEMINDEX_DB_DEFINITION,
-		.kind = record->kind,
-		.symbol = record->symbol,
-		.context = record->context,
-		.mode = record->mode,
-	};
-
-	return output_search_write(output->formatter, &result);
-}
-
 static int open_reader(const char *path, sqlite3 **db)
 {
 	if (sqlite3_open_v2(path, db, SQLITE_OPEN_READONLY, NULL) != SQLITE_OK) {
 		fprintf(stderr, "semindex: failed to open database '%s': %s\n", path,
 			*db ? sqlite3_errmsg(*db) : "unknown error");
+
 		return -1;
 	}
 
@@ -58,59 +34,6 @@ static int open_reader(const char *path, sqlite3 **db)
 		return -1;
 
 	return 0;
-}
-
-int index_db_search(const char *path, const index_db_search_options_t *opts, FILE *out)
-{
-	index_db_search_options_t defaults = {
-		.record = INDEX_DB_RECORD_ALL,
-	};
-	semindex_db_query_options_t query = { 0 };
-
-	semindex_db_t *db = NULL;
-	struct search_output output = { 0 };
-	int ret = -1;
-
-	if (!path || !out)
-		return -1;
-
-	if (!opts)
-		opts = &defaults;
-
-	if (semindex_db_open(path, &db) < 0)
-		goto out;
-
-	output.formatter = output_search_create(out, opts->format ? opts->format : OUTPUT_SEARCH_DEFAULT_FORMAT, path);
-
-	if (!output.formatter)
-		goto out;
-
-	query.symbol = opts->pattern;
-	query.path = opts->path;
-	query.variant = opts->variant;
-	query.mode = opts->mode;
-	query.kind = opts->kind;
-	query.has_mode = opts->has_mode && !opts->mode_definition;
-	query.has_kind = opts->has_kind;
-
-	if (opts->mode_definition)
-		query.record = SEMINDEX_DB_RECORD_DEFINITION;
-
-	else if (opts->record == INDEX_DB_RECORD_SYMBOL)
-		query.record = SEMINDEX_DB_RECORD_SYMBOL;
-
-	else if (opts->record == INDEX_DB_RECORD_USE)
-		query.record = SEMINDEX_DB_RECORD_REFERENCE;
-
-	ret = semindex_db_query(db, &query, print_search_result, &output);
-
-	if (!ret && ferror(out))
-		ret = -1;
-out:
-	output_search_destroy(output.formatter);
-	semindex_db_close(db);
-
-	return ret;
 }
 
 static int print_callgraph_results(sqlite3 *db, const char *sql, int show_id, FILE *out)
