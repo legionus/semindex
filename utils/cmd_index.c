@@ -39,8 +39,13 @@ static void index_help(void)
 	       "                             path to the compiler command database\n"
 	       "                             (default: commands.db beside --database)\n"
 	       "      --variant=NAME          store records in the named variant\n"
-	       "                             (default: general)\n"
-	       "      --no-store-command      do not store the selected compile command\n"
+	       "                             (default: general)\n");
+#ifdef SEMINDEX_HAVE_LIBGIT2
+	printf("      --git-commit=COMMIT     store COMMIT as variant provenance; COMMIT may\n"
+	       "                             be a 40- or 64-digit hash, or auto\n"
+	       "      --no-git-commit         do not store Git provenance\n");
+#endif
+	printf("      --no-store-command      do not store the selected compile command\n"
 	       "      --no-include-local      do not index local symbols or their uses\n"
 	       "      --trace=FILE            append performance events to FILE\n"
 	       "  -h, --help                 display this help and exit\n"
@@ -57,6 +62,10 @@ int cmd_index(int argc, char **argv)
 		{ "commands-database", required_argument, NULL, 3 },
 		{ "no-store-command", no_argument, NULL, 4 },
 		{ "trace", required_argument, NULL, 5 },
+#ifdef SEMINDEX_HAVE_LIBGIT2
+		{ "git-commit", required_argument, NULL, 6 },
+		{ "no-git-commit", no_argument, NULL, 7 },
+#endif
 		{ "format", required_argument, NULL, 'f' },
 		{ "scope", required_argument, NULL, 's' },
 		{ "compile-commands", required_argument, NULL, 'c' },
@@ -72,6 +81,7 @@ int cmd_index(int argc, char **argv)
 	const char *commands_database = NULL;
 	const char *variant = "general";
 	const char *trace_path = NULL;
+	const char *git_commit = NULL;
 
 	semindex_trace_t *trace = NULL;
 	semindex_trace_time_t phase_start;
@@ -79,6 +89,7 @@ int cmd_index(int argc, char **argv)
 
 	index_pipeline_request_t request;
 	index_pipeline_result_t result = { 0 };
+	index_pipeline_git_commit_t git_commit_mode = INDEX_PIPELINE_GIT_COMMIT_DISABLED;
 	index_pipeline_storage_t storage;
 
 	char *default_commands_database = NULL;
@@ -106,6 +117,19 @@ int cmd_index(int argc, char **argv)
 			break;
 		case 5:
 			trace_path = optarg;
+			break;
+		case 6:
+			if (parse_git_commit(optarg, &git_commit_mode) < 0) {
+				fprintf(stderr, "semindex: invalid Git commit: %s\n", optarg);
+
+				return 1;
+			}
+
+			git_commit = git_commit_mode == INDEX_PIPELINE_GIT_COMMIT_EXPLICIT ? optarg : NULL;
+			break;
+		case 7:
+			git_commit_mode = INDEX_PIPELINE_GIT_COMMIT_DISABLED;
+			git_commit = NULL;
 			break;
 		case 'f':
 			if (parse_format(optarg, &format) < 0) {
@@ -187,7 +211,9 @@ int cmd_index(int argc, char **argv)
 		.symbol_database = database,
 		.commands_database = commands_database,
 		.variant = variant,
+		.git_commit = git_commit,
 		.scope = scope,
+		.git_commit_mode = git_commit_mode,
 		.trace = trace,
 		.include_local = include_local,
 		.details = 1,

@@ -1,10 +1,10 @@
 # Index database
 
 `semindex compiler` and `semindex index` store symbol records in
-`.semindex/semindex.db` by default. The database contains only source files and
-semantic records. Compiler commands are stored separately in
-`.semindex/commands.db`. Local symbols and their uses are stored by default;
-indexing with `--no-include-local` omits them.
+`.semindex/semindex.db` by default. The database contains only source files,
+semantic records, and optional repository provenance. Compiler commands are
+stored separately in `.semindex/commands.db`. Local symbols and their uses are
+stored by default; indexing with `--no-include-local` omits them.
 
 An explicit `--format=FORMAT` selects output-only inspection mode for either
 indexing command and does not create or update either database.
@@ -59,6 +59,28 @@ relative to its root. Files outside the repository, including system headers,
 are stored as canonical absolute paths. Path conversion is performed once per
 indexed file rather than once per semantic record.
 
+The `variants` table records optional source provenance when semindex is built
+with libgit2. Use `--git-commit=auto` to resolve the repository's current
+`HEAD`, or `--git-commit=COMMIT` to record a known 40- or 64-digit object ID
+explicitly. Git provenance is disabled by default so short-lived compiler
+wrapper processes do not pay the libgit2 repository initialization cost. A
+source outside a Git repository is indexed normally and does not create a
+provenance row. `--no-git-commit` explicitly disables provenance.
+
+libgit2 is isolated in an optional runtime-loaded backend. Normal indexing and
+explicit object IDs do not load it; only `--git-commit=auto` opens a repository
+through libgit2. This keeps the compiler-wrapper path independent of libgit2's
+initialization cost unless automatic discovery was requested.
+
+Provenance is one row per variant rather than one value per file or record. It
+therefore adds constant database space and one conditional upsert to the
+existing writer transaction. The row describes the commit seen by the most
+recent successful indexing command that recorded provenance for that variant.
+Incremental indexing is not an atomic repository snapshot: if `HEAD` changes
+between translation units, existing records may still have been produced from
+the earlier commit. Consumers must treat a mismatch between the stored commit
+and the current worktree as possible source/index drift.
+
 A symbol database is therefore intended to describe one repository. Relative
 paths are resolved by consumers against that repository root; the LSP uses the
 workspace root supplied by the client.
@@ -101,10 +123,9 @@ rebuilding the index. This is an intentional tradeoff for a reproducible cache.
 
 ## Compatibility
 
-The database is an experimental interface. Schema version 10 uses
-repository-relative paths and does not migrate older databases because mixing
-absolute and relative file keys would retain stale records. Dropping old tables
-in place would also leave their original multi-gigabyte file allocation.
+The database is an experimental interface. Schema version 11 adds optional
+Git provenance for variants and does not migrate older databases. Dropping old
+tables in place would also leave their original multi-gigabyte file allocation.
 Remove an old database before indexing:
 
 ```sh

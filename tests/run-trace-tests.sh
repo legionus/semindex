@@ -36,7 +36,7 @@ trace=$tmpdir/trace.jsonl
 	--compile-commands="$COMPILE_COMMANDS" "$source" >/dev/null
 
 valid_trace "$trace" || fail "trace contains an incomplete or malformed line"
-for phase in parse fingerprint db.stage_records db.merge.begin db.merge.records_insert symbol_database \
+for phase in parse fingerprint provenance db.stage_records db.merge.begin db.merge.records_insert symbol_database \
 	db.merge.fingerprints_insert command_database total; do
 	if [ "$(grep -c "\"phase\":\"$phase\"" "$trace")" != 2 ]; then
 		fail "trace does not contain two $phase events"

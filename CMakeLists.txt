@@ -84,6 +84,10 @@ set(SEMINDEX_FORMAT_SOURCES
 	utils/command_db_writer.c
 	utils/filesystem.c
 	utils/filesystem.h
+	utils/git_provenance.c
+	utils/git_provenance.h
+	utils/git_provenance_loader.c
+	utils/git_provenance_stub.c
 	utils/index_db_callgraph.c
 	utils/index_db.h
 	utils/index_db_reader.c
@@ -123,6 +127,20 @@ endif()
 find_package(SQLite3 3.35 REQUIRED)
 if(NOT TARGET SQLite3::SQLite3 AND TARGET SQLite::SQLite3)
 	add_library(SQLite3::SQLite3 ALIAS SQLite::SQLite3)
+endif()
+
+option(SEMINDEX_GIT "Enable Git provenance when libgit2 is available" ON)
+
+find_package(PkgConfig QUIET)
+if(SEMINDEX_GIT AND PkgConfig_FOUND)
+	pkg_check_modules(LibGit2 QUIET IMPORTED_TARGET libgit2)
+endif()
+if(TARGET PkgConfig::LibGit2)
+	message(STATUS "Git provenance support: enabled")
+elseif(NOT SEMINDEX_GIT)
+	message(STATUS "Git provenance support: disabled by SEMINDEX_GIT")
+else()
+	message(STATUS "Git provenance support: disabled (libgit2 not found)")
 endif()
 
 find_package(LLVM REQUIRED CONFIG)
@@ -230,6 +248,24 @@ target_link_libraries(semindex_parser PRIVATE
 add_library(semindex_pipeline STATIC
 	utils/index_pipeline.c
 )
+if(TARGET PkgConfig::LibGit2)
+	add_library(semindex_git_backend MODULE utils/git_provenance.c)
+	set_target_properties(semindex_git_backend PROPERTIES
+		OUTPUT_NAME semindex_git_backend
+	)
+	target_include_directories(semindex_git_backend PRIVATE utils)
+	target_link_libraries(semindex_git_backend PRIVATE PkgConfig::LibGit2)
+
+	target_sources(semindex_pipeline PRIVATE utils/git_provenance_loader.c)
+	target_compile_definitions(semindex_pipeline PUBLIC SEMINDEX_HAVE_LIBGIT2=1)
+	target_compile_definitions(semindex_pipeline PRIVATE
+		SEMINDEX_GIT_BACKEND_NAME="$<TARGET_FILE_NAME:semindex_git_backend>"
+	)
+	target_link_libraries(semindex_pipeline PRIVATE ${CMAKE_DL_LIBS})
+	add_dependencies(semindex_pipeline semindex_git_backend)
+else()
+	target_sources(semindex_pipeline PRIVATE utils/git_provenance_stub.c)
+endif()
 target_include_directories(semindex_pipeline PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
@@ -260,6 +296,10 @@ target_link_libraries(semindex_lsp PRIVATE
 	semindex_pipeline
 	LLVM
 )
+set_target_properties(semindex_lsp PROPERTIES
+	BUILD_RPATH "$ORIGIN"
+	INSTALL_RPATH "${CMAKE_INSTALL_FULL_LIBDIR}"
+)
 
 add_library(semindex_cli_common STATIC
 	utils/cli_common.c
@@ -283,9 +323,17 @@ set_target_properties(semindex_dispatcher PROPERTIES OUTPUT_NAME semindex)
 
 add_semindex_command(semindex_compiler compiler utils/cmd_compiler.c)
 target_link_libraries(semindex_compiler PRIVATE semindex_cli_common semindex_pipeline)
+set_target_properties(semindex_compiler PROPERTIES
+	BUILD_RPATH "$ORIGIN"
+	INSTALL_RPATH "${CMAKE_INSTALL_FULL_LIBDIR}"
+)
 
 add_semindex_command(semindex_index index utils/cmd_index.c)
 target_link_libraries(semindex_index PRIVATE semindex_cli_common semindex_pipeline)
+set_target_properties(semindex_index PROPERTIES
+	BUILD_RPATH "$ORIGIN"
+	INSTALL_RPATH "${CMAKE_INSTALL_FULL_LIBDIR}"
+)
 
 add_semindex_command(semindex_search search utils/cmd_search.c)
 target_link_libraries(semindex_search PRIVATE semindex_query)
@@ -303,6 +351,9 @@ install(TARGETS semindex_dispatcher semindex_compiler semindex_index semindex_se
 	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 	ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
+if(TARGET semindex_git_backend)
+	install(TARGETS semindex_git_backend LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
 install(FILES include/semindex.h include/semindex_database.h include/semindex_export.h
 	DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )

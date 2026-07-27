@@ -120,7 +120,11 @@ separately in `.semindex/commands.db`; use
 by default; use `--no-include-local` to omit them. A compiler name may be
 provided after `--`; when omitted, `cc` is used as the Clang driver name.
 When a `.git` marker is found above the source file, paths inside that
-repository are stored relative to its root.
+repository are stored relative to its root. The repository's current commit is
+stored as provenance for the selected variant when semindex is built with
+libgit2 and `--git-commit=auto` is requested. Such builds also accept an
+explicit object ID through `--git-commit=COMMIT`. Provenance is disabled by
+default to avoid libgit2 initialization overhead in every compiler process.
 
 Export the commands captured for the default variant as a compilation
 database:

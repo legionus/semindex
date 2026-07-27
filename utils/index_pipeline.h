@@ -22,6 +22,12 @@ typedef enum {
 } index_pipeline_partial_t;
 
 typedef enum {
+	INDEX_PIPELINE_GIT_COMMIT_DISABLED,
+	INDEX_PIPELINE_GIT_COMMIT_AUTO,
+	INDEX_PIPELINE_GIT_COMMIT_EXPLICIT,
+} index_pipeline_git_commit_t;
+
+typedef enum {
 	INDEX_PIPELINE_STAGE_NONE,
 	INDEX_PIPELINE_STAGE_CREATE,
 	INDEX_PIPELINE_STAGE_FRONTEND,
@@ -40,7 +46,9 @@ typedef struct {
 	const char *symbol_database;
 	const char *commands_database;
 	const char *variant;
+	const char *git_commit;
 	semindex_scope_t scope;
+	index_pipeline_git_commit_t git_commit_mode;
 	semindex_trace_t *trace;
 	int include_local;
 	int details;

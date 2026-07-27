@@ -13,7 +13,7 @@
 #include "semindex_database.h"
 #include "sqlite.h"
 
-#define INDEX_SCHEMA_VERSION 10
+#define INDEX_SCHEMA_VERSION 11
 #define STRINGIFY_VALUE(value) #value
 #define STRINGIFY(value) STRINGIFY_VALUE(value)
 
@@ -62,12 +62,13 @@ static void free_stored_paths(struct stored_paths *paths)
 	free(paths->root);
 }
 
-static int init_stored_paths(struct stored_paths *paths, semindex_t *s, const char *main_file, int include_local)
+static int init_stored_paths(struct stored_paths *paths, semindex_t *s, const char *main_file,
+	const char *repository_root, int include_local)
 {
 	size_t i;
 
 	memset(paths, 0, sizeof(*paths));
-	paths->root = semindex_repository_root(main_file);
+	paths->root = repository_root ? strdup(repository_root) : semindex_repository_root(main_file);
 	paths->main_file = semindex_repository_path(paths->root, main_file);
 	paths->count = semindex_file_fingerprint_count(s);
 
@@ -232,6 +233,11 @@ static int init_schema(sqlite3 *db)
 		"CREATE INDEX records_file_idx ON records(file_id)",
 		"CREATE INDEX records_call_context_idx ON records(context, context_usr_id)"
 		" WHERE record = 1 AND action = 3 AND kind = 7",
+		"CREATE TABLE variants ("
+		"  name TEXT PRIMARY KEY,"
+		"  git_commit TEXT NOT NULL,"
+		"  repository_root TEXT"
+		") WITHOUT ROWID",
 		"CREATE TABLE file_fingerprints ("
 		"  file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,"
 		"  fingerprint BLOB NOT NULL,"
@@ -711,8 +717,53 @@ out:
 	return ret;
 }
 
+static int store_variant_provenance(sqlite3 *db, const char *variant, const char *repository_root,
+	const char *git_commit)
+{
+	static const char *sql = "INSERT INTO variants(name, git_commit, repository_root) VALUES(?1, ?2, ?3)"
+				 " ON CONFLICT(name) DO UPDATE SET"
+				 " git_commit = excluded.git_commit,"
+				 " repository_root = excluded.repository_root"
+				 " WHERE variants.git_commit != excluded.git_commit"
+				 " OR variants.repository_root IS NOT excluded.repository_root";
+	sqlite3_stmt *stmt = NULL;
+	int step;
+	int ret = -1;
+
+	if (!git_commit)
+		return 0;
+
+	if (prepare(db, sql, &stmt) < 0)
+		goto out;
+
+	if (semindex_sqlite_bind_text(stmt, 1, variant) < 0)
+		goto out;
+
+	if (semindex_sqlite_bind_text(stmt, 2, git_commit) < 0)
+		goto out;
+
+	if (repository_root) {
+		if (semindex_sqlite_bind_text(stmt, 3, repository_root) < 0)
+			goto out;
+	} else if (sqlite3_bind_null(stmt, 3) != SQLITE_OK) {
+		fprintf(stderr, "semindex: sqlite: %s\n", sqlite3_errmsg(db));
+		goto out;
+	}
+
+	step = sqlite3_step(stmt);
+
+	if (step == SQLITE_DONE)
+		ret = 0;
+	else
+		fprintf(stderr, "semindex: sqlite: %s\n", sqlite3_errmsg(db));
+out:
+	sqlite3_finalize(stmt);
+
+	return ret;
+}
+
 static int merge_staging(sqlite3 *db, const char *variant, uint64_t staged_records, uint64_t fingerprint_attempts,
-	semindex_trace_t *trace)
+	const index_db_provenance_t *provenance, semindex_trace_t *trace)
 {
 	static const char *phases[] = {
 		"db.merge.files_insert",
@@ -798,6 +849,18 @@ static int merge_staging(sqlite3 *db, const char *variant, uint64_t staged_recor
 		}
 	}
 
+	if (provenance->git_commit) {
+		semindex_trace_time_t start = semindex_trace_begin(trace);
+		int provenance_ret;
+
+		provenance_ret =
+			store_variant_provenance(db, variant, provenance->repository_root, provenance->git_commit);
+		semindex_trace_end(trace, "db.merge.variant", start);
+
+		if (provenance_ret < 0)
+			goto rollback;
+	}
+
 	if (trace_exec_sql(db, "COMMIT", trace, "db.merge.commit") < 0)
 		goto out;
 
@@ -817,8 +880,7 @@ out:
 	return ret;
 }
 
-int index_db_store(const char *path, semindex_t *s, const char *main_file, const char *variant, int include_local,
-	semindex_trace_t *trace)
+int index_db_store(const index_db_store_request_t *request)
 {
 	sqlite3 *db = NULL;
 	semindex_trace_time_t start;
@@ -832,13 +894,17 @@ int index_db_store(const char *path, semindex_t *s, const char *main_file, const
 	int merge_ret;
 	int ret = -1;
 
-	if (!path || !s || !variant || !variant[0])
+	if (!request)
 		return -1;
 
-	if (init_stored_paths(&paths, s, main_file, include_local) < 0)
+	if (!request->path || !request->index || !request->variant || !request->variant[0])
 		return -1;
 
-	cached_count = semindex_file_fingerprint_count(s);
+	if (init_stored_paths(&paths, request->index, request->main_file, request->provenance.repository_root,
+		    request->include_local) < 0)
+		return -1;
+
+	cached_count = semindex_file_fingerprint_count(request->index);
 
 	if (cached_count) {
 		cached = calloc(cached_count, sizeof(*cached));
@@ -847,46 +913,47 @@ int index_db_store(const char *path, semindex_t *s, const char *main_file, const
 			goto out;
 	}
 
-	if (open_writer(path, &db, trace) < 0)
+	if (open_writer(request->path, &db, request->trace) < 0)
 		goto out;
 
-	start = semindex_trace_begin(trace);
+	start = semindex_trace_begin(request->trace);
 
 	if (create_staging(db) < 0) {
-		semindex_trace_end(trace, "db.staging_schema", start);
+		semindex_trace_end(request->trace, "db.staging_schema", start);
 		goto out;
 	}
 
-	semindex_trace_end(trace, "db.staging_schema", start);
+	semindex_trace_end(request->trace, "db.staging_schema", start);
 
-	if (trace_exec_sql(db, "BEGIN", trace, "db.staging_begin") < 0)
+	if (trace_exec_sql(db, "BEGIN", request->trace, "db.staging_begin") < 0)
 		goto out;
 
-	start = semindex_trace_begin(trace);
+	start = semindex_trace_begin(request->trace);
 
-	if (stage_files(db, s, &paths, main_file, variant, include_local, cached, cached_count, &files_in,
-		    &files_cached) < 0) {
-		semindex_trace_end_counted(trace, "db.stage_files", start, files_in, files_cached);
+	if (stage_files(db, request->index, &paths, request->main_file, request->variant, request->include_local,
+		    cached, cached_count, &files_in, &files_cached) < 0) {
+		semindex_trace_end_counted(request->trace, "db.stage_files", start, files_in, files_cached);
 		exec_sql(db, "ROLLBACK");
 		goto out;
 	}
 
-	semindex_trace_end_counted(trace, "db.stage_files", start, files_in, files_cached);
+	semindex_trace_end_counted(request->trace, "db.stage_files", start, files_in, files_cached);
 
-	start = semindex_trace_begin(trace);
+	start = semindex_trace_begin(request->trace);
 
-	if (stage_records(db, s, &paths, include_local, cached, cached_count, &records_in, &records_staged) < 0) {
-		semindex_trace_end_counted(trace, "db.stage_records", start, records_in, records_staged);
+	if (stage_records(db, request->index, &paths, request->include_local, cached, cached_count, &records_in,
+		    &records_staged) < 0) {
+		semindex_trace_end_counted(request->trace, "db.stage_records", start, records_in, records_staged);
 		exec_sql(db, "ROLLBACK");
 		goto out;
 	}
 
-	semindex_trace_end_counted(trace, "db.stage_records", start, records_in, records_staged);
+	semindex_trace_end_counted(request->trace, "db.stage_records", start, records_in, records_staged);
 
-	if (trace_exec_sql(db, "COMMIT", trace, "db.staging_commit") < 0)
+	if (trace_exec_sql(db, "COMMIT", request->trace, "db.staging_commit") < 0)
 		goto out;
 
-	merge_ret = merge_staging(db, variant, records_staged, files_in, trace);
+	merge_ret = merge_staging(db, request->variant, records_staged, files_in, &request->provenance, request->trace);
 
 	if (merge_ret < 0)
 		goto out;
@@ -898,7 +965,7 @@ int index_db_store(const char *path, semindex_t *s, const char *main_file, const
 		if (cached_count)
 			memset(cached, 0, cached_count);
 
-		if (trace_exec_sql(db, "BEGIN", trace, "db.staging_retry_begin") < 0)
+		if (trace_exec_sql(db, "BEGIN", request->trace, "db.staging_retry_begin") < 0)
 			goto out;
 
 		if (exec_sql(db, "UPDATE staging_files SET cached = 0") < 0) {
@@ -906,29 +973,32 @@ int index_db_store(const char *path, semindex_t *s, const char *main_file, const
 			goto out;
 		}
 
-		start = semindex_trace_begin(trace);
+		start = semindex_trace_begin(request->trace);
 
-		if (stage_records(db, s, &paths, include_local, cached, cached_count, &retry_in, &retry_staged) < 0) {
-			semindex_trace_end_counted(trace, "db.stage_records_retry", start, retry_in, retry_staged);
+		if (stage_records(db, request->index, &paths, request->include_local, cached, cached_count, &retry_in,
+			    &retry_staged) < 0) {
+			semindex_trace_end_counted(request->trace, "db.stage_records_retry", start, retry_in,
+				retry_staged);
 			exec_sql(db, "ROLLBACK");
 			goto out;
 		}
 
-		semindex_trace_end_counted(trace, "db.stage_records_retry", start, retry_in, retry_staged);
+		semindex_trace_end_counted(request->trace, "db.stage_records_retry", start, retry_in, retry_staged);
 
 		records_staged += retry_staged;
 
-		if (trace_exec_sql(db, "COMMIT", trace, "db.staging_retry_commit") < 0 ||
-			merge_staging(db, variant, records_staged, files_in, trace) != 0)
+		if (trace_exec_sql(db, "COMMIT", request->trace, "db.staging_retry_commit") < 0 ||
+			merge_staging(db, request->variant, records_staged, files_in, &request->provenance,
+				request->trace) != 0)
 			goto out;
 	}
 
 	ret = 0;
 out:
 	if (db) {
-		start = semindex_trace_begin(trace);
+		start = semindex_trace_begin(request->trace);
 		sqlite3_close(db);
-		semindex_trace_end(trace, "db.close", start);
+		semindex_trace_end(request->trace, "db.close", start);
 	}
 
 	free(cached);

@@ -25,6 +25,7 @@ COUNTED_KEYS = BASE_KEYS | {"items_in", "items_out"}
 TOP_LEVEL_PHASES = (
     "parse",
     "fingerprint",
+    "provenance",
     "symbol_database",
     "command_database",
     "output",

@@ -197,10 +197,10 @@ cache hits, ignored inserts measure fingerprints that concurrent writers added
 while the process was waiting for the writer lock.
 
 Top-level phases cover Clang parsing and record construction, semantic
-fingerprinting, symbol database storage, command database storage, output,
-cleanup, and total execution. Symbol database storage is divided into database
-setup, private staging, merge lock acquisition, each bulk merge query, commit,
-and close. In particular, `db.merge.begin` measures
+fingerprinting, repository provenance discovery, symbol database storage,
+command database storage, output, cleanup, and total execution. Symbol database
+storage is divided into database setup, private staging, merge lock acquisition,
+each bulk merge query, commit, and close. In particular, `db.merge.begin` measures
 `BEGIN IMMEDIATE`; after schema initialization its duration is predominantly
 writer-lock wait.
 

@@ -41,8 +41,22 @@ typedef struct {
 	int show_id;
 } index_db_callgraph_options_t;
 
-int index_db_store(const char *path, semindex_t *s, const char *main_file, const char *variant, int include_local,
-	semindex_trace_t *trace);
+typedef struct {
+	const char *repository_root;
+	const char *git_commit;
+} index_db_provenance_t;
+
+typedef struct {
+	const char *path;
+	semindex_t *index;
+	const char *main_file;
+	const char *variant;
+	index_db_provenance_t provenance;
+	semindex_trace_t *trace;
+	int include_local;
+} index_db_store_request_t;
+
+int index_db_store(const index_db_store_request_t *request);
 int index_db_search(const char *path, const index_db_search_options_t *opts, FILE *out);
 int index_db_callgraph(const char *path, const index_db_callgraph_options_t *opts, FILE *out);
 
