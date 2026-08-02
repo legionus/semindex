@@ -94,6 +94,7 @@ struct SymbolTypeRecord {
 	std::string path;
 	std::string symbol;
 	std::string declared_type;
+	std::string canonical_type;
 	semindex_symbol_kind_t kind;
 	unsigned long long usr_id;
 };
@@ -106,12 +107,14 @@ struct SymbolTypeCollector {
 
 struct OwnedTypeCursor {
 	std::string declared_type;
+	std::string canonical_type;
 	std::string path;
 	semindex_db_symbol_type_cursor_t cursor = {};
 
 	void updatePointers()
 	{
 		cursor.declared_type = declared_type.c_str();
+		cursor.canonical_type = canonical_type.c_str();
 		cursor.path = path.c_str();
 	}
 };
@@ -388,6 +391,7 @@ std::string typeCursor(const SymbolTypeRecord &record)
 {
 	llvm::json::Object cursor{
 		{ "declaredType", record.declared_type },
+		{ "canonicalType", record.canonical_type },
 		{ "path", record.path },
 	};
 	std::string serialized;
@@ -420,12 +424,14 @@ bool parseTypeCursor(llvm::StringRef encoded, OwnedTypeCursor &result)
 		return false;
 
 	auto declared_type = object->getString("declaredType");
+	auto canonical_type = object->getString("canonicalType");
 	auto path = object->getString("path");
 
-	if (!declared_type || !path)
+	if (!declared_type || !canonical_type || !path)
 		return false;
 
 	result.declared_type = declared_type->str();
+	result.canonical_type = canonical_type->str();
 	result.path = path->str();
 	result.updatePointers();
 
@@ -569,6 +575,7 @@ int collectSymbolType(void *data, const semindex_db_symbol_type_t *type)
 		.path = type->path,
 		.symbol = type->symbol,
 		.declared_type = type->declared_type,
+		.canonical_type = type->canonical_type,
 		.kind = type->kind,
 		.usr_id = type->usr_id,
 	});
@@ -688,6 +695,7 @@ llvm::json::Object symbolTypesResult(std::vector<SymbolTypeRecord> &records, siz
 			{ "kind", kindName(record.kind) },
 			{ "usrId", idString(record.usr_id) },
 			{ "declaredType", record.declared_type },
+			{ "canonicalType", record.canonical_type },
 		});
 	}
 

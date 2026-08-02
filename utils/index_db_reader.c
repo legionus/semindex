@@ -421,18 +421,19 @@ int semindex_db_query_symbol_types(semindex_db_t *db, const semindex_db_symbol_t
 {
 	static const char *base_sql =
 		"SELECT files.variant, files.path, symbol_types.symbol, symbol_types.declared_type,"
-		" symbol_types.kind, symbol_types.usr_id"
+		" symbol_types.canonical_type, symbol_types.kind, symbol_types.usr_id"
 		" FROM symbol_types JOIN files ON files.id = symbol_types.file_id"
 		" WHERE symbol_types.symbol = ?1 AND symbol_types.kind = ?2 AND symbol_types.usr_id = ?3"
-		" AND files.variant = ?4 ORDER BY symbol_types.declared_type, files.path";
+		" AND files.variant = ?4 ORDER BY symbol_types.declared_type, symbol_types.canonical_type, files.path";
 	static const char *after_sql =
 		"SELECT files.variant, files.path, symbol_types.symbol, symbol_types.declared_type,"
-		" symbol_types.kind, symbol_types.usr_id"
+		" symbol_types.canonical_type, symbol_types.kind, symbol_types.usr_id"
 		" FROM symbol_types JOIN files ON files.id = symbol_types.file_id"
 		" WHERE symbol_types.symbol = ?1 AND symbol_types.kind = ?2 AND symbol_types.usr_id = ?3"
 		" AND files.variant = ?4 AND (symbol_types.declared_type > ?5"
-		" OR (symbol_types.declared_type = ?5 AND files.path > ?6))"
-		" ORDER BY symbol_types.declared_type, files.path";
+		" OR (symbol_types.declared_type = ?5 AND symbol_types.canonical_type > ?6)"
+		" OR (symbol_types.declared_type = ?5 AND symbol_types.canonical_type = ?6 AND files.path > ?7))"
+		" ORDER BY symbol_types.declared_type, symbol_types.canonical_type, files.path";
 	sqlite3_stmt *stmt = NULL;
 	const semindex_db_identity_t *identity;
 	int step;
@@ -450,8 +451,10 @@ int semindex_db_query_symbol_types(semindex_db_t *db, const semindex_db_symbol_t
 	if (!identity->symbol || !identity->symbol[0] || !identity->usr_id)
 		return -1;
 
-	if (query->after && (!query->after->declared_type || !query->after->path))
-		return -1;
+	if (query->after) {
+		if (!query->after->declared_type || !query->after->canonical_type || !query->after->path)
+			return -1;
+	}
 
 	if (identity->kind < SEMINDEX_SYMBOL_VAR || identity->kind > SEMINDEX_SYMBOL_FILE)
 		return -1;
@@ -466,7 +469,8 @@ int semindex_db_query_symbol_types(semindex_db_t *db, const semindex_db_symbol_t
 
 	if (query->after) {
 		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 5, query->after->declared_type));
-		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 6, query->after->path));
+		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 6, query->after->canonical_type));
+		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 7, query->after->path));
 	}
 
 	while ((!query->limit || count < query->limit) && (step = sqlite3_step(stmt)) == SQLITE_ROW) {
@@ -475,8 +479,9 @@ int semindex_db_query_symbol_types(semindex_db_t *db, const semindex_db_symbol_t
 			.path = column_text(stmt, 1),
 			.symbol = column_text(stmt, 2),
 			.declared_type = column_text(stmt, 3),
-			.kind = sqlite3_column_int(stmt, 4),
-			.usr_id = (unsigned long long)sqlite3_column_int64(stmt, 5),
+			.canonical_type = column_text(stmt, 4),
+			.kind = sqlite3_column_int(stmt, 5),
+			.usr_id = (unsigned long long)sqlite3_column_int64(stmt, 6),
 		};
 
 		ret = callback(data, &type);

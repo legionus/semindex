@@ -33,9 +33,9 @@ The default read-only tool set is:
 compiler command in the command database.
 
 `find_declared_types` accepts the identity returned by `symbol_at` and returns
-the declared C type together with the source file that contributed it. Results
-are bounded and cursor-paginated. Typedef expansion and canonical types are not
-yet available.
+the declared and canonical C types together with the source file that
+contributed them. The canonical type expands typedef chains. Results are
+bounded and cursor-paginated.
 
 Record results contain the variant, path, one-based byte position, qualified
 symbol, symbol kind, record type, action, access mode, enclosing context, local

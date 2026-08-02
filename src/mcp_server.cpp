@@ -208,7 +208,7 @@ llvm::json::Array McpServer::toolDefinitions(bool allow_reindex)
 	declared_types["variant"] = stringProperty("Index variant");
 	declared_types["usrId"] = stringProperty("Stable hexadecimal symbol identity");
 	declared_types["kind"] = stringProperty("Symbol kind returned by symbol_at");
-	result.push_back(tool("find_declared_types", "Find declared C types for a semantic identity",
+	result.push_back(tool("find_declared_types", "Find declared and canonical C types for a semantic identity",
 		objectSchema(std::move(declared_types), { "symbol", "usrId", "kind" })));
 
 	llvm::json::Object calls = pagingProperties();

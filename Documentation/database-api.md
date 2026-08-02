@@ -39,10 +39,10 @@ index.
 
 ## Declared type queries
 
-`semindex_db_query_symbol_types()` streams declared C types for an exact
-`semindex_db_identity_t`. Results are ordered by declared type and source path.
-The query accepts a limit and a caller-owned cursor so clients can paginate
-without using `OFFSET`. Type strings remain valid only until the callback
+`semindex_db_query_symbol_types()` streams declared and canonical C types for an
+exact `semindex_db_identity_t`. Results are ordered by declared type, canonical
+type, and source path. The query accepts a limit and a caller-owned cursor so
+clients can paginate without using `OFFSET`. Type strings remain valid only until the callback
 returns.
 
 ## Call queries

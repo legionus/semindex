@@ -23,13 +23,14 @@ computed before SQLite staging; adding a record does not perform an identity
 lookup. A secondary file index supports file
 replacement and narrows source-position lookup to one indexed file.
 
-The `symbol_types` table stores nonempty declared C types for symbol records
-with stable identities. A type is stored once per symbol and source file, not
-on every reference. Its primary key begins with `(symbol, kind, usr_id)`, so an
-exact identity lookup does not scan unrelated types. The file relationship
-allows stale types to be removed with the same replacement rules as semantic
-records. Typedef expansion and canonical type relationships are not yet
-stored.
+The `symbol_types` table stores nonempty declared and canonical C types for
+symbol records with stable identities. A type relationship is stored once per
+symbol and source file, not on every reference. Its primary key begins with
+`(symbol, kind, usr_id)`, so an exact identity lookup does not scan unrelated
+types. The file relationship allows stale types to be removed with the same
+replacement rules as semantic records. The declared spelling preserves typedef
+names while the canonical type expands typedef chains through Clang's type
+system.
 
 ## Reader API
 
@@ -153,8 +154,8 @@ rebuilding the index. This is an intentional tradeoff for a reproducible cache.
 
 ## Compatibility
 
-The database is an experimental interface. Schema version 14 stores declared
-types for symbols with stable identities and does not migrate older databases.
+The database is an experimental interface. Schema version 15 stores declared
+and canonical types for symbols with stable identities and does not migrate older databases.
 Dropping old tables in place would also leave their original multi-gigabyte file allocation.
 Remove an old database before indexing:
 

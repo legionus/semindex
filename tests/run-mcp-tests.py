@@ -158,7 +158,7 @@ def main():
 		database = Path(temporary) / "semindex.db"
 		logfile = Path(temporary) / "mcp.log"
 
-		for source in ("tests/test11.c", "tests/callgraph-a.c", "tests/callgraph-b.c"):
+		for source in ("tests/test8.c", "tests/test11.c", "tests/callgraph-a.c", "tests/callgraph-b.c"):
 			index_fixture(semindex, database, workspace, source)
 
 		client = Client(mcp, database, workspace, logfile)
@@ -235,6 +235,26 @@ def main():
 
 		if [type_record["declaredType"] for type_record in declared_types.get("types", [])] != ["int"]:
 			fail("find_declared_types returned the wrong field type")
+
+		counter_identity = only_record(
+			client.tool("symbol_at", {"path": "tests/test8.c", "line": 13, "column": 11}),
+			"symbol_at typedef variable",
+		)
+		counter_types = client.tool(
+			"find_declared_types",
+			{
+				"symbol": counter_identity["symbol"],
+				"variant": counter_identity["variant"],
+				"usrId": counter_identity["usrId"],
+				"kind": counter_identity["kind"],
+			},
+		)
+		counter_type = counter_types.get("types", [])
+
+		if [(record["declaredType"], record["canonicalType"]) for record in counter_type] != [
+			("counter_t", "int")
+		]:
+			fail("find_declared_types did not expand the typedef")
 
 		definitions = client.tool(
 			"find_definitions",

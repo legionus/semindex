@@ -120,12 +120,14 @@ typedef struct {
 	const char *path;
 	const char *symbol;
 	const char *declared_type;
+	const char *canonical_type;
 	semindex_symbol_kind_t kind;
 	unsigned long long usr_id;
 } semindex_db_symbol_type_t;
 
 typedef struct {
 	const char *declared_type;
+	const char *canonical_type;
 	const char *path;
 } semindex_db_symbol_type_cursor_t;
 

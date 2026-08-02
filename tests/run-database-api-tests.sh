@@ -27,7 +27,14 @@ callgraph_path=tests/callgraph-a.c
 	cc --no-default-config "$callgraph_source"
 "$SEMINDEX" compiler --database="$db" --variant=debug --no-store-command -- \
 	cc --no-default-config "$source"
+"$SEMINDEX" compiler --database="$db" --no-store-command -- \
+	cc --no-default-config "$SOURCE_DIR/tests/test8.c"
 "$DATABASE_API_TEST" "$db" "$source_path" "$callgraph_path" "$SOURCE_DIR"
+
+if [ "$(sqlite3 "$db" "SELECT declared_type || ':' || canonical_type FROM symbol_types
+WHERE symbol = 'c' AND kind = 0")" != "counter_t:int" ]; then
+	fail "typedef relationship was not stored"
+fi
 
 position_plan=$(sqlite3 "$db" "EXPLAIN QUERY PLAN
 SELECT records.symbol FROM files JOIN records ON records.file_id = files.id

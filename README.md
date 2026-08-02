@@ -71,7 +71,6 @@ storage implementation symbols are hidden.
 The remaining long-term work is to deepen the semantic model beyond the
 implemented symbol index, direct call graph, and SQLite queries. This includes:
 
-* expanded typedef relationships;
 * richer struct, union, and enum relationships;
 * indirect-call target resolution;
 * semantic queries beyond the original Sparse semind interface.
@@ -196,7 +195,7 @@ This is still a prototype.
 
 Among the missing features are:
 
-* a persistent type graph, including expanded typedef and complete type
+* a persistent type graph beyond the stored declared-to-canonical type
   relationships;
 * indirect-call target resolution and points-to analysis;
 * indexing of code excluded by preprocessing; separate variants must be indexed

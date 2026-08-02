@@ -70,6 +70,7 @@ struct identity_state {
 struct type_state {
 	const semindex_db_identity_t *identity;
 	const char *declared_type;
+	const char *canonical_type;
 	const char *path;
 	unsigned count;
 	int failed;
@@ -341,7 +342,8 @@ static int check_symbol_type(void *data, const semindex_db_symbol_type_t *type)
 
 	if (strcmp(type->variant, state->identity->variant) || strcmp(type->symbol, state->identity->symbol) ||
 		type->usr_id != state->identity->usr_id || type->kind != state->identity->kind ||
-		strcmp(type->declared_type, state->declared_type) || strcmp(type->path, state->path)) {
+		strcmp(type->declared_type, state->declared_type) ||
+		strcmp(type->canonical_type, state->canonical_type) || strcmp(type->path, state->path)) {
 		state->failed = 1;
 
 		return -1;
@@ -391,6 +393,7 @@ static int check_identity_queries(semindex_db_t *db, const char *path)
 	type = (struct type_state){
 		.identity = &identity.identity,
 		.declared_type = "int",
+		.canonical_type = "int",
 		.path = path,
 	};
 	type_query = (semindex_db_symbol_type_query_t){

@@ -288,6 +288,11 @@ static std::string stableTypeName(QualType type, const ASTContext &ctx)
 		std::to_string(loc.getColumn()) + ")";
 }
 
+static std::string canonicalTypeName(QualType type, const ASTContext &ctx)
+{
+	return stableTypeName(type.getCanonicalType(), ctx);
+}
+
 static std::string typeNameForTypedef(const TypedefNameDecl *D, const ASTContext &ctx)
 {
 	const RecordDecl *anonymousRecord = recordDeclForType(D->getUnderlyingType());
@@ -357,6 +362,7 @@ public:
 		s.name = getName(D);
 		s.owner = "";
 		s.type = typeName;
+		s.canonical_type = canonicalTypeName(D->getType(), ctx);
 		s.usr = getUSR(D, ctx);
 		s.context = currentFunction;
 		s.loc = index.location(D->getLocation());
@@ -396,6 +402,7 @@ public:
 		s.name = getName(D);
 		s.owner = getOwnerName(D);
 		s.type = stableTypeName(D->getType(), ctx);
+		s.canonical_type = canonicalTypeName(D->getType(), ctx);
 		s.usr = getUSR(D, ctx);
 		s.context = "";
 		s.loc = index.location(D->getLocation());
@@ -426,6 +433,7 @@ public:
 		s.name = getName(D);
 		s.owner = "";
 		s.type = typeName;
+		s.canonical_type = canonicalTypeName(D->getUnderlyingType(), ctx);
 		s.usr = getUSR(D, ctx);
 		s.context = currentFunction;
 		s.loc = index.location(D->getLocation());
@@ -631,6 +639,7 @@ public:
 		s.owner = "";
 
 		s.type = stableTypeName(D->getType(), ctx);
+		s.canonical_type = canonicalTypeName(D->getType(), ctx);
 		s.usr = getUSR(D, ctx);
 		s.context = "";
 		s.loc = index.location(D->getLocation());
@@ -658,6 +667,7 @@ public:
 		s.name = getName(D);
 		s.owner = "";
 		s.type = stableTypeName(D->getType(), ctx);
+		s.canonical_type = canonicalTypeName(D->getType(), ctx);
 		s.usr = functionUSR(D);
 		s.context = "";
 		s.loc = index.location(D->getLocation());
@@ -704,6 +714,7 @@ private:
 		std::string name;
 		std::string owner;
 		std::string type;
+		std::string canonical_type;
 		std::string usr;
 	};
 
@@ -723,6 +734,7 @@ private:
 
 			if (details) {
 				entry->second.type = stableTypeName(D->getType(), ctx);
+				entry->second.canonical_type = canonicalTypeName(D->getType(), ctx);
 				entry->second.usr = getUSR(D, ctx);
 			}
 		}
@@ -913,6 +925,7 @@ private:
 		s.name = info.name;
 		s.owner = info.owner;
 		s.type = info.type;
+		s.canonical_type = info.canonical_type;
 		s.usr = info.usr;
 		s.context = "";
 		s.loc = index.location(D->getLocation());
@@ -961,6 +974,7 @@ private:
 			s.owner = owner;
 
 			s.type = stableTypeName(field->getType(), ctx);
+			s.canonical_type = canonicalTypeName(field->getType(), ctx);
 			s.usr = getUSR(field, ctx);
 			s.context = "";
 			s.loc = index.displayLocation(ctx, field->getLocation());
