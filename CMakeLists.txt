@@ -182,6 +182,30 @@ target_include_directories(semindex_database PUBLIC
 )
 target_link_libraries(semindex_database PRIVATE semindex_sqlite)
 
+# Optional Git backend loader
+add_library(semindex_git STATIC)
+if(TARGET PkgConfig::LibGit2)
+	add_library(semindex_git_backend MODULE utils/git_provenance.c)
+	set_target_properties(semindex_git_backend PROPERTIES
+		OUTPUT_NAME semindex_git_backend
+	)
+	target_include_directories(semindex_git_backend PRIVATE utils)
+	target_link_libraries(semindex_git_backend PRIVATE PkgConfig::LibGit2)
+
+	target_sources(semindex_git PRIVATE utils/git_provenance_loader.c)
+	target_compile_definitions(semindex_git PUBLIC SEMINDEX_HAVE_LIBGIT2=1)
+	target_compile_definitions(semindex_git PRIVATE
+		SEMINDEX_GIT_BACKEND_NAME="$<TARGET_FILE_NAME:semindex_git_backend>"
+	)
+	target_link_libraries(semindex_git PRIVATE ${CMAKE_DL_LIBS})
+	add_dependencies(semindex_git semindex_git_backend)
+else()
+	target_sources(semindex_git PRIVATE utils/git_provenance_stub.c)
+endif()
+target_include_directories(semindex_git PUBLIC
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
+)
+
 # Source path resolution and working-tree access
 add_library(semindex_source STATIC
 	src/source_resolver.cpp
@@ -190,7 +214,7 @@ target_include_directories(semindex_source PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
 )
-target_link_libraries(semindex_source PUBLIC semindex_database)
+target_link_libraries(semindex_source PUBLIC semindex_database semindex_git)
 
 # SQLite query adapters
 add_library(semindex_query STATIC
@@ -264,29 +288,12 @@ target_link_libraries(semindex_parser PRIVATE
 add_library(semindex_pipeline STATIC
 	utils/index_pipeline.c
 )
-if(TARGET PkgConfig::LibGit2)
-	add_library(semindex_git_backend MODULE utils/git_provenance.c)
-	set_target_properties(semindex_git_backend PROPERTIES
-		OUTPUT_NAME semindex_git_backend
-	)
-	target_include_directories(semindex_git_backend PRIVATE utils)
-	target_link_libraries(semindex_git_backend PRIVATE PkgConfig::LibGit2)
-
-	target_sources(semindex_pipeline PRIVATE utils/git_provenance_loader.c)
-	target_compile_definitions(semindex_pipeline PUBLIC SEMINDEX_HAVE_LIBGIT2=1)
-	target_compile_definitions(semindex_pipeline PRIVATE
-		SEMINDEX_GIT_BACKEND_NAME="$<TARGET_FILE_NAME:semindex_git_backend>"
-	)
-	target_link_libraries(semindex_pipeline PRIVATE ${CMAKE_DL_LIBS})
-	add_dependencies(semindex_pipeline semindex_git_backend)
-else()
-	target_sources(semindex_pipeline PRIVATE utils/git_provenance_stub.c)
-endif()
 target_include_directories(semindex_pipeline PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
 )
 target_link_libraries(semindex_pipeline PUBLIC
+	semindex_git
 	semindex_parser
 	semindex_storage
 )
@@ -564,6 +571,11 @@ if(BUILD_TESTING)
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-source-resolver-tests.sh
 	)
+	if(TARGET PkgConfig::LibGit2)
+		set_tests_properties(semindex-source-resolver PROPERTIES
+			ENVIRONMENT SEMINDEX_TEST_GIT=1
+		)
+	endif()
 	add_test(
 		NAME semindex-partial-cli
 		COMMAND

@@ -51,6 +51,7 @@ public:
 	bool readLine(const std::filesystem::path &path, unsigned line, std::string &text) const;
 	void readLines(const std::filesystem::path &path, std::vector<std::string> &lines) const;
 	int readWorkingTree(const SemindexSourceRequest &request, SemindexSourceResult &result) const;
+	int readSource(const SemindexSourceRequest &request, SemindexSourceResult &result) const;
 
 private:
 	std::filesystem::path root;

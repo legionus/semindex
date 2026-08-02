@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "source_resolver.h"
 
+#include "git_provenance.h"
+
 #include <cerrno>
+#include <cstring>
 #include <fstream>
+#include <optional>
 #include <sys/stat.h>
 #include <utility>
 
@@ -13,6 +17,12 @@ struct IndexedFileMetadata {
 	long long mtime_ns = 0;
 	long long size = 0;
 	bool found = false;
+};
+
+struct VariantProvenance {
+	std::string variant;
+	std::filesystem::path repository_root;
+	std::string commit;
 };
 
 long long statMtime(const struct stat &st)
@@ -40,6 +50,22 @@ int collectFileMetadata(void *data, const semindex_db_file_t *file)
 	metadata.mtime_ns = file->mtime_ns;
 	metadata.size = file->size;
 	metadata.found = true;
+
+	return 0;
+}
+
+int collectVariantProvenance(void *data, const semindex_db_variant_t *variant)
+{
+	auto &provenance = *static_cast<VariantProvenance *>(data);
+
+	if (provenance.variant != variant->name)
+		return 0;
+
+	if (variant->repository_root)
+		provenance.repository_root = variant->repository_root;
+
+	if (variant->git_commit)
+		provenance.commit = variant->git_commit;
 
 	return 0;
 }
@@ -72,6 +98,98 @@ bool readRange(const std::filesystem::path &path, const SemindexSourceRequest &r
 	}
 
 	return true;
+}
+
+void skipBlobLine(const char *content, size_t size, size_t &offset)
+{
+	const void *newline = memchr(content + offset, '\n', size - offset);
+
+	offset = newline ? static_cast<const char *>(newline) - content + 1 : size;
+}
+
+void readBlobRange(const semindex_git_blob_data_t &blob, const SemindexSourceRequest &request,
+	SemindexSourceResult &result)
+{
+	const char *content = static_cast<const char *>(blob.content);
+	size_t bytes = 0;
+	size_t offset = 0;
+	unsigned current = 1;
+
+	while (current < request.first_line && offset < blob.size) {
+		skipBlobLine(content, blob.size, offset);
+		current++;
+	}
+
+	while (result.lines.size() < request.line_count && offset < blob.size) {
+		const void *newline = memchr(content + offset, '\n', blob.size - offset);
+		size_t end = newline ? static_cast<const char *>(newline) - content : blob.size;
+		size_t length = end - offset;
+
+		if (length && content[offset + length - 1] == '\r')
+			length--;
+
+		if (length + 1 > request.byte_limit - bytes) {
+			result.byte_limit_hit = true;
+
+			break;
+		}
+
+		bytes += length + 1;
+		result.lines.emplace_back(content + offset, length);
+		offset = newline ? end + 1 : blob.size;
+	}
+}
+
+std::optional<std::string> repositoryPath(const std::string &path, const std::filesystem::path &root)
+{
+	std::filesystem::path source(path);
+	std::filesystem::path relative = source;
+
+	if (source.is_absolute())
+		relative = source.lexically_relative(root);
+
+	relative = relative.lexically_normal();
+
+	if (relative.empty() || relative.is_absolute() || *relative.begin() == "..")
+		return std::nullopt;
+
+	return relative.generic_string();
+}
+
+int readGitCommit(const SemindexSourceRequest &request, SemindexSourceResult &result)
+{
+	VariantProvenance provenance = {
+		.variant = request.variant,
+	};
+	semindex_git_blob_t blob;
+	int ret;
+
+	ret = semindex_db_list_variants(request.database, collectVariantProvenance, &provenance);
+
+	if (ret < 0)
+		return -1;
+
+	if (provenance.repository_root.empty() || provenance.commit.empty())
+		return 0;
+
+	auto path = repositoryPath(request.path, provenance.repository_root);
+
+	if (!path)
+		return 0;
+
+	ret = semindex_git_blob(provenance.repository_root.c_str(), provenance.commit.c_str(), path->c_str(), &blob);
+
+	if (ret < 0)
+		return -1;
+
+	if (!ret) {
+		readBlobRange(blob.data, request, result);
+		result.origin = SemindexSourceOrigin::GitCommit;
+	}
+
+	semindex_git_blob_destroy(&blob);
+
+	return 0;
 }
 
 } // namespace
@@ -216,4 +334,17 @@ int SemindexSourceResolver::readWorkingTree(const SemindexSourceRequest &request
 	result.origin = SemindexSourceOrigin::WorkingTree;
 
 	return 0;
+}
+
+int SemindexSourceResolver::readSource(const SemindexSourceRequest &request, SemindexSourceResult &result) const
+{
+	int ret = readWorkingTree(request, result);
+
+	if (ret < 0)
+		return -1;
+
+	if (result.status == SemindexSourceStatus::Current || result.status == SemindexSourceStatus::NotIndexed)
+		return 0;
+
+	return readGitCommit(request, result);
 }

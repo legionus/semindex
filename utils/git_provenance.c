@@ -120,3 +120,66 @@ void semindex_git_backend_provenance_destroy(semindex_git_provenance_data_t *pro
 	free(provenance->commit);
 	memset(provenance, 0, sizeof(*provenance));
 }
+
+int semindex_git_backend_blob(const char *repository_root, const char *commit, const char *path,
+	semindex_git_blob_data_t *blob)
+{
+	git_repository *repository = NULL;
+	git_commit *commit_object = NULL;
+	git_tree_entry *entry = NULL;
+	git_tree *tree = NULL;
+	git_blob *object = NULL;
+	git_oid oid;
+	int ret = -1;
+
+	memset(blob, 0, sizeof(*blob));
+	git_libgit2_init();
+
+	if (git_repository_open(&repository, repository_root) < 0)
+		goto unavailable;
+
+	if (git_oid_fromstr(&oid, commit) < 0)
+		goto out;
+
+	if (git_commit_lookup(&commit_object, repository, &oid) < 0)
+		goto unavailable;
+
+	if (git_commit_tree(&tree, commit_object) < 0)
+		goto out;
+
+	if (git_tree_entry_bypath(&entry, tree, path) < 0)
+		goto unavailable;
+
+	if (git_tree_entry_type(entry) != GIT_OBJECT_BLOB)
+		goto unavailable;
+
+	if (git_blob_lookup(&object, repository, git_tree_entry_id(entry)) < 0)
+		goto out;
+
+	blob->content = git_blob_rawcontent(object);
+	blob->size = git_blob_rawsize(object);
+	blob->object = object;
+	object = NULL;
+	ret = 0;
+	goto out;
+unavailable:
+	ret = 1;
+out:
+	git_blob_free(object);
+	git_tree_entry_free(entry);
+	git_tree_free(tree);
+	git_commit_free(commit_object);
+	git_repository_free(repository);
+
+	if (ret)
+		git_libgit2_shutdown();
+
+	return ret;
+}
+
+void semindex_git_backend_blob_destroy(semindex_git_blob_data_t *blob)
+{
+	git_blob_free(blob->object);
+	git_libgit2_shutdown();
+	memset(blob, 0, sizeof(*blob));
+}

@@ -6,6 +6,9 @@
 
 typedef int (*provenance_fn_t)(const char *path, semindex_git_provenance_data_t *provenance);
 typedef void (*destroy_fn_t)(semindex_git_provenance_data_t *provenance);
+typedef int blob_fn_t(const char *repository_root, const char *commit, const char *path,
+	semindex_git_blob_data_t *blob);
+typedef void (*blob_destroy_fn_t)(semindex_git_blob_data_t *blob);
 
 int semindex_git_provenance(const char *path, semindex_git_provenance_t *provenance)
 {
@@ -41,4 +44,40 @@ void semindex_git_provenance_destroy(semindex_git_provenance_t *provenance)
 		dlclose(provenance->backend);
 
 	memset(provenance, 0, sizeof(*provenance));
+}
+
+int semindex_git_blob(const char *repository_root, const char *commit, const char *path, semindex_git_blob_t *blob)
+{
+	blob_fn_t *load;
+
+	memset(blob, 0, sizeof(*blob));
+	blob->backend = dlopen(SEMINDEX_GIT_BACKEND_NAME, RTLD_NOW | RTLD_LOCAL);
+
+	if (!blob->backend)
+		return 1;
+
+	load = (blob_fn_t *)dlsym(blob->backend, "semindex_git_backend_blob");
+	blob->destroy = (blob_destroy_fn_t)dlsym(blob->backend, "semindex_git_backend_blob_destroy");
+
+	if (!load || !blob->destroy)
+		goto fail;
+
+	return load(repository_root, commit, path, &blob->data);
+
+fail:
+	dlclose(blob->backend);
+	memset(blob, 0, sizeof(*blob));
+
+	return -1;
+}
+
+void semindex_git_blob_destroy(semindex_git_blob_t *blob)
+{
+	if (blob->destroy)
+		blob->destroy(&blob->data);
+
+	if (blob->backend)
+		dlclose(blob->backend);
+
+	memset(blob, 0, sizeof(*blob));
 }

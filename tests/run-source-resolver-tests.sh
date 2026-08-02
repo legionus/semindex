@@ -21,3 +21,23 @@ printf '%s\n' '' 'int changed;' >>"$source"
 "$SOURCE_RESOLVER_TEST" "$SOURCE_DIR" "$SOURCE_DIR/tests/test.c" "$database" "$source" drifted
 rm -f "$source"
 "$SOURCE_RESOLVER_TEST" "$SOURCE_DIR" "$SOURCE_DIR/tests/test.c" "$database" "$source" missing
+
+if [ "${SEMINDEX_TEST_GIT:-0}" != 1 ]; then
+	exit 0
+fi
+
+repository=$tmpdir/repository
+git_database=$tmpdir/git.db
+git_source=$repository/source.c
+mkdir "$repository"
+cp "$SOURCE_DIR/tests/test.c" "$git_source"
+git -C "$repository" init -q
+git -C "$repository" -c user.name=Semindex -c user.email=semindex@example.com add source.c
+git -C "$repository" -c user.name=Semindex -c user.email=semindex@example.com commit -qm initial
+"$SEMINDEX" compiler --database="$git_database" --no-store-command --git-commit=auto -- \
+	cc --no-default-config "$git_source"
+
+printf '%s\n' '' 'int changed;' >>"$git_source"
+"$SOURCE_RESOLVER_TEST" "$repository" "$git_source" "$git_database" source.c git-drifted
+rm -f "$git_source"
+"$SOURCE_RESOLVER_TEST" "$repository" "$repository/source.c" "$git_database" source.c git-missing
