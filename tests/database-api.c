@@ -31,6 +31,21 @@ struct variant_state {
 	int failed;
 };
 
+#define PAGINATION_RECORDS 128
+#define PAGINATION_KEY_SIZE 1024
+
+struct pagination_state {
+	char expected[PAGINATION_RECORDS][PAGINATION_KEY_SIZE];
+	char variant[64];
+	char path[512];
+	char symbol[256];
+	semindex_db_cursor_t cursor;
+	unsigned expected_count;
+	unsigned index;
+	unsigned page_count;
+	int failed;
+};
+
 static int check_record(void *data, const semindex_db_record_t *record)
 {
 	struct result_state *state = data;
@@ -110,6 +125,107 @@ static int check_variant(void *data, const semindex_db_variant_t *variant)
 	return 0;
 }
 
+static int record_key(char *buffer, size_t size, const semindex_db_record_t *record)
+{
+	int length;
+
+	length = snprintf(buffer, size, "%s|%s|%010u|%010u|%s|%010d|%010u|%010d|%010u", record->variant, record->path,
+		record->line, record->column, record->symbol, record->record, record->action, record->kind,
+		record->mode);
+
+	return length < 0 || (size_t)length >= size ? -1 : 0;
+}
+
+static int copy_text(char *buffer, size_t size, const char *value)
+{
+	int length;
+
+	length = snprintf(buffer, size, "%s", value);
+
+	return length < 0 || (size_t)length >= size ? -1 : 0;
+}
+
+static int collect_expected(void *data, const semindex_db_record_t *record)
+{
+	struct pagination_state *state = data;
+
+	if (state->expected_count >= PAGINATION_RECORDS)
+		return -1;
+
+	if (record_key(state->expected[state->expected_count], PAGINATION_KEY_SIZE, record) < 0)
+		return -1;
+
+	state->expected_count++;
+
+	return 0;
+}
+
+static int collect_page(void *data, const semindex_db_record_t *record)
+{
+	struct pagination_state *state = data;
+	char key[PAGINATION_KEY_SIZE];
+
+	if (state->index >= state->expected_count || record_key(key, sizeof(key), record) < 0) {
+		state->failed = 1;
+
+		return -1;
+	}
+
+	if (strcmp(key, state->expected[state->index])) {
+		state->failed = 1;
+
+		return -1;
+	}
+
+	if (copy_text(state->variant, sizeof(state->variant), record->variant) < 0 ||
+		copy_text(state->path, sizeof(state->path), record->path) < 0 ||
+		copy_text(state->symbol, sizeof(state->symbol), record->symbol) < 0) {
+		state->failed = 1;
+
+		return -1;
+	}
+
+	state->cursor = (semindex_db_cursor_t){
+		.variant = state->variant,
+		.path = state->path,
+		.symbol = state->symbol,
+		.record = record->record,
+		.kind = record->kind,
+		.action = record->action,
+		.mode = record->mode,
+		.line = record->line,
+		.column = record->column,
+	};
+	state->index++;
+	state->page_count++;
+
+	return 0;
+}
+
+static int check_pagination(semindex_db_t *db, const char *path)
+{
+	struct pagination_state state = { 0 };
+	semindex_db_query_options_t options = {
+		.path = path,
+		.variant = "general",
+	};
+
+	if (semindex_db_query(db, &options, collect_expected, &state) < 0 || !state.expected_count)
+		return -1;
+
+	options.limit = 3;
+
+	do {
+		state.page_count = 0;
+		options.after = state.index ? &state.cursor : NULL;
+
+		if (semindex_db_query(db, &options, collect_page, &state) < 0 || state.failed)
+			return -1;
+	} while (state.page_count == options.limit);
+
+	return state.index == state.expected_count ? 0 : -1;
+}
+
 int main(int argc, char **argv)
 {
 	semindex_db_t *db = NULL;
@@ -171,6 +287,8 @@ int main(int argc, char **argv)
 		callers.count != 2)
 		goto unexpected;
 	if (semindex_db_list_variants(db, check_variant, &variants) < 0 || variants.failed || variants.count != 2)
+		goto unexpected;
+	if (check_pagination(db, argv[3]) < 0)
 		goto unexpected;
 	ret = 0;
 	goto out;

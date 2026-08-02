@@ -53,6 +53,24 @@ if ! printf '%s\n' "$symbol_plan" |
 	fail "filtered symbol lookup does not use the records primary key"
 fi
 
+cursor_plan=$(sqlite3 "$db" "EXPLAIN QUERY PLAN
+SELECT files.path FROM records JOIN files ON files.id = records.file_id
+WHERE records.symbol = 'Outer.y'
+AND (files.variant, files.path, records.line, records.column, records.symbol,
+records.record, records.action, records.kind, records.mode)
+> ('general', '', 0, 0, '', 0, 0, 0, 0)
+ORDER BY files.variant, files.path, records.line, records.column, records.symbol,
+records.record, records.action, records.kind, records.mode LIMIT 3")
+if ! printf '%s\n' "$cursor_plan" |
+	grep -q 'SEARCH records USING PRIMARY KEY (symbol=?)'; then
+	printf '%s\n' "$cursor_plan" >&2
+	fail "paginated exact lookup does not use the records primary key"
+fi
+if printf '%s\n' "$cursor_plan" | grep -q 'SCAN records'; then
+	printf '%s\n' "$cursor_plan" >&2
+	fail "paginated exact lookup scans all records"
+fi
+
 variant_plan=$(sqlite3 "$db" "EXPLAIN QUERY PLAN
 SELECT name, repository_root, git_commit FROM variants ORDER BY name")
 if ! printf '%s\n' "$variant_plan" | grep -q 'SCAN variants'; then

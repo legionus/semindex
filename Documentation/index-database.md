@@ -36,6 +36,12 @@ Name queries accept the same exact and glob patterns as `semindex search`.
 They may also restrict local records by their containing function and local
 status, allowing language-server queries to distinguish same-named local
 variables without adding an index or changing the database layout.
+Record queries have a stable total order and accept a result limit plus an
+optional cursor. Pagination compares the complete ordered record key rather
+than using `OFFSET`, so later pages do not scan and discard all earlier
+results. A caller copies the last returned record into a cursor before its
+callback returns; the next query resumes strictly after that record. A zero
+limit preserves the unbounded streaming behavior used by existing callers.
 Position queries use one-based source byte coordinates and may select one
 variant or return matches from all variants. The LSP layer is responsible for
 converting its UTF-16 document positions before calling this API.

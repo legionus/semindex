@@ -25,10 +25,24 @@ typedef enum {
 } semindex_db_record_type_t;
 
 typedef struct {
+	const char *variant;
+	const char *path;
+	const char *symbol;
+	semindex_db_record_type_t record;
+	semindex_symbol_kind_t kind;
+	unsigned action;
+	unsigned mode;
+	unsigned line;
+	unsigned column;
+} semindex_db_cursor_t;
+
+typedef struct {
 	const char *symbol;
 	const char *path;
 	const char *variant;
 	const char *context;
+	const semindex_db_cursor_t *after;
+	size_t limit;
 	semindex_db_record_filter_t record;
 	unsigned mode;
 	unsigned long long usr_id;
@@ -89,7 +103,11 @@ typedef int (*semindex_db_variant_callback_t)(void *data, const semindex_db_vari
 SEMINDEX_API int semindex_db_open(const char *path, semindex_db_t **result);
 SEMINDEX_API void semindex_db_close(semindex_db_t *db);
 
-/* A nonzero callback result stops iteration and is returned to the caller. */
+/*
+ * A nonzero callback result stops iteration and is returned to the caller.
+ * A zero limit is unlimited. To continue a limited query, copy the last
+ * record's cursor fields and pass it as `after`; cursor strings are caller-owned.
+ */
 SEMINDEX_API int semindex_db_query(semindex_db_t *db, const semindex_db_query_options_t *opts,
 	semindex_db_record_callback_t callback, void *data);
 

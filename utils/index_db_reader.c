@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <sqlite3.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -51,6 +52,43 @@ static semindex_db_record_type_t record_type(int record, int action)
 		return SEMINDEX_DB_REFERENCE;
 
 	return action ? SEMINDEX_DB_DEFINITION : SEMINDEX_DB_DECLARATION;
+}
+
+static int stored_record_type(semindex_db_record_type_t record, int *stored)
+{
+	switch (record) {
+	case SEMINDEX_DB_DECLARATION:
+	case SEMINDEX_DB_DEFINITION:
+		*stored = STORED_RECORD_SYMBOL;
+		break;
+	case SEMINDEX_DB_REFERENCE:
+		*stored = STORED_RECORD_USE;
+		break;
+	default:
+		return -1;
+	}
+
+	return 0;
+}
+
+static int valid_cursor(const semindex_db_cursor_t *cursor)
+{
+	int stored;
+
+	if (!cursor->variant || !cursor->variant[0] || !cursor->path || !cursor->path[0] || !cursor->symbol ||
+		!cursor->symbol[0] || !cursor->line || !cursor->column)
+		return 0;
+
+	if (stored_record_type(cursor->record, &stored) < 0)
+		return 0;
+
+	if (cursor->record == SEMINDEX_DB_DECLARATION && cursor->action)
+		return 0;
+
+	if (cursor->record == SEMINDEX_DB_DEFINITION && !cursor->action)
+		return 0;
+
+	return 1;
 }
 
 static int emit_records(semindex_db_t *db, sqlite3_stmt *stmt, semindex_db_record_callback_t callback, void *data,
@@ -183,6 +221,7 @@ int semindex_db_query(semindex_db_t *db, const semindex_db_query_options_t *opts
 	sqlite3_str *query = NULL;
 	sqlite3_stmt *stmt = NULL;
 	char *sql = NULL;
+	int cursor_record;
 	int ret = -1;
 
 	if (!db || !callback)
@@ -192,6 +231,12 @@ int semindex_db_query(semindex_db_t *db, const semindex_db_query_options_t *opts
 		opts = &defaults;
 
 	if (opts->record < SEMINDEX_DB_RECORD_ALL || opts->record > SEMINDEX_DB_RECORD_REFERENCE)
+		return -1;
+
+	if (opts->limit > LLONG_MAX)
+		return -1;
+
+	if (opts->after && !valid_cursor(opts->after))
 		return -1;
 
 	query = sqlite3_str_new(db->handle);
@@ -251,8 +296,23 @@ int semindex_db_query(semindex_db_t *db, const semindex_db_query_options_t *opts
 
 	if (opts->has_local)
 		sqlite3_str_appendf(query, " AND records.local = %d", !!opts->local);
+
+	if (opts->after) {
+		stored_record_type(opts->after->record, &cursor_record);
+		sqlite3_str_appendf(query,
+			" AND (files.variant, files.path, records.line, records.column, records.symbol,"
+			" records.record, records.action, records.kind, records.mode) >"
+			" (%Q, %Q, %u, %u, %Q, %d, %u, %d, %u)",
+			opts->after->variant, opts->after->path, opts->after->line, opts->after->column,
+			opts->after->symbol, cursor_record, opts->after->action, opts->after->kind, opts->after->mode);
+	}
+
 	sqlite3_str_appendall(query,
-		" ORDER BY files.variant, files.path, records.line, records.column, records.record");
+		" ORDER BY files.variant, files.path, records.line, records.column, records.symbol,"
+		" records.record, records.action, records.kind, records.mode");
+
+	if (opts->limit)
+		sqlite3_str_appendf(query, " LIMIT %lld", (long long)opts->limit);
 
 	if (sqlite3_str_errcode(query) != SQLITE_OK)
 		goto out;
