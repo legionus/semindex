@@ -67,6 +67,14 @@ struct identity_state {
 	int failed;
 };
 
+struct type_state {
+	const semindex_db_identity_t *identity;
+	const char *declared_type;
+	const char *path;
+	unsigned count;
+	int failed;
+};
+
 static int check_record(void *data, const semindex_db_record_t *record)
 {
 	struct result_state *state = data;
@@ -327,6 +335,23 @@ static int check_identity_record(void *data, const semindex_db_record_t *record)
 	return 0;
 }
 
+static int check_symbol_type(void *data, const semindex_db_symbol_type_t *type)
+{
+	struct type_state *state = data;
+
+	if (strcmp(type->variant, state->identity->variant) || strcmp(type->symbol, state->identity->symbol) ||
+		type->usr_id != state->identity->usr_id || type->kind != state->identity->kind ||
+		strcmp(type->declared_type, state->declared_type) || strcmp(type->path, state->path)) {
+		state->failed = 1;
+
+		return -1;
+	}
+
+	state->count++;
+
+	return 0;
+}
+
 static int check_identity_queries(semindex_db_t *db, const char *path)
 {
 	struct identity_state identity = { 0 };
@@ -335,6 +360,8 @@ static int check_identity_queries(semindex_db_t *db, const char *path)
 	};
 	struct identity_state definition;
 	struct identity_state reference;
+	struct type_state type;
+	semindex_db_symbol_type_query_t type_query;
 
 	if (semindex_db_find_at(db, path, "general", 14, 3, collect_identity, &identity) < 0 || identity.count != 1)
 		return -1;
@@ -359,6 +386,20 @@ static int check_identity_queries(semindex_db_t *db, const char *path)
 
 	if (semindex_db_query_identity(db, &query, check_identity_record, &reference) < 0 || reference.failed ||
 		reference.count != 1)
+		return -1;
+
+	type = (struct type_state){
+		.identity = &identity.identity,
+		.declared_type = "int",
+		.path = path,
+	};
+	type_query = (semindex_db_symbol_type_query_t){
+		.identity = &identity.identity,
+		.limit = 1,
+	};
+
+	if (semindex_db_query_symbol_types(db, &type_query, check_symbol_type, &type) < 0 || type.failed ||
+		type.count != 1)
 		return -1;
 
 	return 0;

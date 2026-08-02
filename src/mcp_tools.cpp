@@ -89,6 +89,33 @@ struct GraphCollector {
 	bool stopped = false;
 };
 
+struct SymbolTypeRecord {
+	std::string variant;
+	std::string path;
+	std::string symbol;
+	std::string declared_type;
+	semindex_symbol_kind_t kind;
+	unsigned long long usr_id;
+};
+
+struct SymbolTypeCollector {
+	const McpRequestControl &control;
+	std::vector<SymbolTypeRecord> records;
+	bool stopped = false;
+};
+
+struct OwnedTypeCursor {
+	std::string declared_type;
+	std::string path;
+	semindex_db_symbol_type_cursor_t cursor = {};
+
+	void updatePointers()
+	{
+		cursor.declared_type = declared_type.c_str();
+		cursor.path = path.c_str();
+	}
+};
+
 struct VariantRecord {
 	std::string name;
 	std::string repository_root;
@@ -357,6 +384,54 @@ std::string recordCursor(const SemindexQueryRecord &record)
 	return encodeHex(serialized);
 }
 
+std::string typeCursor(const SymbolTypeRecord &record)
+{
+	llvm::json::Object cursor{
+		{ "declaredType", record.declared_type },
+		{ "path", record.path },
+	};
+	std::string serialized;
+	llvm::raw_string_ostream stream(serialized);
+
+	stream << llvm::json::Value(std::move(cursor));
+	stream.flush();
+
+	return encodeHex(serialized);
+}
+
+bool parseTypeCursor(llvm::StringRef encoded, OwnedTypeCursor &result)
+{
+	auto decoded = decodeHex(encoded);
+
+	if (!decoded)
+		return false;
+
+	auto parsed = llvm::json::parse(*decoded);
+
+	if (!parsed) {
+		llvm::consumeError(parsed.takeError());
+
+		return false;
+	}
+
+	const llvm::json::Object *object = parsed->getAsObject();
+
+	if (!object)
+		return false;
+
+	auto declared_type = object->getString("declaredType");
+	auto path = object->getString("path");
+
+	if (!declared_type || !path)
+		return false;
+
+	result.declared_type = declared_type->str();
+	result.path = path->str();
+	result.updatePointers();
+
+	return true;
+}
+
 struct OwnedCursor {
 	std::string variant;
 	std::string path;
@@ -479,6 +554,28 @@ int collectGraphRecord(void *data, const semindex_db_record_t *record)
 	return collector.records.size() >= collector.limit;
 }
 
+int collectSymbolType(void *data, const semindex_db_symbol_type_t *type)
+{
+	auto &collector = *static_cast<SymbolTypeCollector *>(data);
+
+	if (collector.control.stopped()) {
+		collector.stopped = true;
+
+		return 1;
+	}
+
+	collector.records.push_back(SymbolTypeRecord{
+		.variant = type->variant,
+		.path = type->path,
+		.symbol = type->symbol,
+		.declared_type = type->declared_type,
+		.kind = type->kind,
+		.usr_id = type->usr_id,
+	});
+
+	return 0;
+}
+
 int collectVariant(void *data, const semindex_db_variant_t *variant)
 {
 	auto &collector = *static_cast<VariantCollector *>(data);
@@ -570,6 +667,39 @@ llvm::json::Object graphResult(std::vector<GraphRecord> &records, size_t limit, 
 		{ "nodeLimitHit", node_limit_hit },
 		{ "cyclesDetected", cycles_detected },
 	};
+}
+
+llvm::json::Object symbolTypesResult(std::vector<SymbolTypeRecord> &records, size_t limit)
+{
+	bool more = records.size() > limit;
+
+	if (more)
+		records.resize(limit);
+
+	llvm::json::Array items;
+
+	items.reserve(records.size());
+
+	for (const auto &record : records) {
+		items.push_back(llvm::json::Object{
+			{ "variant", record.variant },
+			{ "path", record.path },
+			{ "symbol", record.symbol },
+			{ "kind", kindName(record.kind) },
+			{ "usrId", idString(record.usr_id) },
+			{ "declaredType", record.declared_type },
+		});
+	}
+
+	llvm::json::Object result{
+		{ "types", std::move(items) },
+		{ "truncated", more },
+	};
+
+	if (more && !records.empty())
+		result["nextCursor"] = typeCursor(records.back());
+
+	return result;
 }
 
 std::optional<std::string> selectedVariant(const llvm::json::Object *arguments, const std::string &configured)
@@ -795,6 +925,63 @@ McpToolResult relatedRecords(semindex_db_t *database, const llvm::json::Object *
 		return { McpToolStatus::DatabaseError, {}, "Database query failed" };
 
 	return { McpToolStatus::Success, recordsResult(collector.records, limit), {} };
+}
+
+McpToolResult declaredTypes(semindex_db_t *database, const llvm::json::Object *arguments,
+	const std::string &configured_variant, const McpRequestControl &control)
+{
+	if (!arguments)
+		return { McpToolStatus::InvalidParams, {}, "Arguments are required" };
+
+	auto symbol = arguments->getString("symbol");
+	auto id_value = arguments->getString("usrId");
+	auto kind_value = arguments->getString("kind");
+	auto selected = selectedVariant(arguments, configured_variant);
+	size_t limit;
+
+	if (!symbol || symbol->empty() || !id_value || !kind_value || !selected || selected->empty())
+		return { McpToolStatus::InvalidParams, {}, "Invalid symbol identity" };
+
+	if (!parseLimit(arguments, limit))
+		return { McpToolStatus::InvalidParams, {}, "Invalid limit" };
+
+	auto id = parseId(*id_value);
+	auto kind = parseKind(*kind_value);
+
+	if (!id || !*id || !kind)
+		return { McpToolStatus::InvalidParams, {}, "Invalid symbol identity" };
+
+	semindex_db_identity_t identity = {
+		.variant = selected->c_str(),
+		.symbol = symbol->data(),
+		.usr_id = *id,
+		.kind = *kind,
+	};
+	semindex_db_symbol_type_query_t query = {
+		.identity = &identity,
+		.limit = limit + 1,
+	};
+	OwnedTypeCursor cursor;
+
+	if (auto value = arguments->getString("cursor")) {
+		if (!parseTypeCursor(*value, cursor))
+			return { McpToolStatus::InvalidParams, {}, "Invalid cursor" };
+
+		query.after = &cursor.cursor;
+	} else if (arguments->get("cursor")) {
+		return { McpToolStatus::InvalidParams, {}, "Invalid cursor" };
+	}
+
+	SymbolTypeCollector collector{ control };
+	int ret = semindex_db_query_symbol_types(database, &query, collectSymbolType, &collector);
+
+	if (collector.stopped || control.stopped())
+		return stoppedResult(control);
+
+	if (ret < 0)
+		return { McpToolStatus::DatabaseError, {}, "Database query failed" };
+
+	return { McpToolStatus::Success, symbolTypesResult(collector.records, limit), {} };
 }
 
 McpToolResult callRecords(semindex_db_t *database, const llvm::json::Object *arguments,
@@ -1346,6 +1533,9 @@ McpToolResult McpToolService::call(llvm::StringRef name, const llvm::json::Objec
 
 	if (name == "find_references")
 		return relatedRecords(handle.get(), arguments, options.variant, SEMINDEX_DB_RECORD_REFERENCE, control);
+
+	if (name == "find_declared_types")
+		return declaredTypes(handle.get(), arguments, options.variant, control);
 
 	if (name == "find_callers")
 		return callRecords(handle.get(), arguments, options.variant, SEMINDEX_DB_CALLERS, control);

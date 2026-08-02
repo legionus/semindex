@@ -182,6 +182,7 @@ def main():
 			"symbol_at",
 			"find_definitions",
 			"find_references",
+			"find_declared_types",
 			"find_callers",
 			"find_callees",
 			"read_source_context",
@@ -217,6 +218,23 @@ def main():
 
 		if field_record["symbol"] != "Outer.y" or field_record["action"] != "write":
 			fail("symbol_at returned the wrong field operation")
+
+		field_identity = only_record(
+			client.tool("symbol_at", {"path": "tests/test11.c", "line": 8, "column": 6}),
+			"symbol_at field definition",
+		)
+		declared_types = client.tool(
+			"find_declared_types",
+			{
+				"symbol": field_identity["symbol"],
+				"variant": field_identity["variant"],
+				"usrId": field_identity["usrId"],
+				"kind": field_identity["kind"],
+			},
+		)
+
+		if [type_record["declaredType"] for type_record in declared_types.get("types", [])] != ["int"]:
+			fail("find_declared_types returned the wrong field type")
 
 		definitions = client.tool(
 			"find_definitions",

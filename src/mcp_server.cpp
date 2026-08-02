@@ -202,6 +202,14 @@ llvm::json::Array McpServer::toolDefinitions(bool allow_reindex)
 		objectSchema(identityProperties(), { "symbol" })));
 	result.push_back(tool("find_references", "Find bounded references for a semantic identity",
 		objectSchema(identityProperties(), { "symbol" })));
+	llvm::json::Object declared_types = pagingProperties();
+
+	declared_types["symbol"] = stringProperty("Qualified symbol name");
+	declared_types["variant"] = stringProperty("Index variant");
+	declared_types["usrId"] = stringProperty("Stable hexadecimal symbol identity");
+	declared_types["kind"] = stringProperty("Symbol kind returned by symbol_at");
+	result.push_back(tool("find_declared_types", "Find declared C types for a semantic identity",
+		objectSchema(std::move(declared_types), { "symbol", "usrId", "kind" })));
 
 	llvm::json::Object calls = pagingProperties();
 

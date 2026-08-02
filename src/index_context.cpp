@@ -41,7 +41,7 @@ static void hashString(llvm::BLAKE3 &hash, const char *value)
 
 static void hashRecord(llvm::BLAKE3 &hash, int record, int action, int kind, uint64_t mode, const char *owner,
 	const char *name, unsigned line, unsigned column, const char *context, uint64_t usr_id, uint64_t context_usr_id,
-	int local)
+	int local, const char *type)
 {
 	hashInteger(hash, record);
 	hashInteger(hash, action);
@@ -55,11 +55,12 @@ static void hashRecord(llvm::BLAKE3 &hash, int record, int action, int kind, uin
 	hashInteger(hash, usr_id);
 	hashInteger(hash, context_usr_id);
 	hashInteger(hash, local);
+	hashString(hash, type);
 }
 
 static void updateFingerprints(FileFingerprintState &state, int local, int record, int action, int kind, uint64_t mode,
 	const char *owner, const char *name, unsigned line, unsigned column, const char *context, uint64_t usr_id,
-	uint64_t context_usr_id)
+	uint64_t context_usr_id, const char *type)
 {
 	if (local) {
 		if (!state.has_local) {
@@ -68,18 +69,18 @@ static void updateFingerprints(FileFingerprintState &state, int local, int recor
 			state.has_local = true;
 		}
 		hashRecord(state.hash[1], record, action, kind, mode, owner, name, line, column, context, usr_id,
-			context_usr_id, local);
+			context_usr_id, local, type);
 		state.records[1]++;
 		return;
 	}
 
 	hashRecord(state.hash[0], record, action, kind, mode, owner, name, line, column, context, usr_id,
-		context_usr_id, local);
+		context_usr_id, local, type);
 	state.records[0]++;
 
 	if (state.has_local) {
 		hashRecord(state.hash[1], record, action, kind, mode, owner, name, line, column, context, usr_id,
-			context_usr_id, local);
+			context_usr_id, local, type);
 		state.records[1]++;
 	}
 }
@@ -319,13 +320,13 @@ void rebuildFingerprints(semindex *s)
 	for (const auto &rec : s->symbol_records) {
 		if (rec.file_index < fingerprints.size())
 			updateFingerprints(fingerprints[rec.file_index], rec.local, 0, rec.definition, rec.kind, 0,
-				rec.owner, rec.name, rec.line, rec.column, rec.context, rec.usr_id, 0);
+				rec.owner, rec.name, rec.line, rec.column, rec.context, rec.usr_id, 0, rec.type);
 	}
 	for (const auto &rec : s->use_records) {
 		if (rec.file_index < fingerprints.size())
 			updateFingerprints(fingerprints[rec.file_index], rec.local, 1, rec.kind, rec.symbol_kind,
 				rec.mode, rec.owner, rec.name, rec.line, rec.column, rec.context, rec.usr_id,
-				rec.context_usr_id);
+				rec.context_usr_id, "");
 	}
 
 	s->file_fingerprints[0].clear();

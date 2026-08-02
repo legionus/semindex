@@ -345,10 +345,9 @@ public:
 			isAnonymousRecord(anonymousRecord)) {
 			anonymousName = anonymousRecordNameForVar(D);
 
-			if (details)
-				typeName = typeNameForRecord(anonymousRecord, anonymousName);
+			typeName = typeNameForRecord(anonymousRecord, anonymousName);
 			addAnonymousRecordSymbols(anonymousRecord, anonymousName);
-		} else if (details) {
+		} else {
 			typeName = stableTypeName(D->getType(), ctx);
 		}
 
@@ -358,7 +357,7 @@ public:
 		s.name = getName(D);
 		s.owner = "";
 		s.type = typeName;
-		s.usr = detailedUSR(D);
+		s.usr = getUSR(D, ctx);
 		s.context = currentFunction;
 		s.loc = index.location(D->getLocation());
 		s.local = !currentFunction.empty();
@@ -391,14 +390,13 @@ public:
 		if (isAnonymousRecord(D->getParent()))
 			return true;
 
-		const ValueInfo &info = valueInfo(D);
 		SemindexSymbol s;
 
-		s.kind = info.kind;
-		s.name = info.name;
-		s.owner = info.owner;
-		s.type = info.type;
-		s.usr = info.usr;
+		s.kind = symbolKindForDecl(D);
+		s.name = getName(D);
+		s.owner = getOwnerName(D);
+		s.type = stableTypeName(D->getType(), ctx);
+		s.usr = getUSR(D, ctx);
 		s.context = "";
 		s.loc = index.location(D->getLocation());
 		s.local = false;
@@ -415,7 +413,7 @@ public:
 
 		const RecordDecl *anonymousRecord = recordDeclForType(D->getUnderlyingType());
 		std::string anonymousName;
-		std::string typeName = details ? typeNameForTypedef(D, ctx) : "";
+		std::string typeName = typeNameForTypedef(D, ctx);
 
 		if (isAnonymousRecord(anonymousRecord)) {
 			anonymousName = anonymousRecordNameForTypedef(D);
@@ -428,7 +426,7 @@ public:
 		s.name = getName(D);
 		s.owner = "";
 		s.type = typeName;
-		s.usr = detailedUSR(D);
+		s.usr = getUSR(D, ctx);
 		s.context = currentFunction;
 		s.loc = index.location(D->getLocation());
 		s.local = !currentFunction.empty();
@@ -584,7 +582,7 @@ public:
 		s.name = getName(D);
 		s.owner = "";
 		s.type = ""; // TODO: fill it later
-		s.usr = detailedUSR(D);
+		s.usr = getUSR(D, ctx);
 		s.context = "";
 		s.loc = index.location(D->getLocation());
 		s.local = false;
@@ -614,7 +612,7 @@ public:
 		s.name = getName(D);
 		s.owner = "";
 		s.type = "";
-		s.usr = detailedUSR(D);
+		s.usr = getUSR(D, ctx);
 		s.context = "";
 		s.loc = index.location(D->getLocation());
 		s.local = false;
@@ -632,9 +630,8 @@ public:
 		s.name = getName(D);
 		s.owner = "";
 
-		if (details)
-			s.type = stableTypeName(D->getType(), ctx);
-		s.usr = detailedUSR(D);
+		s.type = stableTypeName(D->getType(), ctx);
+		s.usr = getUSR(D, ctx);
 		s.context = "";
 		s.loc = index.location(D->getLocation());
 		s.local = false;
@@ -655,14 +652,12 @@ public:
 		if (!functionSymbols.insert(D->getCanonicalDecl()).second)
 			return true;
 
-		const ValueInfo &info = valueInfo(D);
-
 		SemindexSymbol s;
 
 		s.kind = SEMINDEX_SYMBOL_FUNCTION;
-		s.name = info.name;
+		s.name = getName(D);
 		s.owner = "";
-		s.type = info.type;
+		s.type = stableTypeName(D->getType(), ctx);
 		s.usr = functionUSR(D);
 		s.context = "";
 		s.loc = index.location(D->getLocation());
@@ -935,7 +930,7 @@ private:
 		s.name = name;
 		s.owner = "";
 		s.type = "";
-		s.usr = detailedUSR(D);
+		s.usr = getUSR(D, ctx);
 		s.context = "";
 		s.loc = index.displayLocation(ctx,
 			D->getBraceRange().getBegin().isValid() ? D->getBraceRange().getBegin() : D->getLocation());
@@ -965,9 +960,8 @@ private:
 			s.name = getName(field);
 			s.owner = owner;
 
-			if (details)
-				s.type = stableTypeName(field->getType(), ctx);
-			s.usr = detailedUSR(field);
+			s.type = stableTypeName(field->getType(), ctx);
+			s.usr = getUSR(field, ctx);
 			s.context = "";
 			s.loc = index.displayLocation(ctx, field->getLocation());
 			s.local = false;

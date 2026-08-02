@@ -13,7 +13,7 @@
 #include "semindex_database.h"
 #include "sqlite.h"
 
-#define INDEX_SCHEMA_VERSION 13
+#define INDEX_SCHEMA_VERSION 14
 #define STRINGIFY_VALUE(value) #value
 #define STRINGIFY(value) STRINGIFY_VALUE(value)
 
@@ -231,6 +231,15 @@ static int init_schema(sqlite3 *db)
 		"  PRIMARY KEY(symbol, record, action, kind, mode, file_id, line, column)"
 		") WITHOUT ROWID",
 		"CREATE INDEX records_file_idx ON records(file_id)",
+		"CREATE TABLE symbol_types ("
+		"  symbol TEXT NOT NULL,"
+		"  kind INTEGER NOT NULL,"
+		"  usr_id INTEGER NOT NULL,"
+		"  file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,"
+		"  declared_type TEXT NOT NULL,"
+		"  PRIMARY KEY(symbol, kind, usr_id, file_id, declared_type)"
+		") WITHOUT ROWID",
+		"CREATE INDEX symbol_types_file_idx ON symbol_types(file_id)",
 		"CREATE INDEX records_call_context_idx ON records(context, context_usr_id)"
 		" WHERE record = 1 AND action = 3 AND kind = 7",
 		"CREATE TABLE variants ("
@@ -350,21 +359,32 @@ static int create_staging(sqlite3 *db)
 		    ") WITHOUT ROWID") < 0)
 		return -1;
 
+	if (exec_sql(db,
+		    "CREATE TEMP TABLE staging_records ("
+		    "  symbol TEXT NOT NULL,"
+		    "  record INTEGER NOT NULL,"
+		    "  action INTEGER NOT NULL,"
+		    "  kind INTEGER NOT NULL,"
+		    "  mode INTEGER NOT NULL,"
+		    "  path TEXT NOT NULL,"
+		    "  line INTEGER NOT NULL,"
+		    "  column INTEGER NOT NULL,"
+		    "  context TEXT NOT NULL,"
+		    "  usr_id INTEGER,"
+		    "  context_usr_id INTEGER,"
+		    "  local INTEGER NOT NULL,"
+		    "  PRIMARY KEY(symbol, record, action, kind, mode, path, line, column)"
+		    ") WITHOUT ROWID") < 0)
+		return -1;
+
 	return exec_sql(db,
-		"CREATE TEMP TABLE staging_records ("
+		"CREATE TEMP TABLE staging_symbol_types ("
 		"  symbol TEXT NOT NULL,"
-		"  record INTEGER NOT NULL,"
-		"  action INTEGER NOT NULL,"
 		"  kind INTEGER NOT NULL,"
-		"  mode INTEGER NOT NULL,"
+		"  usr_id INTEGER NOT NULL,"
 		"  path TEXT NOT NULL,"
-		"  line INTEGER NOT NULL,"
-		"  column INTEGER NOT NULL,"
-		"  context TEXT NOT NULL,"
-		"  usr_id INTEGER,"
-		"  context_usr_id INTEGER,"
-		"  local INTEGER NOT NULL,"
-		"  PRIMARY KEY(symbol, record, action, kind, mode, path, line, column)"
+		"  declared_type TEXT NOT NULL,"
+		"  PRIMARY KEY(symbol, kind, usr_id, path, declared_type)"
 		") WITHOUT ROWID");
 }
 
@@ -420,22 +440,58 @@ out:
 	return ret;
 }
 
+static int stage_symbol_type(sqlite3_stmt *stmt, const semindex_symbol_t *symbol, const char *path)
+{
+	sqlite3 *db = sqlite3_db_handle(stmt);
+	char *name = qualified_name(symbol->owner, symbol->name);
+	int ret = -1;
+
+	if (!name)
+		return -1;
+
+	sqlite3_reset(stmt);
+	sqlite3_clear_bindings(stmt);
+
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 1, name));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int(stmt, 2, symbol->kind));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int64(stmt, 3, (sqlite3_int64)symbol->usr_id));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 4, path));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 5, symbol->type));
+
+	if (sqlite3_step(stmt) != SQLITE_DONE) {
+		fprintf(stderr, "semindex: sqlite: %s\n", sqlite3_errmsg(db));
+
+		goto out;
+	}
+
+	ret = 0;
+out:
+	sqlite3_free(name);
+
+	return ret;
+}
+
 static int stage_records(sqlite3 *db, semindex_t *s, const struct stored_paths *paths, int include_local,
-	const unsigned char *cached, size_t cached_count, uint64_t *items_in, uint64_t *items_out)
+	const unsigned char *cached, size_t cached_count, uint64_t *items_in, uint64_t *items_out, uint64_t *types_out)
 {
 	static const char *sql =
 		"INSERT OR IGNORE INTO staging_records(symbol, record, action, kind, mode, path, line, column, "
 		"context, usr_id, context_usr_id, local) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, "
 		"?12)";
+	static const char *type_sql =
+		"INSERT OR IGNORE INTO staging_symbol_types(symbol, kind, usr_id, path, declared_type)"
+		" VALUES(?1, ?2, ?3, ?4, ?5)";
 	sqlite3_stmt *stmt = NULL;
+	sqlite3_stmt *type_stmt = NULL;
 	sqlite3_int64 changes_before = sqlite3_total_changes64(db);
 	size_t i;
 	int ret = -1;
 
 	*items_in = 0;
 	*items_out = 0;
+	*types_out = 0;
 
-	if (prepare(db, sql, &stmt) < 0)
+	if (prepare(db, sql, &stmt) < 0 || prepare(db, type_sql, &type_stmt) < 0)
 		goto out;
 
 	for (i = 0; i < semindex_symbol_count(s); i++) {
@@ -472,6 +528,15 @@ static int stage_records(sqlite3 *db, semindex_t *s, const struct stored_paths *
 
 		if (stage_record(stmt, &record) < 0)
 			goto out;
+
+		if (sym->type && sym->type[0] && sym->usr && sym->usr[0]) {
+			const char *path = record_path(paths, sym->file_index, sym->file);
+
+			if (stage_symbol_type(type_stmt, sym, path) < 0)
+				goto out;
+
+			*types_out += sqlite3_changes64(db);
+		}
 	}
 
 	for (i = 0; i < semindex_use_count(s); i++) {
@@ -518,7 +583,9 @@ static int stage_records(sqlite3 *db, semindex_t *s, const struct stored_paths *
 	ret = 0;
 out:
 	*items_out = (uint64_t)(sqlite3_total_changes64(db) - changes_before);
+	*items_out -= *types_out;
 	sqlite3_finalize(stmt);
+	sqlite3_finalize(type_stmt);
 	return ret;
 }
 
@@ -759,18 +826,20 @@ out:
 	return ret;
 }
 
-static int merge_staging(sqlite3 *db, const char *variant, uint64_t staged_records, uint64_t fingerprint_attempts,
-	const index_db_provenance_t *provenance, semindex_trace_t *trace)
+static int merge_staging(sqlite3 *db, const char *variant, uint64_t staged_records, uint64_t staged_types,
+	uint64_t fingerprint_attempts, const index_db_provenance_t *provenance, semindex_trace_t *trace)
 {
 	static const char *phases[] = {
 		"db.merge.files_insert",
 		"db.merge.records_delete",
+		"db.merge.symbol_types_delete",
 		"db.merge.fingerprints_delete",
 		"db.merge.files_update",
 		"db.merge.records_insert",
+		"db.merge.symbol_types_insert",
 		"db.merge.fingerprints_insert",
 	};
-	char *merge[6] = { NULL };
+	char *merge[8] = { NULL };
 	size_t i;
 	int valid;
 	int ret = -1;
@@ -786,18 +855,25 @@ static int merge_staging(sqlite3 *db, const char *variant, uint64_t staged_recor
 				")",
 			variant);
 	merge[2] =
+		sqlite3_mprintf("DELETE FROM symbol_types WHERE file_id IN ("
+				"  SELECT files.id FROM files JOIN staging_files ON staging_files.path = files.path"
+				"  WHERE files.variant = %Q AND (staging_files.is_main"
+				"     OR files.mtime_ns != staging_files.mtime_ns OR files.size != staging_files.size)"
+				")",
+			variant);
+	merge[3] =
 		sqlite3_mprintf("DELETE FROM file_fingerprints WHERE file_id IN ("
 				"  SELECT files.id FROM files JOIN staging_files ON staging_files.path = files.path"
 				"  WHERE files.variant = %Q AND (staging_files.is_main"
 				"     OR files.mtime_ns != staging_files.mtime_ns OR files.size != staging_files.size)"
 				")",
 			variant);
-	merge[3] = sqlite3_mprintf("UPDATE files SET"
+	merge[4] = sqlite3_mprintf("UPDATE files SET"
 				   "  mtime_ns = (SELECT mtime_ns FROM staging_files WHERE path = files.path),"
 				   "  size = (SELECT size FROM staging_files WHERE path = files.path)"
 				   "WHERE variant = %Q AND path IN (SELECT path FROM staging_files)",
 		variant);
-	merge[4] = sqlite3_mprintf(
+	merge[5] = sqlite3_mprintf(
 		"INSERT OR IGNORE INTO records(symbol, record, action, kind, mode, file_id, line, column, context, "
 		"usr_id, context_usr_id, local) "
 		"SELECT staging_records.symbol, staging_records.record, staging_records.action,"
@@ -807,7 +883,14 @@ static int merge_staging(sqlite3 *db, const char *variant, uint64_t staged_recor
 		" FROM staging_records JOIN files"
 		" ON files.path = staging_records.path AND files.variant = %Q",
 		variant);
-	merge[5] = sqlite3_mprintf("INSERT OR IGNORE INTO file_fingerprints(file_id, fingerprint)"
+	merge[6] = sqlite3_mprintf(
+		"INSERT OR IGNORE INTO symbol_types(symbol, kind, usr_id, file_id, declared_type)"
+		" SELECT staging_symbol_types.symbol, staging_symbol_types.kind, staging_symbol_types.usr_id,"
+		"  files.id, staging_symbol_types.declared_type"
+		" FROM staging_symbol_types JOIN files"
+		" ON files.path = staging_symbol_types.path AND files.variant = %Q",
+		variant);
+	merge[7] = sqlite3_mprintf("INSERT OR IGNORE INTO file_fingerprints(file_id, fingerprint)"
 				   " SELECT files.id, staging_files.fingerprint FROM staging_files JOIN files"
 				   " ON files.path = staging_files.path AND files.variant = %Q"
 				   " WHERE staging_files.fingerprint IS NOT NULL",
@@ -830,11 +913,11 @@ static int merge_staging(sqlite3 *db, const char *variant, uint64_t staged_recor
 		goto stale;
 
 	for (i = 0; i < sizeof(merge) / sizeof(merge[0]); i++) {
-		if (i == 4 || i == 5) {
+		if (i >= 5) {
 			semindex_trace_time_t start = semindex_trace_begin(trace);
 			int merge_ret = exec_sql(db, merge[i]);
 			uint64_t inserted = merge_ret < 0 ? 0 : (uint64_t)sqlite3_changes64(db);
-			uint64_t attempted = i == 4 ? staged_records : fingerprint_attempts;
+			uint64_t attempted = i == 5 ? staged_records : i == 6 ? staged_types : fingerprint_attempts;
 
 			semindex_trace_end_counted(trace, phases[i], start, attempted, inserted);
 
@@ -885,6 +968,7 @@ int index_db_store(const index_db_store_request_t *request)
 	size_t cached_count;
 	uint64_t records_in;
 	uint64_t records_staged;
+	uint64_t types_staged;
 	uint64_t files_in;
 	uint64_t files_cached;
 	int merge_ret;
@@ -938,7 +1022,7 @@ int index_db_store(const index_db_store_request_t *request)
 	start = semindex_trace_begin(request->trace);
 
 	if (stage_records(db, request->index, &paths, request->include_local, cached, cached_count, &records_in,
-		    &records_staged) < 0) {
+		    &records_staged, &types_staged) < 0) {
 		semindex_trace_end_counted(request->trace, "db.stage_records", start, records_in, records_staged);
 		exec_sql(db, "ROLLBACK");
 		goto out;
@@ -949,7 +1033,8 @@ int index_db_store(const index_db_store_request_t *request)
 	if (trace_exec_sql(db, "COMMIT", request->trace, "db.staging_commit") < 0)
 		goto out;
 
-	merge_ret = merge_staging(db, request->variant, records_staged, files_in, &request->provenance, request->trace);
+	merge_ret = merge_staging(db, request->variant, records_staged, types_staged, files_in, &request->provenance,
+		request->trace);
 
 	if (merge_ret < 0)
 		goto out;
@@ -957,6 +1042,7 @@ int index_db_store(const index_db_store_request_t *request)
 	if (merge_ret > 0) {
 		uint64_t retry_in;
 		uint64_t retry_staged;
+		uint64_t retry_types;
 
 		if (cached_count)
 			memset(cached, 0, cached_count);
@@ -972,7 +1058,7 @@ int index_db_store(const index_db_store_request_t *request)
 		start = semindex_trace_begin(request->trace);
 
 		if (stage_records(db, request->index, &paths, request->include_local, cached, cached_count, &retry_in,
-			    &retry_staged) < 0) {
+			    &retry_staged, &retry_types) < 0) {
 			semindex_trace_end_counted(request->trace, "db.stage_records_retry", start, retry_in,
 				retry_staged);
 			exec_sql(db, "ROLLBACK");
@@ -982,10 +1068,11 @@ int index_db_store(const index_db_store_request_t *request)
 		semindex_trace_end_counted(request->trace, "db.stage_records_retry", start, retry_in, retry_staged);
 
 		records_staged += retry_staged;
+		types_staged += retry_types;
 
 		if (trace_exec_sql(db, "COMMIT", request->trace, "db.staging_retry_commit") < 0 ||
-			merge_staging(db, request->variant, records_staged, files_in, &request->provenance,
-				request->trace) != 0)
+			merge_staging(db, request->variant, records_staged, types_staged, files_in,
+				&request->provenance, request->trace) != 0)
 			goto out;
 	}
 

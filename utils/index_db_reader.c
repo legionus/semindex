@@ -416,6 +416,95 @@ int semindex_db_query_identity(semindex_db_t *db, const semindex_db_identity_que
 	return semindex_db_query(db, &options, callback, data);
 }
 
+int semindex_db_query_symbol_types(semindex_db_t *db, const semindex_db_symbol_type_query_t *query,
+	semindex_db_symbol_type_callback_t callback, void *data)
+{
+	static const char *base_sql =
+		"SELECT files.variant, files.path, symbol_types.symbol, symbol_types.declared_type,"
+		" symbol_types.kind, symbol_types.usr_id"
+		" FROM symbol_types JOIN files ON files.id = symbol_types.file_id"
+		" WHERE symbol_types.symbol = ?1 AND symbol_types.kind = ?2 AND symbol_types.usr_id = ?3"
+		" AND files.variant = ?4 ORDER BY symbol_types.declared_type, files.path";
+	static const char *after_sql =
+		"SELECT files.variant, files.path, symbol_types.symbol, symbol_types.declared_type,"
+		" symbol_types.kind, symbol_types.usr_id"
+		" FROM symbol_types JOIN files ON files.id = symbol_types.file_id"
+		" WHERE symbol_types.symbol = ?1 AND symbol_types.kind = ?2 AND symbol_types.usr_id = ?3"
+		" AND files.variant = ?4 AND (symbol_types.declared_type > ?5"
+		" OR (symbol_types.declared_type = ?5 AND files.path > ?6))"
+		" ORDER BY symbol_types.declared_type, files.path";
+	sqlite3_stmt *stmt = NULL;
+	const semindex_db_identity_t *identity;
+	int step;
+	int ret = -1;
+	size_t count = 0;
+
+	if (!db || !query || !query->identity || !callback)
+		return -1;
+
+	identity = query->identity;
+
+	if (!identity->variant || !identity->variant[0])
+		return -1;
+
+	if (!identity->symbol || !identity->symbol[0] || !identity->usr_id)
+		return -1;
+
+	if (query->after && (!query->after->declared_type || !query->after->path))
+		return -1;
+
+	if (identity->kind < SEMINDEX_SYMBOL_VAR || identity->kind > SEMINDEX_SYMBOL_FILE)
+		return -1;
+
+	if (prepare(db, query->after ? after_sql : base_sql, &stmt) < 0)
+		goto out;
+
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 1, identity->symbol));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int(stmt, 2, identity->kind));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int64(stmt, 3, (sqlite3_int64)identity->usr_id));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 4, identity->variant));
+
+	if (query->after) {
+		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 5, query->after->declared_type));
+		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 6, query->after->path));
+	}
+
+	while ((!query->limit || count < query->limit) && (step = sqlite3_step(stmt)) == SQLITE_ROW) {
+		semindex_db_symbol_type_t type = {
+			.variant = column_text(stmt, 0),
+			.path = column_text(stmt, 1),
+			.symbol = column_text(stmt, 2),
+			.declared_type = column_text(stmt, 3),
+			.kind = sqlite3_column_int(stmt, 4),
+			.usr_id = (unsigned long long)sqlite3_column_int64(stmt, 5),
+		};
+
+		ret = callback(data, &type);
+		count++;
+
+		if (ret)
+			goto out;
+	}
+
+	if (query->limit && count == query->limit) {
+		ret = 0;
+
+		goto out;
+	}
+
+	if (step != SQLITE_DONE) {
+		fprintf(stderr, "semindex: sqlite: %s\n", sqlite3_errmsg(db->handle));
+
+		goto out;
+	}
+
+	ret = 0;
+out:
+	sqlite3_finalize(stmt);
+
+	return ret;
+}
+
 int semindex_db_query_calls(semindex_db_t *db, const semindex_db_call_options_t *opts,
 	semindex_db_record_callback_t callback, void *data)
 {

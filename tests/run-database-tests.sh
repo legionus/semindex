@@ -158,6 +158,9 @@ fi
 if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM records JOIN files ON files.id = records.file_id WHERE records.symbol = 'shared.pid' AND files.path = '$tmpdir/shared.h'")" != 1 ]; then
 	fail "shared header record was duplicated"
 fi
+if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM symbol_types JOIN files ON files.id = symbol_types.file_id WHERE symbol_types.symbol = 'shared.pid' AND files.path = '$tmpdir/shared.h'")" != 1 ]; then
+	fail "shared header declared type was duplicated"
+fi
 if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM file_fingerprints JOIN files ON files.id = file_fingerprints.file_id WHERE files.path = '$tmpdir/shared.h'")" != 1 ]; then
 	fail "parallel writers duplicated the shared header fingerprint"
 fi
@@ -232,6 +235,22 @@ if [ "$(sqlite3 "$context_db" "SELECT COUNT(*) FROM records WHERE symbol = 'cond
 	fail "a distinct header context was omitted from the index"
 fi
 
+type_context_db=$tmpdir/type-context.db
+printf '%s\n' '#ifdef WIDE_VALUE' '#define VALUE_TYPE long' '#else' '#define VALUE_TYPE int' '#endif' \
+	'struct typed_context { VALUE_TYPE value; };' >"$tmpdir/type-context.h"
+printf '%s\n' '#include "type-context.h"' \
+	'int read_narrow(struct typed_context *p) { return p->value; }' >"$tmpdir/type-context-a.c"
+printf '%s\n' '#include "type-context.h"' \
+	'long read_wide(struct typed_context *p) { return p->value; }' >"$tmpdir/type-context-b.c"
+"$SEMINDEX" compiler --database "$type_context_db" --no-store-command -- \
+	cc --no-default-config -I"$tmpdir" "$tmpdir/type-context-a.c"
+"$SEMINDEX" compiler --database "$type_context_db" --no-store-command -- \
+	cc --no-default-config -DWIDE_VALUE -I"$tmpdir" "$tmpdir/type-context-b.c"
+
+if [ "$(sqlite3 "$type_context_db" "SELECT COUNT(DISTINCT declared_type) FROM symbol_types WHERE symbol = 'typed_context.value'")" != 2 ]; then
+	fail "different type contexts shared a header fingerprint"
+fi
+
 local_db=$tmpdir/local.db
 printf '%s\n' 'static inline int local_header(void)' '{' 'int hidden = 1;' 'return hidden;' '}' \
 	>"$tmpdir/local.h"
@@ -255,6 +274,9 @@ printf '%s\n' '#include "shared.h"' \
 	-I"$tmpdir" "$tmpdir/worker-new.c"
 if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM records JOIN files ON files.id = records.file_id WHERE records.symbol = 'shared.pid' AND files.path = '$tmpdir/shared.h'")" != 0 ]; then
 	fail "changing a header retained records from an old fingerprint"
+fi
+if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM symbol_types JOIN files ON files.id = symbol_types.file_id WHERE symbol_types.symbol = 'shared.pid' AND files.path = '$tmpdir/shared.h'")" != 0 ]; then
+	fail "changing a header retained an old declared type"
 fi
 if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM records JOIN files ON files.id = records.file_id WHERE records.symbol = 'shared.replacement' AND files.path = '$tmpdir/shared.h'")" != 1 ]; then
 	fail "changing a header did not store its new records"

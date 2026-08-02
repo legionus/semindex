@@ -15,13 +15,21 @@ The `records` table stores declarations, definitions, and uses together. Its
 `WITHOUT ROWID` primary key starts with the qualified symbol name, so an exact
 query such as `task_struct.pid` is an indexed lookup rather than a scan.
 
-Names and contexts are stored directly in each record. Types and full USRs
-remain available only from the in-memory index and output formats. Every record
-with a Clang USR stores a compact ID derived from it, so symbols can be
+Names and contexts are stored directly in each record. Full USRs remain
+available only from the in-memory index and output formats. Every record with a
+Clang USR stores a compact ID derived from it, so symbols can be
 disambiguated without repeating identity strings at every location. IDs are
 computed before SQLite staging; adding a record does not perform an identity
 lookup. A secondary file index supports file
 replacement and narrows source-position lookup to one indexed file.
+
+The `symbol_types` table stores nonempty declared C types for symbol records
+with stable identities. A type is stored once per symbol and source file, not
+on every reference. Its primary key begins with `(symbol, kind, usr_id)`, so an
+exact identity lookup does not scan unrelated types. The file relationship
+allows stale types to be removed with the same replacement rules as semantic
+records. Typedef expansion and canonical type relationships are not yet
+stored.
 
 ## Reader API
 
@@ -145,9 +153,9 @@ rebuilding the index. This is an intentional tradeoff for a reproducible cache.
 
 ## Compatibility
 
-The database is an experimental interface. Schema version 13 stores compact
-identities for all symbols with USRs and does not migrate older databases. Dropping old
-tables in place would also leave their original multi-gigabyte file allocation.
+The database is an experimental interface. Schema version 14 stores declared
+types for symbols with stable identities and does not migrate older databases.
+Dropping old tables in place would also leave their original multi-gigabyte file allocation.
 Remove an old database before indexing:
 
 ```sh

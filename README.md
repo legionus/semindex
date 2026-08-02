@@ -71,7 +71,6 @@ storage implementation symbols are hidden.
 The remaining long-term work is to deepen the semantic model beyond the
 implemented symbol index, direct call graph, and SQLite queries. This includes:
 
-* persistent, queryable type relationships;
 * expanded typedef relationships;
 * richer struct, union, and enum relationships;
 * indirect-call target resolution;

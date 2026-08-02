@@ -22,6 +22,7 @@ The default read-only tool set is:
 * `symbol_at`;
 * `find_definitions`;
 * `find_references`;
+* `find_declared_types`;
 * `find_callers`;
 * `find_callees`;
 * `read_source_context`;
@@ -30,6 +31,11 @@ The default read-only tool set is:
 
 `index_status` also reports whether the selected file and variant have a saved
 compiler command in the command database.
+
+`find_declared_types` accepts the identity returned by `symbol_at` and returns
+the declared C type together with the source file that contributed it. Results
+are bounded and cursor-paginated. Typedef expansion and canonical types are not
+yet available.
 
 Record results contain the variant, path, one-based byte position, qualified
 symbol, symbol kind, record type, action, access mode, enclosing context, local

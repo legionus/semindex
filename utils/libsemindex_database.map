@@ -10,6 +10,7 @@
 		semindex_db_query_calls;
 		semindex_db_query_functions;
 		semindex_db_query_identity;
+		semindex_db_query_symbol_types;
 
 	local:
 		*;

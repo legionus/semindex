@@ -115,6 +115,26 @@ typedef struct {
 	long long size;
 } semindex_db_file_t;
 
+typedef struct {
+	const char *variant;
+	const char *path;
+	const char *symbol;
+	const char *declared_type;
+	semindex_symbol_kind_t kind;
+	unsigned long long usr_id;
+} semindex_db_symbol_type_t;
+
+typedef struct {
+	const char *declared_type;
+	const char *path;
+} semindex_db_symbol_type_cursor_t;
+
+typedef struct {
+	const semindex_db_identity_t *identity;
+	const semindex_db_symbol_type_cursor_t *after;
+	size_t limit;
+} semindex_db_symbol_type_query_t;
+
 /* Record strings remain valid only until the callback returns. */
 typedef int (*semindex_db_record_callback_t)(void *data, const semindex_db_record_t *record);
 
@@ -123,6 +143,9 @@ typedef int (*semindex_db_variant_callback_t)(void *data, const semindex_db_vari
 
 /* File strings remain valid only until the callback returns. */
 typedef int (*semindex_db_file_callback_t)(void *data, const semindex_db_file_t *file);
+
+/* Type strings remain valid only until the callback returns. */
+typedef int (*semindex_db_symbol_type_callback_t)(void *data, const semindex_db_symbol_type_t *type);
 
 SEMINDEX_API int semindex_db_open(const char *path, semindex_db_t **result);
 SEMINDEX_API void semindex_db_close(semindex_db_t *db);
@@ -155,6 +178,9 @@ SEMINDEX_API int semindex_db_list_variants(semindex_db_t *db, semindex_db_varian
 
 SEMINDEX_API int semindex_db_find_file(semindex_db_t *db, const char *variant, const char *path,
 	semindex_db_file_callback_t callback, void *data);
+
+SEMINDEX_API int semindex_db_query_symbol_types(semindex_db_t *db, const semindex_db_symbol_type_query_t *query,
+	semindex_db_symbol_type_callback_t callback, void *data);
 
 #ifdef __cplusplus
 }

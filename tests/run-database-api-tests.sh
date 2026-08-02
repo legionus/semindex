@@ -86,6 +86,20 @@ if ! printf '%s\n' "$identity_plan" |
 	printf '%s\n' "$identity_plan" >&2
 	fail "identity lookup does not use the records primary key"
 fi
+
+type_plan=$(sqlite3 "$db" "EXPLAIN QUERY PLAN
+SELECT files.path FROM symbol_types JOIN files ON files.id = symbol_types.file_id
+WHERE symbol_types.symbol = 'Outer.y' AND symbol_types.kind = 1
+AND symbol_types.usr_id = 0x$field_id AND files.variant = 'general'")
+if ! printf '%s\n' "$type_plan" |
+	grep -q 'SEARCH symbol_types USING PRIMARY KEY (symbol=? AND kind=? AND usr_id=?)'; then
+	printf '%s\n' "$type_plan" >&2
+	fail "declared type lookup does not use the symbol_types primary key"
+fi
+if printf '%s\n' "$type_plan" | grep -q 'SCAN symbol_types'; then
+	printf '%s\n' "$type_plan" >&2
+	fail "declared type lookup scans all symbol types"
+fi
 if printf '%s\n' "$identity_plan" | grep -q 'SCAN records'; then
 	printf '%s\n' "$identity_plan" >&2
 	fail "identity lookup scans all records"
