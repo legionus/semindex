@@ -94,6 +94,7 @@ dispatcher or directly:
 ./build/semindex search --help
 ./build/semindex-search --help
 ./build/semindex-lsp --help
+./build/semindex-mcp --help
 ```
 
 The dispatcher resolves helpers beside its own path and then through `PATH`.

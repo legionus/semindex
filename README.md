@@ -28,6 +28,8 @@ Implemented so far:
 * direct caller and callee queries with stable function identities;
 * LSP definition, reference, document-highlight, call-hierarchy, diagnostics,
   and saved-file update support;
+* bounded read-only MCP tools for semantic search, call relationships, source
+  context, variants, and index status;
 * a C API exported from the C++ indexing implementation.
 
 An indexing operation reports a clean, partial, or failed result. Partial
@@ -171,6 +173,15 @@ semindex-lsp --database=.semindex/semindex.db
 
 See [Documentation/lsp.md](Documentation/lsp.md) for editor integration,
 variants, saved-file updates, diagnostics, and navigation after parse errors.
+
+Run the read-only MCP server with an explicit source-access boundary:
+
+```sh
+semindex mcp --database=.semindex/semindex.db --workspace="$PWD"
+```
+
+See [Documentation/mcp.md](Documentation/mcp.md) for the tool set, pagination,
+source limits, protocol version, and security boundary.
 
 The current database format is intentionally incompatible with earlier
 prototype versions. Remove an old `.semindex/semindex.db` before rebuilding an

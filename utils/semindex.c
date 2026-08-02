@@ -23,6 +23,7 @@ static void help(void)
 	       "  compile-commands           export stored compiler commands as JSON\n"
 	       "  index                      index a source file using `compile_commands.json'\n"
 	       "  lsp                        serve Language Server Protocol requests\n"
+	       "  mcp                        serve read-only Model Context Protocol tools\n"
 	       "  search                     search stored symbol and use records\n"
 	       "\n"
 	       "Run 'semindex COMMAND --help' for command-specific help.\n"

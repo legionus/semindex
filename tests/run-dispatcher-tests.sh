@@ -9,8 +9,8 @@ fail()
 	exit 1
 }
 
-if [ "$#" != 8 ]; then
-	fail "usage: run-dispatcher-tests.sh DISPATCHER CC COMPILER INDEX SEARCH CALLGRAPH COMPILE_COMMANDS LSP"
+if [ "$#" != 9 ]; then
+	fail "usage: run-dispatcher-tests.sh DISPATCHER CC COMPILER INDEX SEARCH CALLGRAPH COMPILE_COMMANDS LSP MCP"
 fi
 
 dispatcher=$1
@@ -22,7 +22,7 @@ for helper in "$@"; do
 	fi
 done
 
-for command in cc compiler index search callgraph compile-commands lsp; do
+for command in cc compiler index search callgraph compile-commands lsp mcp; do
 	if ! "$dispatcher" "$command" --help >/dev/null; then
 		fail "dispatched helper failed: $command"
 	fi

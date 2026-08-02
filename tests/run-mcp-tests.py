@@ -1,0 +1,259 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+
+def fail(message):
+	print(f"FAIL: {message}", file=sys.stderr)
+	sys.exit(1)
+
+
+class Client:
+	def __init__(self, executable, database, workspace, logfile):
+		self.process = subprocess.Popen(
+			[
+				executable,
+				f"--database={database}",
+				f"--workspace={workspace}",
+				f"--logfile={logfile}",
+			],
+			stdin=subprocess.PIPE,
+			stdout=subprocess.PIPE,
+			stderr=subprocess.PIPE,
+			text=True,
+		)
+		self.next_id = 1
+
+	def send(self, method, params=None, notification=False):
+		message = {"jsonrpc": "2.0", "method": method}
+
+		if params is not None:
+			message["params"] = params
+
+		if not notification:
+			message["id"] = self.next_id
+			self.next_id += 1
+
+		self.process.stdin.write(json.dumps(message, separators=(",", ":")) + "\n")
+		self.process.stdin.flush()
+
+		if notification:
+			return None
+
+		line = self.process.stdout.readline()
+
+		if not line:
+			fail(f"server exited while handling {method}: {self.process.stderr.read()}")
+
+		response = json.loads(line)
+
+		if response.get("id") != message["id"]:
+			fail(f"unexpected response ID for {method}: {response}")
+
+		return response
+
+	def tool(self, name, arguments=None):
+		params = {"name": name}
+
+		if arguments is not None:
+			params["arguments"] = arguments
+
+		response = self.send("tools/call", params)
+
+		if "error" in response:
+			return response
+
+		result = response["result"]
+
+		if result.get("isError"):
+			return result
+
+		if "structuredContent" not in result or not result.get("content"):
+			fail(f"tool {name} did not return structured and text content")
+
+		return result["structuredContent"]
+
+	def close(self):
+		self.process.stdin.close()
+		status = self.process.wait(timeout=10)
+
+		if status:
+			fail(f"server exited with status {status}: {self.process.stderr.read()}")
+
+
+def index_fixture(semindex, database, workspace, source):
+	subprocess.run(
+		[
+			semindex,
+			"compiler",
+			f"--database={database}",
+			"--no-store-command",
+			"--",
+			"cc",
+			"--no-default-config",
+			source,
+		],
+		cwd=workspace,
+		check=True,
+	)
+
+
+def only_record(result, tool):
+	records = result.get("records", [])
+
+	if len(records) != 1:
+		fail(f"{tool} returned {len(records)} records instead of one")
+
+	return records[0]
+
+
+def main():
+	if len(sys.argv) != 4:
+		fail("usage: run-mcp-tests.py MCP SEMINDEX SOURCE_DIR")
+
+	mcp, semindex, source_dir = sys.argv[1:]
+	workspace = Path(source_dir).resolve()
+
+	with tempfile.TemporaryDirectory() as temporary:
+		database = Path(temporary) / "semindex.db"
+		logfile = Path(temporary) / "mcp.log"
+
+		for source in ("tests/test11.c", "tests/callgraph-a.c", "tests/callgraph-b.c"):
+			index_fixture(semindex, database, workspace, source)
+
+		client = Client(mcp, database, workspace, logfile)
+		initialize = client.send(
+			"initialize",
+			{
+				"protocolVersion": "2025-11-25",
+				"capabilities": {},
+				"clientInfo": {"name": "semindex-test", "version": "1"},
+			},
+		)
+
+		if initialize.get("result", {}).get("protocolVersion") != "2025-11-25":
+			fail("initialize did not negotiate the supported protocol")
+
+		client.send("notifications/initialized", notification=True)
+		listed = client.send("tools/list", {})
+		names = {tool["name"] for tool in listed.get("result", {}).get("tools", [])}
+		expected = {
+			"search_symbols",
+			"symbol_at",
+			"find_definitions",
+			"find_references",
+			"find_callers",
+			"find_callees",
+			"read_source_context",
+			"list_variants",
+			"index_status",
+		}
+
+		if names != expected:
+			fail(f"unexpected tool set: {sorted(names)}")
+
+		variants = client.tool("list_variants", {"limit": 1})
+
+		if [variant["name"] for variant in variants["variants"]] != ["general"]:
+			fail("list_variants did not return general")
+
+		first = client.tool("search_symbols", {"pattern": "Outer.y", "limit": 1})
+		first_record = only_record(first, "search_symbols first page")
+
+		if not first.get("truncated") or "nextCursor" not in first:
+			fail("search_symbols did not paginate a multi-record result")
+
+		second = client.tool(
+			"search_symbols",
+			{"pattern": "Outer.y", "limit": 1, "cursor": first["nextCursor"]},
+		)
+		second_record = only_record(second, "search_symbols second page")
+
+		if (first_record["line"], second_record["line"]) != (8, 14):
+			fail("search cursor did not preserve stable record order")
+
+		field = client.tool("symbol_at", {"path": "tests/test11.c", "line": 14, "column": 3})
+		field_record = only_record(field, "symbol_at field")
+
+		if field_record["symbol"] != "Outer.y" or field_record["action"] != "write":
+			fail("symbol_at returned the wrong field operation")
+
+		definitions = client.tool(
+			"find_definitions",
+			{"symbol": "Outer.y", "variant": "general", "kind": "field"},
+		)
+
+		if only_record(definitions, "find_definitions")["line"] != 8:
+			fail("find_definitions returned the wrong location")
+
+		references = client.tool(
+			"find_references",
+			{"symbol": "Outer.y", "variant": "general", "kind": "field"},
+		)
+
+		if only_record(references, "find_references")["line"] != 14:
+			fail("find_references returned the wrong location")
+
+		context = client.tool(
+			"read_source_context",
+			{"path": "tests/test11.c", "variant": "general", "firstLine": 12, "lineCount": 3},
+		)
+
+		if context.get("origin") != "working-tree" or context.get("lines", [None])[0] != "struct Outer o = {":
+			fail("read_source_context returned unexpected source")
+
+		status = client.tool("index_status", {"path": "tests/test11.c", "variant": "general"})
+
+		if status.get("status") != "current" or status.get("drifted"):
+			fail("index_status did not report current source")
+
+		caller = only_record(
+			client.tool("symbol_at", {"path": "tests/callgraph-a.c", "line": 13, "column": 13}),
+			"symbol_at caller",
+		)
+		callees = client.tool(
+			"find_callees",
+			{"symbol": "caller", "variant": "general", "usrId": caller["usrId"], "limit": 10},
+		)
+
+		if not any(record["symbol"] == "leaf" for record in callees.get("records", [])):
+			fail("find_callees omitted leaf")
+
+		leaf = only_record(
+			client.tool("symbol_at", {"path": "tests/callgraph-a.c", "line": 7, "column": 6}),
+			"symbol_at leaf",
+		)
+		callers = client.tool(
+			"find_callers",
+			{"symbol": "leaf", "variant": "general", "usrId": leaf["usrId"], "limit": 10},
+		)
+
+		if not any(record["context"] == "caller" for record in callers.get("records", [])):
+			fail("find_callers omitted caller")
+
+		outside = client.tool("read_source_context", {"path": "../etc/passwd", "variant": "general"})
+
+		if not outside.get("isError"):
+			fail("source access escaped the workspace")
+
+		unknown = client.tool("not_a_tool", {})
+
+		if unknown.get("error", {}).get("code") != -32602:
+			fail("unknown tool did not return Invalid Params")
+
+		client.close()
+
+		log = logfile.read_text()
+
+		if "CLIENT --> SERVER" not in log or "SERVER --> CLIENT" not in log:
+			fail("protocol logfile did not contain both directions")
+
+
+if __name__ == "__main__":
+	main()

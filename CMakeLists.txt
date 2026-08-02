@@ -32,6 +32,12 @@ set(SEMINDEX_FORMAT_SOURCES
 	src/lsp_server.h
 	src/lsp_transport.cpp
 	src/lsp_transport.h
+	src/mcp_server.cpp
+	src/mcp_server.h
+	src/mcp_tools.cpp
+	src/mcp_tools.h
+	src/mcp_transport.cpp
+	src/mcp_transport.h
 	src/semantic_query.cpp
 	src/semantic_query.h
 	src/index_pp.cpp
@@ -117,6 +123,7 @@ set(SEMINDEX_FORMAT_SOURCES
 	utils/semindex.c
 	utils/semindex_cli.h
 	utils/semindex_lsp.cpp
+	utils/semindex_mcp.cpp
 )
 
 find_program(CLANG_FORMAT clang-format)
@@ -154,6 +161,7 @@ endif()
 
 find_package(LLVM REQUIRED CONFIG)
 find_package(Clang REQUIRED CONFIG)
+find_package(Threads REQUIRED)
 
 # Internal SQLite helpers
 add_library(semindex_sqlite STATIC
@@ -338,6 +346,28 @@ set_target_properties(semindex_lsp PROPERTIES
 	INSTALL_RPATH "${CMAKE_INSTALL_FULL_LIBDIR}"
 )
 
+add_executable(semindex_mcp
+	src/mcp_server.cpp
+	src/mcp_tools.cpp
+	src/mcp_transport.cpp
+	utils/semindex_mcp.cpp
+)
+set_target_properties(semindex_mcp PROPERTIES OUTPUT_NAME semindex-mcp)
+target_include_directories(semindex_mcp PRIVATE
+	${CMAKE_CURRENT_SOURCE_DIR}/src
+	${LLVM_INCLUDE_DIRS}
+)
+target_compile_definitions(semindex_mcp PRIVATE ${LLVM_DEFINITIONS})
+target_link_libraries(semindex_mcp PRIVATE
+	semindex_semantic
+	Threads::Threads
+	LLVM
+)
+set_target_properties(semindex_mcp PROPERTIES
+	BUILD_RPATH "$ORIGIN"
+	INSTALL_RPATH "${CMAKE_INSTALL_FULL_LIBDIR}"
+)
+
 add_library(semindex_cli_common STATIC
 	utils/cli_common.c
 	utils/output_dissect.c
@@ -392,7 +422,7 @@ set_target_properties(semindex_compile_commands PROPERTIES OUTPUT_NAME semindex-
 target_link_libraries(semindex_compile_commands PRIVATE semindex_query)
 
 install(TARGETS semindex_dispatcher semindex_cc semindex_compiler semindex_index semindex_search semindex_callgraph
-	semindex_compile_commands semindex_lsp semindex_parser semindex_database
+	semindex_compile_commands semindex_lsp semindex_mcp semindex_parser semindex_database
 	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 	ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -501,6 +531,7 @@ if(BUILD_TESTING)
 				$<TARGET_FILE:semindex_callgraph>
 				$<TARGET_FILE:semindex_compile_commands>
 				$<TARGET_FILE:semindex_lsp>
+				$<TARGET_FILE:semindex_mcp>
 	)
 	add_test(
 		NAME semindex-scope
@@ -643,5 +674,13 @@ if(BUILD_TESTING)
 			${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-lsp-tests.py
 				$<TARGET_FILE:semindex_lsp>
 				$<TARGET_FILE:semindex_dispatcher>
+	)
+	add_test(
+		NAME semindex-mcp
+		COMMAND
+			${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-mcp-tests.py
+				$<TARGET_FILE:semindex_mcp>
+				$<TARGET_FILE:semindex_dispatcher>
+				${CMAKE_CURRENT_SOURCE_DIR}
 	)
 endif()

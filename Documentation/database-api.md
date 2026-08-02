@@ -12,7 +12,10 @@ implementation details; they are neither installed nor covered by the public
 ABI. `libsemindex_database.so` depends on SQLite, but not on Clang or LLVM.
 
 Open a database with `semindex_db_open()` and close it with
-`semindex_db_close()`.
+`semindex_db_close()`. `semindex_db_interrupt()` may be called from another
+thread to stop the operation currently running on a database handle. The
+caller must still keep the handle alive until the interrupted operation has
+returned.
 
 ## Record queries
 

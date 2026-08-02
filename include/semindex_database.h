@@ -126,6 +126,8 @@ typedef int (*semindex_db_file_callback_t)(void *data, const semindex_db_file_t 
 
 SEMINDEX_API int semindex_db_open(const char *path, semindex_db_t **result);
 SEMINDEX_API void semindex_db_close(semindex_db_t *db);
+/* May be called from another thread to stop an active database operation. */
+SEMINDEX_API void semindex_db_interrupt(semindex_db_t *db);
 
 /*
  * A nonzero callback result stops iteration and is returned to the caller.

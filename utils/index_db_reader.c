@@ -174,6 +174,12 @@ void semindex_db_close(semindex_db_t *db)
 	free(db);
 }
 
+void semindex_db_interrupt(semindex_db_t *db)
+{
+	if (db && db->handle)
+		sqlite3_interrupt(db->handle);
+}
+
 int semindex_db_list_variants(semindex_db_t *db, semindex_db_variant_callback_t callback, void *data)
 {
 	static const char *sql = "SELECT name, repository_root, git_commit FROM variants ORDER BY name";

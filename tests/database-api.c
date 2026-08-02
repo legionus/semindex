@@ -397,6 +397,9 @@ int main(int argc, char **argv)
 
 	if (semindex_db_open(argv[1], &db) < 0)
 		goto out;
+
+	semindex_db_interrupt(db);
+
 	if (run_query(db, "Outer.y", SEMINDEX_DB_RECORD_DEFINITION, SEMINDEX_DB_DEFINITION, 8, 1) < 0 ||
 		run_query(db, "Outer.y", SEMINDEX_DB_RECORD_REFERENCE, SEMINDEX_DB_REFERENCE, 14, 1) < 0 ||
 		semindex_db_find_at(db, argv[2], "general", 6, 10, check_record, &position) < 0 || position.failed ||
