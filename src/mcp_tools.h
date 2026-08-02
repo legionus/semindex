@@ -9,7 +9,19 @@
 #include <chrono>
 #include <condition_variable>
 #include <filesystem>
+#include <memory>
 #include <string>
+
+class SemindexIndexUpdater;
+
+struct McpToolOptions {
+	std::string database;
+	std::string commands_database;
+	std::filesystem::path workspace;
+	std::string variant;
+	bool allow_reindex = false;
+	bool include_local = true;
+};
 
 struct McpRequestControl {
 	std::atomic<bool> cancelled = false;
@@ -47,12 +59,13 @@ struct McpToolResult {
 class McpToolService
 {
 public:
-	McpToolService(std::string database, std::filesystem::path workspace, std::string variant);
+	explicit McpToolService(McpToolOptions options);
+	~McpToolService();
 
 	McpToolResult call(llvm::StringRef name, const llvm::json::Object *arguments, McpRequestControl &control) const;
+	bool canReindex() const;
 
 private:
-	std::string database;
-	std::filesystem::path workspace;
-	std::string variant;
+	McpToolOptions options;
+	std::unique_ptr<SemindexIndexUpdater> updater;
 };

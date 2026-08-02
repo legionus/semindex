@@ -61,7 +61,8 @@ llvm::json::Object objectSchema(llvm::json::Object properties, std::initializer_
 	return schema;
 }
 
-llvm::json::Object tool(llvm::StringRef name, llvm::StringRef description, llvm::json::Object schema)
+llvm::json::Object tool(llvm::StringRef name, llvm::StringRef description, llvm::json::Object schema,
+	bool read_only = true)
 {
 	return llvm::json::Object{
 		{ "name", name },
@@ -69,8 +70,8 @@ llvm::json::Object tool(llvm::StringRef name, llvm::StringRef description, llvm:
 		{ "inputSchema", std::move(schema) },
 		{ "annotations",
 			llvm::json::Object{
-				{ "readOnlyHint", true },
-				{ "destructiveHint", false },
+				{ "readOnlyHint", read_only },
+				{ "destructiveHint", !read_only },
 				{ "idempotentHint", true },
 			} },
 	};
@@ -177,7 +178,7 @@ std::optional<McpServer::RequestId> McpServer::requestId(const llvm::json::Value
 	return std::nullopt;
 }
 
-llvm::json::Array McpServer::toolDefinitions()
+llvm::json::Array McpServer::toolDefinitions(bool allow_reindex)
 {
 	llvm::json::Array result;
 	llvm::json::Object search = pagingProperties();
@@ -235,6 +236,16 @@ llvm::json::Array McpServer::toolDefinitions()
 	result.push_back(tool("index_status", "Report whether indexed source matches the working tree",
 		objectSchema(std::move(status), { "path" })));
 
+	if (allow_reindex) {
+		llvm::json::Object reindex{
+			{ "path", stringProperty("Source path below the configured workspace") },
+			{ "variant", stringProperty("Index variant") },
+		};
+
+		result.push_back(tool("reindex_file", "Reindex one file using its saved compiler command",
+			objectSchema(std::move(reindex), { "path" }), false));
+	}
+
 	return result;
 }
 
@@ -286,7 +297,11 @@ bool McpServer::initialize(const RequestId &id, const llvm::json::Object *params
 					{ "title", "semindex semantic index" },
 					{ "version", "0" },
 				} },
-			{ "instructions", "Use bounded read-only tools to inspect the configured semantic index." },
+			{ "instructions",
+				tools.canReindex()
+					? "Use bounded tools to inspect the index and reindex individual workspace "
+					  "files."
+					: "Use bounded read-only tools to inspect the configured semantic index." },
 		});
 }
 
@@ -295,7 +310,7 @@ bool McpServer::listTools(const RequestId &id, const llvm::json::Object *params)
 	if (params && params->get("cursor"))
 		return error(&id, INVALID_PARAMS, "Tool list cursor is not supported");
 
-	return reply(id, llvm::json::Object{ { "tools", toolDefinitions() } });
+	return reply(id, llvm::json::Object{ { "tools", toolDefinitions(tools.canReindex()) } });
 }
 
 bool McpServer::callTool(const RequestId &id, const llvm::json::Object *params, const std::string &payload)

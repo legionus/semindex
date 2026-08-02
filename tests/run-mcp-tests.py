@@ -15,14 +15,19 @@ def fail(message):
 
 
 class Client:
-	def __init__(self, executable, database, workspace, logfile):
+	def __init__(self, executable, database, workspace, logfile, options=None):
+		arguments = [
+			executable,
+			f"--database={database}",
+			f"--workspace={workspace}",
+			f"--logfile={logfile}",
+		]
+
+		if options:
+			arguments.extend(options)
+
 		self.process = subprocess.Popen(
-			[
-				executable,
-				f"--database={database}",
-				f"--workspace={workspace}",
-				f"--logfile={logfile}",
-			],
+			arguments,
 			stdin=subprocess.PIPE,
 			stdout=subprocess.PIPE,
 			stderr=subprocess.PIPE,
@@ -46,6 +51,23 @@ class Client:
 		if notification:
 			return None
 
+		return self.receive(message["id"], method)
+
+	def request(self, method, params=None):
+		message = {"jsonrpc": "2.0", "method": method, "id": self.next_id}
+
+		self.next_id += 1
+
+		if params is not None:
+			message["params"] = params
+
+		self.process.stdin.write(json.dumps(message, separators=(",", ":")) + "\n")
+		self.process.stdin.flush()
+
+		return message["id"]
+
+	def receive(self, request_id, method):
+
 		line = self.process.stdout.readline()
 
 		if not line:
@@ -53,10 +75,18 @@ class Client:
 
 		response = json.loads(line)
 
-		if response.get("id") != message["id"]:
+		if response.get("id") != request_id:
 			fail(f"unexpected response ID for {method}: {response}")
 
 		return response
+
+	def receive_any(self, method):
+		line = self.process.stdout.readline()
+
+		if not line:
+			fail(f"server exited while handling {method}: {self.process.stderr.read()}")
+
+		return json.loads(line)
 
 	def tool(self, name, arguments=None):
 		params = {"name": name}
@@ -87,18 +117,22 @@ class Client:
 			fail(f"server exited with status {status}: {self.process.stderr.read()}")
 
 
-def index_fixture(semindex, database, workspace, source):
-	subprocess.run(
-		[
+def index_fixture(semindex, database, workspace, source, store_command=False):
+	arguments = [
 			semindex,
 			"compiler",
 			f"--database={database}",
-			"--no-store-command",
 			"--",
 			"cc",
 			"--no-default-config",
 			source,
-		],
+		]
+
+	if not store_command:
+		arguments.insert(3, "--no-store-command")
+
+	subprocess.run(
+		arguments,
 		cwd=workspace,
 		check=True,
 	)
@@ -342,6 +376,93 @@ def main():
 
 		if "CLIENT --> SERVER" not in log or "SERVER --> CLIENT" not in log:
 			fail("protocol logfile did not contain both directions")
+
+		update_workspace = Path(temporary) / "workspace"
+		update_workspace.mkdir()
+		update_database = Path(temporary) / "update.db"
+		update_log = Path(temporary) / "update.log"
+		update_source = update_workspace / "update.c"
+		update_source.write_text("int before(void) { return 0; }\n", encoding="utf-8")
+		index_fixture(semindex, update_database, update_workspace, "update.c", store_command=True)
+
+		update_client = Client(mcp, update_database, update_workspace, update_log, ["--allow-reindex"])
+		update_client.send(
+			"initialize",
+			{
+				"protocolVersion": "2025-11-25",
+				"capabilities": {},
+				"clientInfo": {"name": "semindex-update-test", "version": "1"},
+			},
+		)
+		update_client.send("notifications/initialized", notification=True)
+		update_tools = update_client.send("tools/list", {})
+		update_names = {tool["name"] for tool in update_tools.get("result", {}).get("tools", [])}
+
+		if "reindex_file" not in update_names:
+			fail("opt-in MCP server did not advertise reindex_file")
+
+		reindex_definition = next(tool for tool in update_tools["result"]["tools"] if tool["name"] == "reindex_file")
+
+		if reindex_definition["annotations"].get("readOnlyHint"):
+			fail("reindex_file was advertised as read-only")
+
+		update_status = update_client.tool("index_status", {"path": "update.c", "variant": "general"})
+
+		if not update_status.get("compilerCommandAvailable"):
+			fail("index_status did not find the saved compiler command")
+
+		update_source.write_text("int after(void) { return missing; }\n", encoding="utf-8")
+		partial = update_client.tool("reindex_file", {"path": "update.c", "variant": "general"})
+
+		if partial.get("status") != "partial" or not partial.get("diagnostics"):
+			fail("reindex_file did not return partial diagnostics")
+
+		partial_records = update_client.tool("search_symbols", {"pattern": "after", "variant": "general"})
+
+		if not partial_records.get("records"):
+			fail("reindex_file did not store the partial index")
+
+		update_source.write_text("int after(void) { return 0; }\n", encoding="utf-8")
+		clean = update_client.tool("reindex_file", {"path": "update.c", "variant": "general"})
+
+		if clean.get("status") != "clean" or clean.get("diagnostics"):
+			fail("reindex_file did not return a clean status")
+
+		missing_command = update_workspace / "missing-command.c"
+		missing_command.write_text("int missing_command;\n", encoding="utf-8")
+		failed = update_client.tool("reindex_file", {"path": "missing-command.c", "variant": "general"})
+
+		if failed.get("status") != "failed" or failed.get("compilerCommandAvailable"):
+			fail("reindex_file did not report a missing compiler command")
+
+		second_source = update_workspace / "update-two.c"
+		second_source.write_text("int second_before(void) { return 0; }\n", encoding="utf-8")
+		index_fixture(semindex, update_database, update_workspace, "update-two.c", store_command=True)
+		update_source.write_text("int concurrent_one(void) { return 0; }\n", encoding="utf-8")
+		second_source.write_text("int concurrent_two(void) { return 0; }\n", encoding="utf-8")
+		first_id = update_client.request(
+			"tools/call",
+			{"name": "reindex_file", "arguments": {"path": "update.c", "variant": "general"}},
+		)
+		second_id = update_client.request(
+			"tools/call",
+			{"name": "reindex_file", "arguments": {"path": "update-two.c", "variant": "general"}},
+		)
+		concurrent = [
+			update_client.receive_any("concurrent reindex_file"),
+			update_client.receive_any("concurrent reindex_file"),
+		]
+
+		if {response.get("id") for response in concurrent} != {first_id, second_id}:
+			fail(f"concurrent reindex_file returned unexpected IDs: {concurrent}")
+
+		for response in concurrent:
+			content = response.get("result", {}).get("structuredContent", {})
+
+			if content.get("status") != "clean":
+				fail(f"concurrent reindex_file failed: {response}")
+
+		update_client.close()
 
 
 if __name__ == "__main__":

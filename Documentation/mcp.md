@@ -16,7 +16,7 @@ directory.
 
 ## Tools
 
-The initial tool set is:
+The default read-only tool set is:
 
 * `search_symbols`;
 * `symbol_at`;
@@ -27,6 +27,9 @@ The initial tool set is:
 * `read_source_context`;
 * `list_variants`;
 * `index_status`.
+
+`index_status` also reports whether the selected file and variant have a saved
+compiler command in the command database.
 
 Record results contain the variant, path, one-based byte position, qualified
 symbol, symbol kind, record type, action, access mode, enclosing context, local
@@ -53,5 +56,34 @@ Tool calls have a 30-second server-side deadline. The server accepts
 `notifications/cancelled` while a query is running. Responses are limited to
 1 MiB in addition to each tool's record and source limits.
 
-The server opens the symbol database read-only for each tool call. It does not
-expose indexing, compiler execution, or arbitrary file access.
+The server opens the symbol database read-only for ordinary tool calls. It does
+not expose arbitrary file access, compiler execution, or full-project
+indexing.
+
+## Controlled updates
+
+Start the server with `--allow-reindex` to add the `reindex_file` tool:
+
+```sh
+semindex mcp --allow-reindex \
+	--database=.semindex/semindex.db \
+	--commands-database=.semindex/commands.db \
+	--workspace="$PWD"
+```
+
+The tool accepts one workspace path and an optional variant. It uses only the
+compiler command already saved for that exact file and variant; clients cannot
+supply compiler arguments. A missing command is returned as a failed indexing
+status. `--no-include-local` omits local symbols from updates.
+
+Successful requests return `clean` or `partial`, together with at most 100
+diagnostics. Partial frontend results are stored so the index continues to
+describe the saved file. Failed frontend or database operations leave the
+previous index intact where the indexing pipeline cannot produce usable
+records.
+
+Updates are serialized because compiler commands may contain paths relative to
+their recorded working directory. Read-only tool calls remain independently
+bounded by the normal request deadline and result limits. Cancellation is
+observed before and after a single-file update; the Clang frontend itself does
+not currently provide an interruption point.

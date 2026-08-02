@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "mcp_tools.h"
 
+#include "index_updater.h"
 #include "semantic_query.h"
 #include "semindex_database.h"
 #include "source_resolver.h"
@@ -1028,6 +1029,34 @@ const char *sourceOriginName(SemindexSourceOrigin origin)
 	return "unknown";
 }
 
+const char *diagnosticSeverityName(semindex_diagnostic_severity_t severity)
+{
+	switch (severity) {
+	case SEMINDEX_DIAGNOSTIC_NOTE:
+		return "note";
+	case SEMINDEX_DIAGNOSTIC_WARNING:
+		return "warning";
+	case SEMINDEX_DIAGNOSTIC_ERROR:
+		return "error";
+	}
+
+	return "unknown";
+}
+
+const char *updateStatusName(SemindexIndexUpdateResult::Status status)
+{
+	switch (status) {
+	case SemindexIndexUpdateResult::Status::Clean:
+		return "clean";
+	case SemindexIndexUpdateResult::Status::Partial:
+		return "partial";
+	case SemindexIndexUpdateResult::Status::Failed:
+		return "failed";
+	}
+
+	return "failed";
+}
+
 McpToolResult sourceRequest(semindex_db_t *database, const llvm::json::Object *arguments,
 	const std::filesystem::path &workspace, const std::string &configured_variant, bool include_source,
 	const McpRequestControl &control)
@@ -1124,6 +1153,81 @@ McpToolResult sourceRequest(semindex_db_t *database, const llvm::json::Object *a
 	return { McpToolStatus::Success, std::move(result), {} };
 }
 
+McpToolResult indexStatus(semindex_db_t *database, const llvm::json::Object *arguments,
+	const std::filesystem::path &workspace, const std::string &configured_variant,
+	const SemindexIndexUpdater &updater, const McpRequestControl &control)
+{
+	auto path = allowedPath(arguments, workspace);
+	auto selected = selectedVariant(arguments, configured_variant);
+
+	if (!path || !selected || selected->empty())
+		return { McpToolStatus::InvalidParams, {}, "Invalid source path or variant" };
+
+	auto result = sourceRequest(database, arguments, workspace, configured_variant, false, control);
+
+	if (result.status != McpToolStatus::Success)
+		return result;
+
+	int available = updater.commandAvailable(path->string(), *selected);
+
+	if (available < 0)
+		return { McpToolStatus::DatabaseError, {}, "Compiler command lookup failed" };
+
+	result.data["compilerCommandAvailable"] = available == 0;
+
+	return result;
+}
+
+McpToolResult reindexFile(const llvm::json::Object *arguments, const std::filesystem::path &workspace,
+	const std::string &configured_variant, const SemindexIndexUpdater &updater, const McpRequestControl &control)
+{
+	auto path = allowedPath(arguments, workspace);
+	auto selected = selectedVariant(arguments, configured_variant);
+
+	if (!path || !selected || selected->empty())
+		return { McpToolStatus::InvalidParams, {}, "Invalid source path or variant" };
+
+	if (control.stopped())
+		return stoppedResult(control);
+
+	auto update = updater.update(SemindexIndexUpdateRequest{
+		.file = path->string(),
+		.variant = *selected,
+		.diagnostic_limit = 100,
+		.store_partial = true,
+		.stopped = [&control] { return control.stopped(); },
+	});
+
+	if (control.stopped())
+		return stoppedResult(control);
+
+	llvm::json::Array diagnostics;
+
+	for (const auto &diagnostic : update.diagnostics) {
+		diagnostics.push_back(llvm::json::Object{
+			{ "severity", diagnosticSeverityName(diagnostic.severity) },
+			{ "message", diagnostic.message },
+			{ "path", diagnostic.file },
+			{ "line", diagnostic.line },
+			{ "column", diagnostic.column },
+		});
+	}
+
+	llvm::json::Object result{
+		{ "variant", *selected },
+		{ "path", path->string() },
+		{ "status", updateStatusName(update.status) },
+		{ "compilerCommandAvailable", update.command_available },
+		{ "diagnostics", std::move(diagnostics) },
+		{ "diagnosticsTruncated", update.diagnostics_truncated },
+	};
+
+	if (!update.error.empty())
+		result["error"] = update.error;
+
+	return { McpToolStatus::Success, std::move(result), {} };
+}
+
 } // namespace
 
 bool McpRequestControl::stopped() const
@@ -1183,9 +1287,20 @@ void McpRequestControl::complete()
 	completion_changed.notify_all();
 }
 
-McpToolService::McpToolService(std::string database, std::filesystem::path workspace, std::string variant)
-    : database(std::move(database)), workspace(std::move(workspace)), variant(std::move(variant))
+McpToolService::McpToolService(McpToolOptions options)
+    : options(std::move(options)), updater(std::make_unique<SemindexIndexUpdater>(SemindexIndexUpdaterOptions{
+					   .database = this->options.database,
+					   .commands_database = this->options.commands_database,
+					   .include_local = this->options.include_local,
+				   }))
 {
+}
+
+McpToolService::~McpToolService() = default;
+
+bool McpToolService::canReindex() const
+{
+	return options.allow_reindex;
 }
 
 McpToolResult McpToolService::call(llvm::StringRef name, const llvm::json::Object *arguments,
@@ -1196,7 +1311,14 @@ McpToolResult McpToolService::call(llvm::StringRef name, const llvm::json::Objec
 	if (control.stopped())
 		return stoppedResult(control);
 
-	if (!openDatabase(database, handle))
+	if (name == "reindex_file") {
+		if (!options.allow_reindex)
+			return { McpToolStatus::UnknownTool, {}, "Unknown tool" };
+
+		return reindexFile(arguments, options.workspace, options.variant, *updater, control);
+	}
+
+	if (!openDatabase(options.database, handle))
 		return { McpToolStatus::DatabaseError, {}, "Failed to open database" };
 
 	control.bind(handle.get());
@@ -1214,31 +1336,31 @@ McpToolResult McpToolService::call(llvm::StringRef name, const llvm::json::Objec
 		return stoppedResult(control);
 
 	if (name == "search_symbols")
-		return searchSymbols(handle.get(), arguments, variant, control);
+		return searchSymbols(handle.get(), arguments, options.variant, control);
 
 	if (name == "symbol_at")
-		return symbolAt(handle.get(), arguments, workspace, variant, control);
+		return symbolAt(handle.get(), arguments, options.workspace, options.variant, control);
 
 	if (name == "find_definitions")
-		return relatedRecords(handle.get(), arguments, variant, SEMINDEX_DB_RECORD_DEFINITION, control);
+		return relatedRecords(handle.get(), arguments, options.variant, SEMINDEX_DB_RECORD_DEFINITION, control);
 
 	if (name == "find_references")
-		return relatedRecords(handle.get(), arguments, variant, SEMINDEX_DB_RECORD_REFERENCE, control);
+		return relatedRecords(handle.get(), arguments, options.variant, SEMINDEX_DB_RECORD_REFERENCE, control);
 
 	if (name == "find_callers")
-		return callRecords(handle.get(), arguments, variant, SEMINDEX_DB_CALLERS, control);
+		return callRecords(handle.get(), arguments, options.variant, SEMINDEX_DB_CALLERS, control);
 
 	if (name == "find_callees")
-		return callRecords(handle.get(), arguments, variant, SEMINDEX_DB_CALLEES, control);
+		return callRecords(handle.get(), arguments, options.variant, SEMINDEX_DB_CALLEES, control);
 
 	if (name == "read_source_context")
-		return sourceRequest(handle.get(), arguments, workspace, variant, true, control);
+		return sourceRequest(handle.get(), arguments, options.workspace, options.variant, true, control);
 
 	if (name == "list_variants")
-		return listVariants(handle.get(), arguments, variant, control);
+		return listVariants(handle.get(), arguments, options.variant, control);
 
 	if (name == "index_status")
-		return sourceRequest(handle.get(), arguments, workspace, variant, false, control);
+		return indexStatus(handle.get(), arguments, options.workspace, options.variant, *updater, control);
 
 	return { McpToolStatus::UnknownTool, {}, "Unknown tool" };
 }

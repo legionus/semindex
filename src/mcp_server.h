@@ -49,7 +49,7 @@ private:
 	void waitWorkers();
 
 	static std::optional<RequestId> requestId(const llvm::json::Value *id);
-	static llvm::json::Array toolDefinitions();
+	static llvm::json::Array toolDefinitions(bool allow_reindex);
 
 	McpTransport &transport;
 	McpToolService &tools;

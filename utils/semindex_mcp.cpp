@@ -3,7 +3,12 @@
 #include "mcp_tools.h"
 #include "mcp_transport.h"
 
+extern "C" {
+#include "command_db.h"
+}
+
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -18,14 +23,19 @@ static void help()
 {
 	usage(std::cout);
 	std::cout << "\n"
-		     "Serve read-only Model Context Protocol tools over standard input and output.\n"
+		     "Serve bounded Model Context Protocol tools over standard input and output.\n"
 		     "\n"
 		     "Options:\n"
 		     "  -d, --database=PATH        path to the semindex database\n"
 		     "                             (default: .semindex/semindex.db)\n"
+		     "      --commands-database=PATH\n"
+		     "                             path to the compiler command database\n"
+		     "                             (default: commands.db beside --database)\n"
 		     "      --variant=NAME         query only the named index variant\n"
 		     "      --workspace=PATH       restrict source access to PATH\n"
 		     "                             (default: current directory)\n"
+		     "      --allow-reindex        allow reindex_file to update one source file\n"
+		     "      --no-include-local     omit local symbols when reindexing\n"
 		     "      --logfile=FILE         append JSON-RPC requests and responses to FILE\n"
 		     "  -h, --help                 display this help and exit\n"
 		     "\n"
@@ -58,9 +68,12 @@ static bool optionValue(int &index, int argc, char **argv, const std::string &ar
 int main(int argc, char **argv)
 {
 	std::string database = ".semindex/semindex.db";
+	std::string commands_database;
 	std::string workspace = std::filesystem::current_path().string();
 	std::string variant;
 	std::string logfile_path;
+	bool allow_reindex = false;
+	bool include_local = true;
 
 	for (int i = 1; i < argc; i++) {
 		std::string argument(argv[i]);
@@ -82,7 +95,20 @@ int main(int argc, char **argv)
 			continue;
 		}
 
+		if (argument == "--allow-reindex") {
+			allow_reindex = true;
+
+			continue;
+		}
+
+		if (argument == "--no-include-local") {
+			include_local = false;
+
+			continue;
+		}
+
 		if (optionValue(i, argc, argv, argument, "--database", database) ||
+			optionValue(i, argc, argv, argument, "--commands-database", commands_database) ||
 			optionValue(i, argc, argv, argument, "--variant", variant) ||
 			optionValue(i, argc, argv, argument, "--workspace", workspace) ||
 			optionValue(i, argc, argv, argument, "--logfile", logfile_path))
@@ -100,6 +126,19 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	if (commands_database.empty()) {
+		char *path = command_db_default_path(database.c_str());
+
+		if (!path) {
+			std::cerr << "semindex-mcp: failed to allocate command database path\n";
+
+			return 1;
+		}
+
+		commands_database = path;
+		free(path);
+	}
+
 	std::error_code error;
 	std::filesystem::path workspace_path = std::filesystem::canonical(workspace, error);
 
@@ -110,6 +149,7 @@ int main(int argc, char **argv)
 	}
 
 	database = std::filesystem::absolute(database).lexically_normal().string();
+	commands_database = std::filesystem::absolute(commands_database).lexically_normal().string();
 	std::ofstream logfile;
 
 	if (!logfile_path.empty()) {
@@ -123,7 +163,14 @@ int main(int argc, char **argv)
 	}
 
 	McpTransport transport(std::cin, std::cout, std::cerr, logfile.is_open() ? &logfile : nullptr);
-	McpToolService tools(std::move(database), std::move(workspace_path), std::move(variant));
+	McpToolService tools(McpToolOptions{
+		.database = std::move(database),
+		.commands_database = std::move(commands_database),
+		.workspace = std::move(workspace_path),
+		.variant = std::move(variant),
+		.allow_reindex = allow_reindex,
+		.include_local = include_local,
+	});
 	McpServer server(transport, tools, std::chrono::seconds(30));
 
 	return server.run();

@@ -37,6 +37,8 @@ and per-argument index maintenance on the compiler hot path.
 The internal read API loads one command by `(variant, canonical file)` through
 the table's primary key. It reconstructs only that command's argument vector;
 language-server save handling does not scan or buffer the command database.
+The opt-in MCP `reindex_file` tool uses the same exact lookup and does not
+accept replacement compiler arguments from clients.
 
 The command database uses WAL mode and `synchronous=OFF`.  Concurrent indexing
 processes prepare their semantic records independently and hold the command

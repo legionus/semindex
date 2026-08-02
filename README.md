@@ -28,8 +28,8 @@ Implemented so far:
 * direct caller and callee queries with stable function identities;
 * LSP definition, reference, document-highlight, call-hierarchy, diagnostics,
   and saved-file update support;
-* bounded read-only MCP tools for semantic search, call relationships, source
-  context, variants, and index status;
+* bounded MCP tools for semantic search, call relationships, source context,
+  variants, index status, and opt-in single-file updates;
 * a C API exported from the C++ indexing implementation.
 
 An indexing operation reports a clean, partial, or failed result. Partial
@@ -179,6 +179,10 @@ Run the read-only MCP server with an explicit source-access boundary:
 ```sh
 semindex mcp --database=.semindex/semindex.db --workspace="$PWD"
 ```
+
+Add `--allow-reindex` to expose controlled single-file updates through saved
+compiler commands. Full-project indexing and client-supplied compiler arguments
+remain unavailable through MCP.
 
 See [Documentation/mcp.md](Documentation/mcp.md) for the tool set, pagination,
 source limits, protocol version, and security boundary.

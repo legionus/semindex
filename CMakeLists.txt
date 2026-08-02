@@ -20,6 +20,8 @@ set(SEMINDEX_FORMAT_SOURCES
 	include/semindex_export.h
 	src/index_ast.cpp
 	src/index_context.cpp
+	src/index_updater.cpp
+	src/index_updater.h
 	src/lsp_call_hierarchy.cpp
 	src/lsp_call_hierarchy.h
 	src/lsp_indexer.cpp
@@ -319,6 +321,16 @@ target_link_libraries(semindex_pipeline PUBLIC
 	semindex_storage
 )
 
+add_library(semindex_index_update STATIC
+	src/index_updater.cpp
+)
+target_include_directories(semindex_index_update PUBLIC
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+)
+target_link_libraries(semindex_index_update PUBLIC
+	semindex_pipeline
+)
+
 add_executable(semindex_lsp
 	src/lsp_call_hierarchy.cpp
 	src/lsp_indexer.cpp
@@ -337,7 +349,7 @@ target_include_directories(semindex_lsp PRIVATE
 )
 target_compile_definitions(semindex_lsp PRIVATE ${LLVM_DEFINITIONS})
 target_link_libraries(semindex_lsp PRIVATE
-	semindex_pipeline
+	semindex_index_update
 	semindex_semantic
 	LLVM
 )
@@ -359,6 +371,7 @@ target_include_directories(semindex_mcp PRIVATE
 )
 target_compile_definitions(semindex_mcp PRIVATE ${LLVM_DEFINITIONS})
 target_link_libraries(semindex_mcp PRIVATE
+	semindex_index_update
 	semindex_semantic
 	Threads::Threads
 	LLVM
