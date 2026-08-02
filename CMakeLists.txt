@@ -187,8 +187,10 @@ add_library(semindex_source STATIC
 	src/source_resolver.cpp
 )
 target_include_directories(semindex_source PUBLIC
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
 )
+target_link_libraries(semindex_source PUBLIC semindex_database)
 
 # SQLite query adapters
 add_library(semindex_query STATIC
@@ -556,9 +558,11 @@ if(BUILD_TESTING)
 	add_test(
 		NAME semindex-source-resolver
 		COMMAND
-			$<TARGET_FILE:semindex_source_resolver_test>
-			${CMAKE_CURRENT_SOURCE_DIR}
-			${CMAKE_CURRENT_SOURCE_DIR}/tests/test.c
+			${CMAKE_COMMAND} -E env
+			SEMINDEX=$<TARGET_FILE:semindex_dispatcher>
+			SOURCE_RESOLVER_TEST=$<TARGET_FILE:semindex_source_resolver_test>
+			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-source-resolver-tests.sh
 	)
 	add_test(
 		NAME semindex-partial-cli
