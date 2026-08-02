@@ -207,9 +207,11 @@ llvm::json::Array McpServer::toolDefinitions()
 	calls["symbol"] = stringProperty("Qualified function name");
 	calls["variant"] = stringProperty("Index variant");
 	calls["usrId"] = stringProperty("Stable hexadecimal function identity");
-	result.push_back(tool("find_callers", "Find direct calls to a function",
+	calls["depth"] = integerProperty("Maximum traversal depth", 1, 16);
+	calls["nodeLimit"] = integerProperty("Maximum unique functions", 1, 200);
+	result.push_back(tool("find_callers", "Find bounded callers of a function",
 		objectSchema(llvm::json::Object(calls), { "symbol", "usrId" })));
-	result.push_back(tool("find_callees", "Find direct calls made by a function",
+	result.push_back(tool("find_callees", "Find bounded callees of a function",
 		objectSchema(std::move(calls), { "symbol", "usrId" })));
 
 	llvm::json::Object source{

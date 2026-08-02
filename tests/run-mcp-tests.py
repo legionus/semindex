@@ -237,6 +237,95 @@ def main():
 		if not any(record["context"] == "caller" for record in callers.get("records", [])):
 			fail("find_callers omitted caller")
 
+		entry = only_record(
+			client.tool("symbol_at", {"path": "tests/callgraph-a.c", "line": 21, "column": 6}),
+			"symbol_at entry_a",
+		)
+		graph = client.tool(
+			"find_callees",
+			{
+				"symbol": "entry_a",
+				"variant": "general",
+				"usrId": entry["usrId"],
+				"depth": 2,
+				"nodeLimit": 10,
+				"limit": 20,
+			},
+		)
+		depths = {(record["symbol"], record["depth"]) for record in graph.get("records", [])}
+
+		if ("caller", 1) not in depths or ("leaf", 2) not in depths:
+			fail("recursive find_callees returned the wrong depths")
+
+		if graph.get("truncated") or not graph.get("cyclesDetected"):
+			fail("recursive find_callees did not report its cycle")
+
+		reverse_graph = client.tool(
+			"find_callers",
+			{
+				"symbol": "leaf",
+				"variant": "general",
+				"usrId": leaf["usrId"],
+				"depth": 2,
+				"nodeLimit": 10,
+				"limit": 20,
+			},
+		)
+		reverse_contexts = {
+			(record["context"], record["path"], record["depth"])
+			for record in reverse_graph.get("records", [])
+		}
+
+		if ("entry_a", "tests/callgraph-a.c", 2) not in reverse_contexts:
+			fail("recursive find_callers omitted entry_a")
+
+		if any(path == "tests/callgraph-b.c" for _, path, _ in reverse_contexts):
+			fail("recursive find_callers mixed static function identities")
+
+		bounded = client.tool(
+			"find_callees",
+			{
+				"symbol": "entry_a",
+				"variant": "general",
+				"usrId": entry["usrId"],
+				"depth": 2,
+				"nodeLimit": 2,
+				"limit": 20,
+			},
+		)
+
+		if not bounded.get("truncated") or not bounded.get("nodeLimitHit"):
+			fail("recursive find_callees did not enforce its node limit")
+
+		record_bounded = client.tool(
+			"find_callees",
+			{
+				"symbol": "entry_a",
+				"variant": "general",
+				"usrId": entry["usrId"],
+				"depth": 2,
+				"nodeLimit": 10,
+				"limit": 1,
+			},
+		)
+
+		if len(record_bounded.get("records", [])) != 1 or not record_bounded.get("truncated"):
+			fail("recursive find_callees did not enforce its record limit")
+
+		invalid_cursor = client.tool(
+			"find_callees",
+			{
+				"symbol": "entry_a",
+				"variant": "general",
+				"usrId": entry["usrId"],
+				"depth": 2,
+				"cursor": "not-supported",
+			},
+		)
+
+		if not invalid_cursor.get("isError"):
+			fail("recursive find_callees accepted a cursor")
+
 		outside = client.tool("read_source_context", {"path": "../etc/passwd", "variant": "general"})
 
 		if not outside.get("isError"):

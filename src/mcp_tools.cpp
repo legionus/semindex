@@ -10,14 +10,20 @@
 
 #include <charconv>
 #include <cstdio>
+#include <deque>
 #include <limits>
 #include <memory>
 #include <optional>
+#include <set>
+#include <tuple>
 #include <utility>
 #include <vector>
 
 static constexpr size_t DEFAULT_LIMIT = 50;
 static constexpr size_t MAX_LIMIT = 200;
+static constexpr unsigned MAX_GRAPH_DEPTH = 16;
+static constexpr size_t DEFAULT_GRAPH_NODES = 50;
+static constexpr size_t MAX_GRAPH_NODES = 200;
 static constexpr unsigned DEFAULT_CONTEXT_LINES = 20;
 static constexpr unsigned MAX_CONTEXT_LINES = 200;
 static constexpr size_t DEFAULT_CONTEXT_BYTES = 16 * 1024;
@@ -48,6 +54,37 @@ struct CallCollector {
 	std::string after;
 	std::vector<SemindexQueryRecord> records;
 	bool after_seen;
+	bool stopped = false;
+};
+
+struct GraphFunctionKey {
+	std::string variant;
+	std::string symbol;
+	unsigned long long usr_id;
+
+	bool operator<(const GraphFunctionKey &other) const
+	{
+		return std::tie(variant, symbol, usr_id) < std::tie(other.variant, other.symbol, other.usr_id);
+	}
+};
+
+struct GraphFunction {
+	std::string variant;
+	std::string symbol;
+	unsigned long long usr_id;
+	unsigned depth;
+	std::set<GraphFunctionKey> ancestors;
+};
+
+struct GraphRecord {
+	SemindexQueryRecord record;
+	unsigned depth;
+};
+
+struct GraphCollector {
+	const McpRequestControl &control;
+	size_t limit;
+	std::vector<SemindexQueryRecord> records;
 	bool stopped = false;
 };
 
@@ -191,6 +228,15 @@ llvm::json::Object recordObject(const SemindexQueryRecord &record)
 	return result;
 }
 
+llvm::json::Object graphRecordObject(const GraphRecord &record)
+{
+	auto result = recordObject(record.record);
+
+	result["depth"] = record.depth;
+
+	return result;
+}
+
 bool parseLimit(const llvm::json::Object *arguments, size_t &limit)
 {
 	limit = DEFAULT_LIMIT;
@@ -207,6 +253,35 @@ bool parseLimit(const llvm::json::Object *arguments, size_t &limit)
 		return false;
 
 	limit = *value;
+
+	return true;
+}
+
+bool parseGraphBounds(const llvm::json::Object *arguments, unsigned &depth, size_t &node_limit)
+{
+	depth = 1;
+	node_limit = DEFAULT_GRAPH_NODES;
+
+	if (!arguments)
+		return true;
+
+	if (auto value = arguments->getInteger("depth")) {
+		if (*value < 1 || *value > MAX_GRAPH_DEPTH)
+			return false;
+
+		depth = *value;
+	} else if (arguments->get("depth")) {
+		return false;
+	}
+
+	if (auto value = arguments->getInteger("nodeLimit")) {
+		if (*value < 1 || static_cast<unsigned long long>(*value) > MAX_GRAPH_NODES)
+			return false;
+
+		node_limit = *value;
+	} else if (arguments->get("nodeLimit")) {
+		return false;
+	}
 
 	return true;
 }
@@ -388,6 +463,21 @@ int collectCallRecord(void *data, const semindex_db_record_t *record)
 	return collector.records.size() > collector.limit;
 }
 
+int collectGraphRecord(void *data, const semindex_db_record_t *record)
+{
+	auto &collector = *static_cast<GraphCollector *>(data);
+
+	if (collector.control.stopped()) {
+		collector.stopped = true;
+
+		return 1;
+	}
+
+	collector.records.push_back(semindexQueryRecord(*record));
+
+	return collector.records.size() >= collector.limit;
+}
+
 int collectVariant(void *data, const semindex_db_variant_t *variant)
 {
 	auto &collector = *static_cast<VariantCollector *>(data);
@@ -456,6 +546,29 @@ llvm::json::Object recordsResult(std::vector<SemindexQueryRecord> &records, size
 		result["nextCursor"] = recordCursor(records.back());
 
 	return result;
+}
+
+llvm::json::Object graphResult(std::vector<GraphRecord> &records, size_t limit, bool node_limit_hit,
+	bool cycles_detected)
+{
+	bool more = records.size() > limit;
+
+	if (more)
+		records.resize(limit);
+
+	llvm::json::Array items;
+
+	items.reserve(records.size());
+
+	for (const auto &record : records)
+		items.push_back(graphRecordObject(record));
+
+	return llvm::json::Object{
+		{ "records", std::move(items) },
+		{ "truncated", more || node_limit_hit },
+		{ "nodeLimitHit", node_limit_hit },
+		{ "cyclesDetected", cycles_detected },
+	};
 }
 
 std::optional<std::string> selectedVariant(const llvm::json::Object *arguments, const std::string &configured)
@@ -693,14 +806,112 @@ McpToolResult callRecords(semindex_db_t *database, const llvm::json::Object *arg
 	auto id_value = arguments->getString("usrId");
 	auto selected = selectedVariant(arguments, configured_variant);
 	size_t limit;
+	unsigned depth;
+	size_t node_limit;
 
-	if (!symbol || symbol->empty() || !id_value || !selected || selected->empty() || !parseLimit(arguments, limit))
+	if (!symbol || symbol->empty() || !id_value || !selected || selected->empty())
+		return { McpToolStatus::InvalidParams, {}, "Invalid function identity" };
+
+	if (!parseLimit(arguments, limit) || !parseGraphBounds(arguments, depth, node_limit))
 		return { McpToolStatus::InvalidParams, {}, "Invalid function identity" };
 
 	auto id = parseId(*id_value);
 
 	if (!id || !*id)
 		return { McpToolStatus::InvalidParams, {}, "Invalid function identity" };
+
+	if (depth > 1 && arguments->get("cursor"))
+		return { McpToolStatus::InvalidParams, {}, "Recursive call queries do not accept a cursor" };
+
+	if (depth > 1) {
+		std::deque<GraphFunction> pending;
+		std::set<GraphFunctionKey> visited;
+		std::vector<GraphRecord> records;
+		bool node_limit_hit = false;
+		bool cycles_detected = false;
+
+		pending.push_back(GraphFunction{
+			.variant = *selected,
+			.symbol = symbol->str(),
+			.usr_id = *id,
+			.depth = 0,
+			.ancestors = { GraphFunctionKey{ *selected, symbol->str(), *id } },
+		});
+		visited.insert(GraphFunctionKey{ *selected, symbol->str(), *id });
+
+		while (!pending.empty() && records.size() <= limit) {
+			GraphFunction function = std::move(pending.front());
+
+			pending.pop_front();
+
+			if (function.depth >= depth)
+				continue;
+
+			semindex_db_call_options_t query = {
+				.function = function.symbol.c_str(),
+				.variant = function.variant.c_str(),
+				.usr_id = function.usr_id,
+				.direction = direction,
+			};
+			size_t remaining = limit + 1 - records.size();
+			GraphCollector collector{ control, remaining };
+			int ret = semindex_db_query_calls(database, &query, collectGraphRecord, &collector);
+
+			if (collector.stopped || control.stopped())
+				return stoppedResult(control);
+
+			if (ret < 0)
+				return { McpToolStatus::DatabaseError, {}, "Database query failed" };
+
+			for (auto &record : collector.records) {
+				GraphFunction next;
+
+				if (direction == SEMINDEX_DB_CALLERS) {
+					next = GraphFunction{
+						.variant = record.variant,
+						.symbol = record.context,
+						.usr_id = record.context_usr_id,
+						.depth = function.depth + 1,
+					};
+				} else {
+					next = GraphFunction{
+						.variant = record.variant,
+						.symbol = record.symbol,
+						.usr_id = record.usr_id,
+						.depth = function.depth + 1,
+					};
+				}
+
+				GraphFunctionKey key{ next.variant, next.symbol, next.usr_id };
+				bool cycle = function.ancestors.find(key) != function.ancestors.end();
+
+				if (cycle) {
+					cycles_detected = true;
+				} else if (visited.find(key) == visited.end()) {
+					if (visited.size() >= node_limit) {
+						node_limit_hit = true;
+
+						continue;
+					}
+
+					next.ancestors = function.ancestors;
+					next.ancestors.insert(key);
+					visited.insert(key);
+					pending.push_back(std::move(next));
+				}
+
+				records.push_back(GraphRecord{
+					.record = std::move(record),
+					.depth = function.depth + 1,
+				});
+
+				if (records.size() > limit)
+					break;
+			}
+		}
+
+		return { McpToolStatus::Success, graphResult(records, limit, node_limit_hit, cycles_detected), {} };
+	}
 
 	semindex_db_call_options_t query = {
 		.function = symbol->data(),

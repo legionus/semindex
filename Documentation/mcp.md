@@ -33,6 +33,16 @@ symbol, symbol kind, record type, action, access mode, enclosing context, local
 status, and stable identities when present. List tools use bounded result
 counts and return an opaque `nextCursor` when another page is available.
 
+`find_callers` and `find_callees` return direct relationships by default. Set
+`depth` to a value from 2 through 16 to traverse recursively and `nodeLimit` to
+bound the number of unique functions visited. Recursive results include the
+one-based edge depth and report whether the record or node limit truncated the
+graph and whether a cycle was encountered. Recursive traversal does not accept
+a pagination cursor; use the result and node limits to bound one complete
+traversal. Function identities include the variant, so static functions and
+same-named functions from different variants remain distinct. Indirect calls
+are not expanded.
+
 Source access is restricted to paths below the canonical workspace root.
 `read_source_context` returns at most 200 complete lines and 64 KiB. It uses the
 shared source resolver, so current working-tree contents are returned only when
