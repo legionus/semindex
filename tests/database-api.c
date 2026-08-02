@@ -46,6 +46,16 @@ struct pagination_state {
 	int failed;
 };
 
+struct identity_state {
+	char variant[64];
+	char symbol[256];
+	semindex_db_identity_t identity;
+	semindex_db_record_type_t record;
+	unsigned line;
+	unsigned count;
+	int failed;
+};
+
 static int check_record(void *data, const semindex_db_record_t *record)
 {
 	struct result_state *state = data;
@@ -226,6 +236,79 @@ static int check_pagination(semindex_db_t *db, const char *path)
 	return state.index == state.expected_count ? 0 : -1;
 }
 
+static int collect_identity(void *data, const semindex_db_record_t *record)
+{
+	struct identity_state *state = data;
+
+	if (!record->usr_id || copy_text(state->variant, sizeof(state->variant), record->variant) < 0 ||
+		copy_text(state->symbol, sizeof(state->symbol), record->symbol) < 0)
+		return -1;
+
+	state->identity = (semindex_db_identity_t){
+		.variant = state->variant,
+		.symbol = state->symbol,
+		.usr_id = record->usr_id,
+		.kind = record->kind,
+	};
+	state->count++;
+
+	return 0;
+}
+
+static int check_identity_record(void *data, const semindex_db_record_t *record)
+{
+	struct identity_state *state = data;
+
+	if (strcmp(record->variant, state->identity.variant) || strcmp(record->symbol, state->identity.symbol) ||
+		record->usr_id != state->identity.usr_id || record->kind != state->identity.kind ||
+		record->record != state->record || record->line != state->line) {
+		state->failed = 1;
+
+		return -1;
+	}
+
+	state->count++;
+
+	return 0;
+}
+
+static int check_identity_queries(semindex_db_t *db, const char *path)
+{
+	struct identity_state identity = { 0 };
+	semindex_db_identity_query_t query = {
+		.identity = &identity.identity,
+	};
+	struct identity_state definition;
+	struct identity_state reference;
+
+	if (semindex_db_find_at(db, path, "general", 14, 3, collect_identity, &identity) < 0 || identity.count != 1)
+		return -1;
+
+	definition = (struct identity_state){
+		.identity = identity.identity,
+		.record = SEMINDEX_DB_DEFINITION,
+		.line = 8,
+	};
+	query.record = SEMINDEX_DB_RECORD_DEFINITION;
+
+	if (semindex_db_query_identity(db, &query, check_identity_record, &definition) < 0 || definition.failed ||
+		definition.count != 1)
+		return -1;
+
+	reference = (struct identity_state){
+		.identity = identity.identity,
+		.record = SEMINDEX_DB_REFERENCE,
+		.line = 14,
+	};
+	query.record = SEMINDEX_DB_RECORD_REFERENCE;
+
+	if (semindex_db_query_identity(db, &query, check_identity_record, &reference) < 0 || reference.failed ||
+		reference.count != 1)
+		return -1;
+
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	semindex_db_t *db = NULL;
@@ -289,6 +372,8 @@ int main(int argc, char **argv)
 	if (semindex_db_list_variants(db, check_variant, &variants) < 0 || variants.failed || variants.count != 2)
 		goto unexpected;
 	if (check_pagination(db, argv[3]) < 0)
+		goto unexpected;
+	if (check_identity_queries(db, argv[2]) < 0)
 		goto unexpected;
 	ret = 0;
 	goto out;

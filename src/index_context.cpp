@@ -270,7 +270,7 @@ void rebuildRecords(semindex *s)
 		rec.owner = sym.owner.c_str();
 		rec.type = sym.type.c_str();
 		rec.usr = sym.usr.c_str();
-		rec.usr_id = sym.kind == SEMINDEX_SYMBOL_FUNCTION && !sym.usr.empty() ? llvm::xxHash64(sym.usr) : 0;
+		rec.usr_id = sym.usr.empty() ? 0 : llvm::xxHash64(sym.usr);
 		rec.context = sym.context.c_str();
 		rec.file = sym.loc.file ? sym.loc.file->c_str() : "";
 		rec.file_index = sym.loc.file ? file_index.at(sym.loc.file) : s->files.size();
@@ -298,8 +298,8 @@ void rebuildRecords(semindex *s)
 		rec.usr = use.usr.c_str();
 		rec.context = use.context.c_str();
 		rec.context_usr = use.context_usr.c_str();
-		rec.usr_id = use.usr_id;
-		rec.context_usr_id = use.context_usr_id;
+		rec.usr_id = use.usr.empty() ? 0 : llvm::xxHash64(use.usr);
+		rec.context_usr_id = use.context_usr.empty() ? 0 : llvm::xxHash64(use.context_usr);
 		rec.file = use.loc.file ? use.loc.file->c_str() : "";
 		rec.file_index = use.loc.file ? file_index.at(use.loc.file) : s->files.size();
 		rec.line = use.loc.line;
@@ -317,19 +317,15 @@ void rebuildFingerprints(semindex *s)
 	size_t index = 0;
 
 	for (const auto &rec : s->symbol_records) {
-		bool function = rec.kind == SEMINDEX_SYMBOL_FUNCTION;
-
 		if (rec.file_index < fingerprints.size())
 			updateFingerprints(fingerprints[rec.file_index], rec.local, 0, rec.definition, rec.kind, 0,
-				rec.owner, rec.name, rec.line, rec.column, rec.context, function ? rec.usr_id : 0, 0);
+				rec.owner, rec.name, rec.line, rec.column, rec.context, rec.usr_id, 0);
 	}
 	for (const auto &rec : s->use_records) {
-		bool direct_call = rec.kind == SEMINDEX_USE_CALL && rec.symbol_kind == SEMINDEX_SYMBOL_FUNCTION;
-
 		if (rec.file_index < fingerprints.size())
 			updateFingerprints(fingerprints[rec.file_index], rec.local, 1, rec.kind, rec.symbol_kind,
-				rec.mode, rec.owner, rec.name, rec.line, rec.column, rec.context,
-				direct_call ? rec.usr_id : 0, direct_call ? rec.context_usr_id : 0);
+				rec.mode, rec.owner, rec.name, rec.line, rec.column, rec.context, rec.usr_id,
+				rec.context_usr_id);
 	}
 
 	s->file_fingerprints[0].clear();

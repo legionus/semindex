@@ -89,6 +89,20 @@ typedef struct {
 } semindex_db_function_t;
 
 typedef struct {
+	const char *variant;
+	const char *symbol;
+	unsigned long long usr_id;
+	semindex_symbol_kind_t kind;
+} semindex_db_identity_t;
+
+typedef struct {
+	const semindex_db_identity_t *identity;
+	const semindex_db_cursor_t *after;
+	size_t limit;
+	semindex_db_record_filter_t record;
+} semindex_db_identity_query_t;
+
+typedef struct {
 	const char *name;
 	const char *repository_root;
 	const char *git_commit;
@@ -119,6 +133,9 @@ SEMINDEX_API int semindex_db_query_calls(semindex_db_t *db, const semindex_db_ca
 	semindex_db_record_callback_t callback, void *data);
 
 SEMINDEX_API int semindex_db_query_functions(semindex_db_t *db, const semindex_db_function_t *functions, size_t count,
+	semindex_db_record_callback_t callback, void *data);
+
+SEMINDEX_API int semindex_db_query_identity(semindex_db_t *db, const semindex_db_identity_query_t *query,
 	semindex_db_record_callback_t callback, void *data);
 
 /* Variants are returned in name order. Provenance fields may be NULL. */

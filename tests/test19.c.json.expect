@@ -1,19 +1,19 @@
 {
   "version": 1,
   "symbols": [
-    {"kind":"struct","name":"Container","owner":null,"type":null,"usr":"c:@S@Container","usr_id":null,"context":null,"file":"tests/test19.c","line":2,"column":8,"local":false,"definition":true},
-    {"kind":"field","name":"value","owner":"Container","type":"int","usr":"c:@S@Container@value","usr_id":null,"context":null,"file":"tests/test19.c","line":4,"column":7,"local":false,"definition":true},
+    {"kind":"struct","name":"Container","owner":null,"type":null,"usr":"c:@S@Container","usr_id":"9cd1a86c1edaed5b","context":null,"file":"tests/test19.c","line":2,"column":8,"local":false,"definition":true},
+    {"kind":"field","name":"value","owner":"Container","type":"int","usr":"c:@S@Container@value","usr_id":"b043a6fd1da45022","context":null,"file":"tests/test19.c","line":4,"column":7,"local":false,"definition":true},
     {"kind":"function","name":"read_value","owner":null,"type":"int (struct Container *)","usr":"c:@F@read_value","usr_id":"bce5128ff75a5068","context":null,"file":"tests/test19.c","line":8,"column":5,"local":false,"definition":true},
-    {"kind":"variable","name":"p","owner":null,"type":"struct Container *","usr":"c:test19.c@109@F@read_value@p","usr_id":null,"context":"read_value","file":"tests/test19.c","line":8,"column":34,"local":true,"definition":true},
+    {"kind":"variable","name":"p","owner":null,"type":"struct Container *","usr":"c:test19.c@109@F@read_value@p","usr_id":"b5eeaeb28169b1e7","context":"read_value","file":"tests/test19.c","line":8,"column":34,"local":true,"definition":true},
     {"kind":"function","name":"write_value","owner":null,"type":"void (struct Container *)","usr":"c:@F@write_value","usr_id":"e3e079788fa50a47","context":null,"file":"tests/test19.c","line":13,"column":6,"local":false,"definition":true},
-    {"kind":"variable","name":"p","owner":null,"type":"struct Container *","usr":"c:test19.c@170@F@write_value@p","usr_id":null,"context":"write_value","file":"tests/test19.c","line":13,"column":36,"local":true,"definition":true}
+    {"kind":"variable","name":"p","owner":null,"type":"struct Container *","usr":"c:test19.c@170@F@write_value@p","usr_id":"d8e32c5237990fba","context":"write_value","file":"tests/test19.c","line":13,"column":36,"local":true,"definition":true}
   ],
   "uses": [
-    {"kind":"read","symbol_kind":"struct","mode":"-r-","mode_bits":4,"name":"Container","owner":null,"type":null,"usr":"c:@S@Container","usr_id":null,"context":"read_value","context_usr":null,"context_usr_id":null,"file":"tests/test19.c","line":8,"column":23,"local":true},
-    {"kind":"read","symbol_kind":"field","mode":"-r-","mode_bits":4,"name":"value","owner":"Container","type":"int","usr":"c:@S@Container@value","usr_id":null,"context":"read_value","context_usr":null,"context_usr_id":null,"file":"tests/test19.c","line":10,"column":12,"local":false},
-    {"kind":"read","symbol_kind":"variable","mode":"--r","mode_bits":16,"name":"p","owner":null,"type":"struct Container *","usr":"c:test19.c@109@F@read_value@p","usr_id":null,"context":"read_value","context_usr":null,"context_usr_id":null,"file":"tests/test19.c","line":10,"column":9,"local":true},
-    {"kind":"read","symbol_kind":"struct","mode":"-r-","mode_bits":4,"name":"Container","owner":null,"type":null,"usr":"c:@S@Container","usr_id":null,"context":"write_value","context_usr":null,"context_usr_id":null,"file":"tests/test19.c","line":13,"column":25,"local":true},
-    {"kind":"write","symbol_kind":"field","mode":"-w-","mode_bits":8,"name":"value","owner":"Container","type":"int","usr":"c:@S@Container@value","usr_id":null,"context":"write_value","context_usr":null,"context_usr_id":null,"file":"tests/test19.c","line":15,"column":5,"local":false},
-    {"kind":"read","symbol_kind":"variable","mode":"--r","mode_bits":16,"name":"p","owner":null,"type":"struct Container *","usr":"c:test19.c@170@F@write_value@p","usr_id":null,"context":"write_value","context_usr":null,"context_usr_id":null,"file":"tests/test19.c","line":15,"column":2,"local":true}
+    {"kind":"read","symbol_kind":"struct","mode":"-r-","mode_bits":4,"name":"Container","owner":null,"type":null,"usr":"c:@S@Container","usr_id":"9cd1a86c1edaed5b","context":"read_value","context_usr":null,"context_usr_id":null,"file":"tests/test19.c","line":8,"column":23,"local":true},
+    {"kind":"read","symbol_kind":"field","mode":"-r-","mode_bits":4,"name":"value","owner":"Container","type":"int","usr":"c:@S@Container@value","usr_id":"b043a6fd1da45022","context":"read_value","context_usr":null,"context_usr_id":null,"file":"tests/test19.c","line":10,"column":12,"local":false},
+    {"kind":"read","symbol_kind":"variable","mode":"--r","mode_bits":16,"name":"p","owner":null,"type":"struct Container *","usr":"c:test19.c@109@F@read_value@p","usr_id":"b5eeaeb28169b1e7","context":"read_value","context_usr":null,"context_usr_id":null,"file":"tests/test19.c","line":10,"column":9,"local":true},
+    {"kind":"read","symbol_kind":"struct","mode":"-r-","mode_bits":4,"name":"Container","owner":null,"type":null,"usr":"c:@S@Container","usr_id":"9cd1a86c1edaed5b","context":"write_value","context_usr":null,"context_usr_id":null,"file":"tests/test19.c","line":13,"column":25,"local":true},
+    {"kind":"write","symbol_kind":"field","mode":"-w-","mode_bits":8,"name":"value","owner":"Container","type":"int","usr":"c:@S@Container@value","usr_id":"b043a6fd1da45022","context":"write_value","context_usr":null,"context_usr_id":null,"file":"tests/test19.c","line":15,"column":5,"local":false},
+    {"kind":"read","symbol_kind":"variable","mode":"--r","mode_bits":16,"name":"p","owner":null,"type":"struct Container *","usr":"c:test19.c@170@F@write_value@p","usr_id":"d8e32c5237990fba","context":"write_value","context_usr":null,"context_usr_id":null,"file":"tests/test19.c","line":15,"column":2,"local":true}
   ]
 }

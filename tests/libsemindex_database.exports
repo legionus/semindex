@@ -5,3 +5,4 @@ semindex_db_open
 semindex_db_query
 semindex_db_query_calls
 semindex_db_query_functions
+semindex_db_query_identity

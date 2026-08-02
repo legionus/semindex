@@ -71,6 +71,26 @@ if printf '%s\n' "$cursor_plan" | grep -q 'SCAN records'; then
 	fail "paginated exact lookup scans all records"
 fi
 
+field_id=$(sqlite3 "$db" "SELECT printf('%016x', usr_id) FROM records
+WHERE symbol = 'Outer.y' AND record = 0 LIMIT 1")
+if [ -z "$field_id" ]; then
+	fail "field record does not have a stable identity"
+fi
+
+identity_plan=$(sqlite3 "$db" "EXPLAIN QUERY PLAN
+SELECT files.path FROM records JOIN files ON files.id = records.file_id
+WHERE records.symbol = 'Outer.y' AND records.usr_id = 0x$field_id
+AND records.kind = 1 AND files.variant = 'general'")
+if ! printf '%s\n' "$identity_plan" |
+	grep -q 'SEARCH records USING PRIMARY KEY (symbol=?)'; then
+	printf '%s\n' "$identity_plan" >&2
+	fail "identity lookup does not use the records primary key"
+fi
+if printf '%s\n' "$identity_plan" | grep -q 'SCAN records'; then
+	printf '%s\n' "$identity_plan" >&2
+	fail "identity lookup scans all records"
+fi
+
 variant_plan=$(sqlite3 "$db" "EXPLAIN QUERY PLAN
 SELECT name, repository_root, git_commit FROM variants ORDER BY name")
 if ! printf '%s\n' "$variant_plan" | grep -q 'SCAN variants'; then

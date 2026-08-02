@@ -15,12 +15,12 @@ The `records` table stores declarations, definitions, and uses together. Its
 `WITHOUT ROWID` primary key starts with the qualified symbol name, so an exact
 query such as `task_struct.pid` is an indexed lookup rather than a scan.
 
-Names and contexts are stored directly in each record. Types and general symbol
-USRs remain available only from the in-memory index and output formats.
-Function symbols and direct call records store compact IDs derived from their
-Clang USRs, so static functions can be distinguished without repeating identity
-strings at every call site. IDs are computed before SQLite staging; adding a
-record does not perform an identity lookup. A secondary file index supports file
+Names and contexts are stored directly in each record. Types and full USRs
+remain available only from the in-memory index and output formats. Every record
+with a Clang USR stores a compact ID derived from it, so symbols can be
+disambiguated without repeating identity strings at every location. IDs are
+computed before SQLite staging; adding a record does not perform an identity
+lookup. A secondary file index supports file
 replacement and narrows source-position lookup to one indexed file.
 
 ## Reader API
@@ -45,6 +45,10 @@ limit preserves the unbounded streaming behavior used by existing callers.
 Position queries use one-based source byte coordinates and may select one
 variant or return matches from all variants. The LSP layer is responsible for
 converting its UTF-16 document positions before calling this API.
+Records returned by a position query include `(variant, symbol, kind, usr_id)`
+as a stable identity. `semindex_db_query_identity()` accepts that identity and
+streams matching declarations, definitions, or references with the same
+limits and cursors as a normal record query.
 
 A partial `(context, context_usr_id)` index contains only direct function-call
 records and supports caller-to-callee queries. Callee-to-caller queries use the
@@ -134,8 +138,8 @@ rebuilding the index. This is an intentional tradeoff for a reproducible cache.
 
 ## Compatibility
 
-The database is an experimental interface. Schema version 12 lists variants
-even when Git provenance is disabled and does not migrate older databases. Dropping old
+The database is an experimental interface. Schema version 13 stores compact
+identities for all symbols with USRs and does not migrate older databases. Dropping old
 tables in place would also leave their original multi-gigabyte file allocation.
 Remove an old database before indexing:
 

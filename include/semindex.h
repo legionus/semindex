@@ -92,7 +92,7 @@ typedef struct {
 	const char *owner;	   /* containing record for fields */
 	const char *type;	   /* textual type */
 	const char *usr;	   /* stable unique id */
-	unsigned long long usr_id; /* hashed function USR */
+	unsigned long long usr_id; /* hashed USR */
 	const char *context;	   /* containing function for local symbols */
 	const char *file;
 	size_t file_index;
@@ -114,8 +114,8 @@ typedef struct {
 	const char *usr;		   /* target symbol */
 	const char *context;		   /* containing function */
 	const char *context_usr;	   /* containing function USR for call records */
-	unsigned long long usr_id;	   /* hashed target USR for direct calls */
-	unsigned long long context_usr_id; /* hashed containing function USR */
+	unsigned long long usr_id;	   /* hashed target USR */
+	unsigned long long context_usr_id; /* hashed context USR */
 	const char *file;
 	size_t file_index;
 	unsigned line;

@@ -75,17 +75,14 @@ if [ "$(wc -l <"$tmpdir/variant.out")" != 4 ] || grep -qv "debug:$source_a_path:
 	fail "variant filter returned unexpected results"
 fi
 
-if [ "$(sqlite3 "$db" 'SELECT count(*) FROM records WHERE record = 0 AND kind = 7 AND usr_id IS NULL')" != 0 ]; then
-	fail "function symbol record lacks a stable identity"
-fi
-if [ "$(sqlite3 "$db" 'SELECT count(*) FROM records WHERE record = 0 AND (kind != 7 AND usr_id IS NOT NULL OR context_usr_id IS NOT NULL)')" != 0 ]; then
-	fail "function IDs were stored for unrelated symbol records"
+if [ "$(sqlite3 "$db" 'SELECT count(*) FROM records WHERE record = 0 AND context_usr_id IS NOT NULL')" != 0 ]; then
+	fail "context identities were stored for symbol records"
 fi
 if [ "$(sqlite3 "$db" 'SELECT count(*) FROM records WHERE action = 3 AND kind = 7 AND (usr_id IS NULL OR context_usr_id IS NULL)')" != 0 ]; then
 	fail "direct call record lacks a stable function identity"
 fi
-if [ "$(sqlite3 "$db" 'SELECT count(*) FROM records WHERE action = 3 AND kind != 7 AND (usr_id IS NOT NULL OR context_usr_id IS NOT NULL)')" != 0 ]; then
-	fail "function IDs were stored for an indirect call"
+if [ "$(sqlite3 "$db" 'SELECT count(*) FROM records WHERE action = 3 AND kind != 7 AND context_usr_id IS NOT NULL')" != 0 ]; then
+	fail "a context identity was stored for an indirect call"
 fi
 
 plan=$(sqlite3 "$db" "EXPLAIN QUERY PLAN SELECT symbol FROM records WHERE record = 1 AND action = 3 AND kind = 7 AND context = 'caller'")

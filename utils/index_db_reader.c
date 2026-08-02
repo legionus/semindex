@@ -332,6 +332,36 @@ out:
 	return ret;
 }
 
+int semindex_db_query_identity(semindex_db_t *db, const semindex_db_identity_query_t *query,
+	semindex_db_record_callback_t callback, void *data)
+{
+	semindex_db_query_options_t options;
+
+	if (!db || !query || !query->identity || !callback)
+		return -1;
+
+	if (!query->identity->variant || !query->identity->variant[0] || !query->identity->symbol ||
+		!query->identity->symbol[0] || !query->identity->usr_id)
+		return -1;
+
+	if (query->identity->kind < SEMINDEX_SYMBOL_VAR || query->identity->kind > SEMINDEX_SYMBOL_FILE)
+		return -1;
+
+	options = (semindex_db_query_options_t){
+		.symbol = query->identity->symbol,
+		.variant = query->identity->variant,
+		.after = query->after,
+		.limit = query->limit,
+		.record = query->record,
+		.usr_id = query->identity->usr_id,
+		.kind = query->identity->kind,
+		.has_usr_id = 1,
+		.has_kind = 1,
+	};
+
+	return semindex_db_query(db, &options, callback, data);
+}
+
 int semindex_db_query_calls(semindex_db_t *db, const semindex_db_call_options_t *opts,
 	semindex_db_record_callback_t callback, void *data)
 {

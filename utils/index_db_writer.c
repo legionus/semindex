@@ -13,7 +13,7 @@
 #include "semindex_database.h"
 #include "sqlite.h"
 
-#define INDEX_SCHEMA_VERSION 12
+#define INDEX_SCHEMA_VERSION 13
 #define STRINGIFY_VALUE(value) #value
 #define STRINGIFY(value) STRINGIFY_VALUE(value)
 
@@ -441,7 +441,6 @@ static int stage_records(sqlite3 *db, semindex_t *s, const struct stored_paths *
 	for (i = 0; i < semindex_symbol_count(s); i++) {
 		const semindex_symbol_t *sym = semindex_get_symbol(s, i);
 		struct staging_record record;
-		int function;
 
 		if (!sym)
 			goto out;
@@ -453,8 +452,6 @@ static int stage_records(sqlite3 *db, semindex_t *s, const struct stored_paths *
 
 		if (sym->file_index < cached_count && cached[sym->file_index])
 			continue;
-
-		function = sym->kind == SEMINDEX_SYMBOL_FUNCTION;
 
 		record = (struct staging_record) {
 			.type = STORED_RECORD_SYMBOL,
@@ -468,7 +465,7 @@ static int stage_records(sqlite3 *db, semindex_t *s, const struct stored_paths *
 			.context = sym->context,
 			.usr_id = {
 				.value = sym->usr_id,
-				.present = function && sym->usr && sym->usr[0],
+				.present = sym->usr && sym->usr[0],
 			},
 			.local = sym->local,
 		};
@@ -480,7 +477,6 @@ static int stage_records(sqlite3 *db, semindex_t *s, const struct stored_paths *
 	for (i = 0; i < semindex_use_count(s); i++) {
 		const semindex_use_t *use = semindex_get_use(s, i);
 		struct staging_record record;
-		int direct_call;
 
 		if (!use)
 			goto out;
@@ -492,8 +488,6 @@ static int stage_records(sqlite3 *db, semindex_t *s, const struct stored_paths *
 
 		if (use->file_index < cached_count && cached[use->file_index])
 			continue;
-
-		direct_call = use->kind == SEMINDEX_USE_CALL && use->symbol_kind == SEMINDEX_SYMBOL_FUNCTION;
 
 		record = (struct staging_record) {
 			.type = STORED_RECORD_USE,
@@ -508,11 +502,11 @@ static int stage_records(sqlite3 *db, semindex_t *s, const struct stored_paths *
 			.context = use->context,
 			.usr_id = {
 				.value = use->usr_id,
-				.present = direct_call && use->usr && use->usr[0],
+				.present = use->usr && use->usr[0],
 			},
 			.context_usr_id = {
 				.value = use->context_usr_id,
-				.present = direct_call && use->context_usr && use->context_usr[0],
+				.present = use->context_usr && use->context_usr[0],
 			},
 			.local = use->local,
 		};
