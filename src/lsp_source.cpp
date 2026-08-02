@@ -4,8 +4,6 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
-#include <fstream>
-#include <utility>
 
 static int hexDigit(char value)
 {
@@ -78,39 +76,6 @@ static std::string uriFromPath(const std::filesystem::path &path)
 		uri.push_back(hex[value & 0xf]);
 	}
 	return uri;
-}
-
-static bool readLine(const std::filesystem::path &path, unsigned line_number, std::string &line)
-{
-	std::ifstream input(path, std::ios::binary);
-
-	if (!input)
-		return false;
-
-	for (unsigned current = 0; current <= line_number; current++) {
-		if (!std::getline(input, line))
-			return false;
-	}
-	if (!line.empty() && line.back() == '\r')
-		line.pop_back();
-	return true;
-}
-
-static void readLines(const std::filesystem::path &path, std::vector<std::string> &lines)
-{
-	std::ifstream input(path, std::ios::binary);
-	std::string line;
-
-	lines.clear();
-
-	if (!input)
-		return;
-
-	while (std::getline(input, line)) {
-		if (!line.empty() && line.back() == '\r')
-			line.pop_back();
-		lines.push_back(std::move(line));
-	}
 }
 
 static bool nextCodePoint(llvm::StringRef text, size_t &offset, uint32_t &codepoint)
@@ -188,9 +153,7 @@ static unsigned utf16Length(llvm::StringRef text)
 	return units;
 }
 
-LspSourceMapper::LspSourceMapper() : root(std::filesystem::current_path())
-{
-}
+LspSourceMapper::LspSourceMapper() = default;
 
 bool LspSourceMapper::setRootUri(llvm::StringRef uri)
 {
@@ -199,8 +162,7 @@ bool LspSourceMapper::setRootUri(llvm::StringRef uri)
 	if (!path || !path->is_absolute())
 		return false;
 
-	root = std::move(*path);
-	return true;
+	return resolver.setWorkspaceRoot(*path);
 }
 
 std::optional<std::string> LspSourceMapper::filePath(llvm::StringRef uri) const
@@ -221,16 +183,7 @@ std::vector<std::string> LspSourceMapper::databasePaths(llvm::StringRef uri) con
 	if (!path || !path->is_absolute())
 		return result;
 
-	result.push_back(path->string());
-	std::filesystem::path relative = path->lexically_relative(root);
-
-	if (!relative.empty() && *relative.begin() != "..")
-		result.push_back(relative.string());
-	std::filesystem::path cwd_relative = path->lexically_relative(std::filesystem::current_path());
-
-	if (!cwd_relative.empty() && *cwd_relative.begin() != ".." && (cwd_relative != relative || result.size() == 1))
-		result.push_back(cwd_relative.string());
-	return result;
+	return resolver.databasePaths(*path);
 }
 
 std::optional<unsigned> LspSourceMapper::byteColumn(llvm::StringRef uri, unsigned line, unsigned character) const
@@ -238,7 +191,7 @@ std::optional<unsigned> LspSourceMapper::byteColumn(llvm::StringRef uri, unsigne
 	auto path = pathFromUri(uri);
 	std::string text;
 
-	if (!path || !readLine(*path, line, text))
+	if (!path || !resolver.readLine(*path, line, text))
 		return std::nullopt;
 
 	auto offset = byteOffset(text, character);
@@ -249,28 +202,19 @@ std::optional<unsigned> LspSourceMapper::byteColumn(llvm::StringRef uri, unsigne
 	return *offset + 1;
 }
 
-std::filesystem::path LspSourceMapper::resolve(const char *path) const
-{
-	std::filesystem::path result(path ? path : "");
-
-	if (result.is_relative())
-		result = root / result;
-	return result.lexically_normal();
-}
-
 std::string LspSourceMapper::uri(const char *path) const
 {
-	return uriFromPath(resolve(path));
+	return uriFromPath(resolver.resolve(path ? path : ""));
 }
 
 std::string LspSourceMapper::displayPath(const char *path) const
 {
-	return resolve(path).string();
+	return resolver.resolve(path ? path : "").string();
 }
 
 llvm::json::Value LspSourceMapper::range(const semindex_db_record_t &record, Cache &cache) const
 {
-	std::filesystem::path path = resolve(record.path);
+	std::filesystem::path path = resolver.resolve(record.path ? record.path : "");
 	unsigned start = record.column ? record.column - 1 : 0;
 	unsigned end;
 	unsigned line_number = record.line ? record.line - 1 : 0;
@@ -282,7 +226,7 @@ llvm::json::Value LspSourceMapper::range(const semindex_db_record_t &record, Cac
 
 	if (cache.path != path_string) {
 		cache.path = path_string;
-		readLines(path, cache.lines);
+		resolver.readLines(path, cache.lines);
 	}
 	if (record.line && record.line <= cache.lines.size()) {
 		const std::string &line = cache.lines[record.line - 1];

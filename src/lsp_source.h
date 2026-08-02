@@ -2,6 +2,7 @@
 #pragma once
 
 #include "semindex_database.h"
+#include "source_resolver.h"
 
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Support/JSON.h>
@@ -31,7 +32,5 @@ public:
 	llvm::json::Value location(const semindex_db_record_t &record, Cache &cache) const;
 
 private:
-	std::filesystem::path resolve(const char *path) const;
-
-	std::filesystem::path root;
+	SemindexSourceResolver resolver;
 };

@@ -36,6 +36,8 @@ set(SEMINDEX_FORMAT_SOURCES
 	src/index_pp.h
 	src/semindex.cpp
 	src/semindex_internal.h
+	src/source_resolver.cpp
+	src/source_resolver.h
 	tests/include/test14.h
 	tests/scope/api.h
 	tests/scope/use.c
@@ -44,6 +46,7 @@ set(SEMINDEX_FORMAT_SOURCES
 	tests/callgraph-b.c
 	tests/database-api.c
 	tests/partial-index.cpp
+	tests/source-resolver.cpp
 	tests/partial/broken-delimiter.c
 	tests/partial/clean.c
 	tests/partial/local-syntax.c
@@ -179,6 +182,14 @@ target_include_directories(semindex_database PUBLIC
 )
 target_link_libraries(semindex_database PRIVATE semindex_sqlite)
 
+# Source path resolution and working-tree access
+add_library(semindex_source STATIC
+	src/source_resolver.cpp
+)
+target_include_directories(semindex_source PUBLIC
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+)
+
 # SQLite query adapters
 add_library(semindex_query STATIC
 	utils/command_db.c
@@ -297,6 +308,7 @@ target_include_directories(semindex_lsp PRIVATE
 target_compile_definitions(semindex_lsp PRIVATE ${LLVM_DEFINITIONS})
 target_link_libraries(semindex_lsp PRIVATE
 	semindex_pipeline
+	semindex_source
 	LLVM
 )
 set_target_properties(semindex_lsp PROPERTIES
@@ -393,6 +405,11 @@ if(BUILD_TESTING)
 		tests/partial-index.cpp
 	)
 	target_link_libraries(semindex_partial_index_test PRIVATE semindex_parser)
+
+	add_executable(semindex_source_resolver_test
+		tests/source-resolver.cpp
+	)
+	target_link_libraries(semindex_source_resolver_test PRIVATE semindex_source)
 
 	foreach(test_source IN ITEMS
 		tests/test.c
@@ -535,6 +552,13 @@ if(BUILD_TESTING)
 			$<TARGET_FILE:semindex_partial_index_test>
 			${CMAKE_C_COMPILER}
 			${CMAKE_CURRENT_SOURCE_DIR}/tests/partial
+	)
+	add_test(
+		NAME semindex-source-resolver
+		COMMAND
+			$<TARGET_FILE:semindex_source_resolver_test>
+			${CMAKE_CURRENT_SOURCE_DIR}
+			${CMAKE_CURRENT_SOURCE_DIR}/tests/test.c
 	)
 	add_test(
 		NAME semindex-partial-cli
