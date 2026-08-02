@@ -21,14 +21,6 @@ static constexpr int DOCUMENT_HIGHLIGHT_TEXT = 1;
 static constexpr int DOCUMENT_HIGHLIGHT_READ = 2;
 static constexpr int DOCUMENT_HIGHLIGHT_WRITE = 3;
 
-struct CursorRecord {
-	std::string variant;
-	std::string path;
-	std::string symbol;
-	std::string context;
-	int local;
-};
-
 struct LocationCollector {
 	const LspSourceMapper &sources;
 	llvm::json::Array locations;
@@ -36,11 +28,6 @@ struct LocationCollector {
 	LspSourceMapper::Cache source_cache;
 	std::string excluded_uri;
 	unsigned records = 0;
-};
-
-struct CursorCollector {
-	std::vector<CursorRecord> records;
-	std::set<std::string> keys;
 };
 
 struct HighlightRecord {
@@ -55,24 +42,6 @@ struct HighlightCollector {
 	LspSourceMapper::Cache source_cache;
 	std::string excluded_uri;
 };
-
-static int collectCursorRecord(void *data, const semindex_db_record_t *record)
-{
-	auto &collector = *static_cast<CursorCollector *>(data);
-	CursorRecord copy;
-
-	copy.variant = record->variant;
-	copy.path = record->path;
-	copy.symbol = record->symbol;
-	copy.context = record->context;
-	copy.local = record->local;
-	std::string key = copy.variant + '\n' + copy.path + '\n' + copy.symbol + '\n' + copy.context + '\n' +
-		std::to_string(copy.local);
-
-	if (collector.keys.insert(std::move(key)).second)
-		collector.records.push_back(std::move(copy));
-	return 0;
-}
 
 static int collectLocation(void *data, const semindex_db_record_t *record)
 {
@@ -182,11 +151,11 @@ static void setWorkspaceRoot(LspSourceMapper &sources, const llvm::json::Object 
 
 LspServer::LspServer(LspTransport &transport, semindex_db_t *database, LspIndexer &indexer, std::string variant)
     : transport(transport), database(database), indexer(indexer), variant(std::move(variant)),
-      call_hierarchy(database, sources, this->variant)
+      queries(database, sources.sourceResolver()), call_hierarchy(database, queries, sources, this->variant)
 {
 }
 
-static int querySymbol(semindex_db_t *database, const LspOverlay &overlay, const CursorRecord &cursor,
+static int querySymbol(semindex_db_t *database, const LspOverlay &overlay, const SemindexQueryRecord &cursor,
 	semindex_db_record_filter_t filter, LocationCollector &collector)
 {
 	semindex_db_query_options_t options = {};
@@ -226,35 +195,25 @@ static int querySymbol(semindex_db_t *database, const LspOverlay &overlay, const
 	return 0;
 }
 
-static int symbolsAt(semindex_db_t *database, const LspOverlay &overlay, const std::string &variant,
+static int symbolsAt(const SemindexQueryService &queries, const LspOverlay &overlay, const std::string &variant,
 	const LspSourceMapper &sources, llvm::StringRef uri, unsigned line, unsigned character,
-	std::vector<CursorRecord> &records)
+	std::vector<SemindexQueryRecord> &records)
 {
 	auto column = sources.byteColumn(uri, line, character);
+	auto path = sources.filePath(uri);
 
-	if (!column)
+	if (!column || !path)
 		return 0;
 
-	CursorCollector collector;
+	SemindexPositionQuery query = {
+		.path = std::move(*path),
+		.variant = variant,
+		.line = line + 1,
+		.column = *column,
+		.overlay = &overlay,
+	};
 
-	for (const auto &path : sources.databasePaths(uri)) {
-		if (overlay.contains(path)) {
-			if (overlay.findAt(path, variant.empty() ? nullptr : variant.c_str(), line + 1, *column,
-				    collectCursorRecord, &collector) < 0)
-				return -1;
-
-			if (!collector.records.empty())
-				break;
-		}
-		if (semindex_db_find_at(database, path.c_str(), variant.empty() ? nullptr : variant.c_str(), line + 1,
-			    *column, collectCursorRecord, &collector) < 0)
-			return -1;
-
-		if (!collector.records.empty())
-			break;
-	}
-	records = std::move(collector.records);
-	return 0;
+	return queries.recordsAt(query, records);
 }
 
 bool LspServer::definition(const llvm::json::Value &id, const llvm::json::Object *params)
@@ -266,10 +225,10 @@ bool LspServer::definition(const llvm::json::Value &id, const llvm::json::Object
 	if (!parsePosition(params, uri, line, character))
 		return error(&id, INVALID_PARAMS, "Invalid params");
 
-	std::vector<CursorRecord> cursors;
+	std::vector<SemindexQueryRecord> cursors;
 	const LspOverlay &overlay = indexer.overlay();
 
-	if (symbolsAt(database, overlay, variant, sources, uri, line, character, cursors) < 0)
+	if (symbolsAt(queries, overlay, variant, sources, uri, line, character, cursors) < 0)
 		return error(&id, INTERNAL_ERROR, "Database query failed");
 
 	if (cursors.empty())
@@ -302,10 +261,10 @@ bool LspServer::references(const llvm::json::Value &id, const llvm::json::Object
 	if (!parsePosition(params, uri, line, character))
 		return error(&id, INVALID_PARAMS, "Invalid params");
 
-	std::vector<CursorRecord> cursors;
+	std::vector<SemindexQueryRecord> cursors;
 	const LspOverlay &overlay = indexer.overlay();
 
-	if (symbolsAt(database, overlay, variant, sources, uri, line, character, cursors) < 0)
+	if (symbolsAt(queries, overlay, variant, sources, uri, line, character, cursors) < 0)
 		return error(&id, INTERNAL_ERROR, "Database query failed");
 
 	LocationCollector collector{ sources };
@@ -339,10 +298,10 @@ bool LspServer::documentHighlight(const llvm::json::Value &id, const llvm::json:
 	if (!parsePosition(params, uri, line, character))
 		return error(&id, INVALID_PARAMS, "Invalid params");
 
-	std::vector<CursorRecord> cursors;
+	std::vector<SemindexQueryRecord> cursors;
 	const LspOverlay &overlay = indexer.overlay();
 
-	if (symbolsAt(database, overlay, variant, sources, uri, line, character, cursors) < 0)
+	if (symbolsAt(queries, overlay, variant, sources, uri, line, character, cursors) < 0)
 		return error(&id, INTERNAL_ERROR, "Database query failed");
 
 	HighlightCollector collector{ sources };

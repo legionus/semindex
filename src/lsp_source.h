@@ -30,6 +30,7 @@ public:
 	std::string uri(const char *path) const;
 	llvm::json::Value range(const semindex_db_record_t &record, Cache &cache) const;
 	llvm::json::Value location(const semindex_db_record_t &record, Cache &cache) const;
+	const SemindexSourceResolver &sourceResolver() const;
 
 private:
 	SemindexSourceResolver resolver;

@@ -26,59 +26,7 @@ struct FunctionIdentity {
 	}
 };
 
-struct CallRecord {
-	std::string variant;
-	std::string path;
-	std::string symbol;
-	std::string context;
-	semindex_db_record_type_t record;
-	semindex_symbol_kind_t kind;
-	unsigned action;
-	unsigned mode;
-	unsigned line;
-	unsigned column;
-	unsigned long long usr_id;
-	unsigned long long context_usr_id;
-	int local;
-
-	semindex_db_record_t view() const
-	{
-		return semindex_db_record_t{
-			.variant = variant.c_str(),
-			.path = path.c_str(),
-			.symbol = symbol.c_str(),
-			.context = context.c_str(),
-			.record = record,
-			.kind = kind,
-			.action = action,
-			.mode = mode,
-			.line = line,
-			.column = column,
-			.usr_id = usr_id,
-			.context_usr_id = context_usr_id,
-			.local = local,
-		};
-	}
-};
-
-static CallRecord copyRecord(const semindex_db_record_t &record)
-{
-	return CallRecord{
-		.variant = record.variant,
-		.path = record.path,
-		.symbol = record.symbol,
-		.context = record.context,
-		.record = record.record,
-		.kind = record.kind,
-		.action = record.action,
-		.mode = record.mode,
-		.line = record.line,
-		.column = record.column,
-		.usr_id = record.usr_id,
-		.context_usr_id = record.context_usr_id,
-		.local = record.local,
-	};
-}
+using CallRecord = SemindexQueryRecord;
 
 static bool parsePosition(const llvm::json::Object *params, llvm::StringRef &uri, unsigned &line, unsigned &character)
 {
@@ -160,7 +108,7 @@ static int collectFunctionRecord(void *data, const semindex_db_record_t *record)
 	auto found = collector.records.find(identity);
 
 	if (found == collector.records.end() || (!found->second.action && record->action))
-		collector.records[std::move(identity)] = copyRecord(*record);
+		collector.records[std::move(identity)] = semindexQueryRecord(*record);
 	return 0;
 }
 
@@ -225,12 +173,13 @@ static int collectCall(void *data, const semindex_db_record_t *record)
 	if (identity.symbol.empty() || !identity.usr_id)
 		return 0;
 
-	collector.groups[std::move(identity)].push_back(copyRecord(*record));
+	collector.groups[std::move(identity)].push_back(semindexQueryRecord(*record));
 	return 0;
 }
 
-LspCallHierarchy::LspCallHierarchy(semindex_db_t *database, const LspSourceMapper &sources, std::string variant)
-    : database(database), sources(sources), variant(std::move(variant))
+LspCallHierarchy::LspCallHierarchy(semindex_db_t *database, const SemindexQueryService &queries,
+	const LspSourceMapper &sources, std::string variant)
+    : database(database), queries(queries), sources(sources), variant(std::move(variant))
 {
 }
 
@@ -244,21 +193,29 @@ LspCallHierarchy::Status LspCallHierarchy::prepare(const llvm::json::Object *par
 		return Status::InvalidParams;
 
 	auto column = sources.byteColumn(uri, line, character);
+	auto path = sources.filePath(uri);
 
-	if (!column) {
+	if (!column || !path) {
 		result = nullptr;
 		return Status::Success;
 	}
 
+	SemindexPositionQuery query = {
+		.path = std::move(*path),
+		.variant = variant,
+		.line = line + 1,
+		.column = *column,
+	};
+	std::vector<SemindexQueryRecord> records;
 	FunctionCollector collector;
 
-	for (const auto &path : sources.databasePaths(uri)) {
-		if (semindex_db_find_at(database, path.c_str(), variant.empty() ? nullptr : variant.c_str(), line + 1,
-			    *column, collectFunctionIdentity, &collector) < 0)
-			return Status::DatabaseError;
+	if (queries.recordsAt(query, records) < 0)
+		return Status::DatabaseError;
 
-		if (!collector.identities.empty())
-			break;
+	for (const auto &record : records) {
+		semindex_db_record_t view = record.view();
+
+		collectFunctionIdentity(&collector, &view);
 	}
 	if (collector.identities.empty()) {
 		result = nullptr;

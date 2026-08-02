@@ -32,6 +32,8 @@ set(SEMINDEX_FORMAT_SOURCES
 	src/lsp_server.h
 	src/lsp_transport.cpp
 	src/lsp_transport.h
+	src/semantic_query.cpp
+	src/semantic_query.h
 	src/index_pp.cpp
 	src/index_pp.h
 	src/semindex.cpp
@@ -46,6 +48,7 @@ set(SEMINDEX_FORMAT_SOURCES
 	tests/callgraph-b.c
 	tests/database-api.c
 	tests/partial-index.cpp
+	tests/semantic-query.cpp
 	tests/source-resolver.cpp
 	tests/partial/broken-delimiter.c
 	tests/partial/clean.c
@@ -216,6 +219,16 @@ target_include_directories(semindex_source PUBLIC
 )
 target_link_libraries(semindex_source PUBLIC semindex_database semindex_git)
 
+# Protocol-neutral semantic queries
+add_library(semindex_semantic STATIC
+	src/semantic_query.cpp
+)
+target_include_directories(semindex_semantic PUBLIC
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+)
+target_link_libraries(semindex_semantic PUBLIC semindex_database semindex_source)
+
 # SQLite query adapters
 add_library(semindex_query STATIC
 	utils/command_db.c
@@ -317,7 +330,7 @@ target_include_directories(semindex_lsp PRIVATE
 target_compile_definitions(semindex_lsp PRIVATE ${LLVM_DEFINITIONS})
 target_link_libraries(semindex_lsp PRIVATE
 	semindex_pipeline
-	semindex_source
+	semindex_semantic
 	LLVM
 )
 set_target_properties(semindex_lsp PROPERTIES
@@ -419,6 +432,11 @@ if(BUILD_TESTING)
 		tests/source-resolver.cpp
 	)
 	target_link_libraries(semindex_source_resolver_test PRIVATE semindex_source)
+
+	add_executable(semindex_semantic_query_test
+		tests/semantic-query.cpp
+	)
+	target_link_libraries(semindex_semantic_query_test PRIVATE semindex_semantic)
 
 	foreach(test_source IN ITEMS
 		tests/test.c
@@ -570,6 +588,16 @@ if(BUILD_TESTING)
 			SOURCE_RESOLVER_TEST=$<TARGET_FILE:semindex_source_resolver_test>
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-source-resolver-tests.sh
+	)
+	add_test(
+		NAME semindex-semantic-query
+		COMMAND
+			${CMAKE_COMMAND} -E env
+			SEMINDEX=$<TARGET_FILE:semindex_dispatcher>
+			SEMINDEX_COMPILER=$<TARGET_FILE:semindex_compiler>
+			SEMANTIC_QUERY_TEST=$<TARGET_FILE:semindex_semantic_query_test>
+			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-semantic-query-tests.sh
 	)
 	if(TARGET PkgConfig::LibGit2)
 		set_tests_properties(semindex-source-resolver PROPERTIES

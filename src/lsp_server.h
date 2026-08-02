@@ -5,6 +5,7 @@
 #include "lsp_indexer.h"
 #include "lsp_source.h"
 #include "lsp_transport.h"
+#include "semantic_query.h"
 #include "semindex_database.h"
 
 #include <llvm/Support/JSON.h>
@@ -39,6 +40,7 @@ private:
 	LspIndexer &indexer;
 	std::string variant;
 	LspSourceMapper sources;
+	SemindexQueryService queries;
 	LspCallHierarchy call_hierarchy;
 	State state = State::Uninitialized;
 	bool exiting = false;

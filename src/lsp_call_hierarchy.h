@@ -2,6 +2,7 @@
 #pragma once
 
 #include "lsp_source.h"
+#include "semantic_query.h"
 #include "semindex_database.h"
 
 #include <llvm/Support/JSON.h>
@@ -17,7 +18,8 @@ public:
 		DatabaseError,
 	};
 
-	LspCallHierarchy(semindex_db_t *database, const LspSourceMapper &sources, std::string variant);
+	LspCallHierarchy(semindex_db_t *database, const SemindexQueryService &queries, const LspSourceMapper &sources,
+		std::string variant);
 
 	Status prepare(const llvm::json::Object *params, llvm::json::Value &result) const;
 	Status incoming(const llvm::json::Object *params, llvm::json::Value &result) const;
@@ -28,6 +30,7 @@ private:
 		llvm::json::Value &result) const;
 
 	semindex_db_t *database;
+	const SemindexQueryService &queries;
 	const LspSourceMapper &sources;
 	std::string variant;
 };

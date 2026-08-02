@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 
+#include "semantic_query.h"
 #include "semindex.h"
 #include "semindex_database.h"
 
@@ -8,15 +9,15 @@
 #include <string>
 #include <vector>
 
-class LspOverlay
+class LspOverlay : public SemindexQueryOverlay
 {
 public:
 	void replace(const std::string &path, const std::string &directory, const semindex_t *index);
 	void erase(const std::string &path);
-	bool contains(const std::string &path) const;
+	bool contains(const std::string &path) const override;
 
 	int findAt(const std::string &path, const char *variant, unsigned line, unsigned column,
-		semindex_db_record_callback_t callback, void *data) const;
+		semindex_db_record_callback_t callback, void *data) const override;
 
 	int query(const std::string &path, const char *variant, const semindex_db_query_options_t &options,
 		semindex_db_record_callback_t callback, void *data) const;

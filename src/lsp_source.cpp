@@ -247,3 +247,8 @@ llvm::json::Value LspSourceMapper::location(const semindex_db_record_t &record, 
 		{ "range", range(record, cache) },
 	};
 }
+
+const SemindexSourceResolver &LspSourceMapper::sourceResolver() const
+{
+	return resolver;
+}
