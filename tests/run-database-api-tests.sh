@@ -25,7 +25,9 @@ callgraph_path=tests/callgraph-a.c
 "$SEMINDEX" index --database="$db" --compile-commands="$COMPILE_COMMANDS" "$source" >/dev/null
 "$SEMINDEX" compiler --database="$db" --no-store-command -- \
 	cc --no-default-config "$callgraph_source"
-"$DATABASE_API_TEST" "$db" "$source_path" "$callgraph_path"
+"$SEMINDEX" compiler --database="$db" --variant=debug --no-store-command -- \
+	cc --no-default-config "$source"
+"$DATABASE_API_TEST" "$db" "$source_path" "$callgraph_path" "$SOURCE_DIR"
 
 position_plan=$(sqlite3 "$db" "EXPLAIN QUERY PLAN
 SELECT records.symbol FROM files JOIN records ON records.file_id = files.id
@@ -49,4 +51,15 @@ if ! printf '%s\n' "$symbol_plan" |
 	grep -q 'SEARCH records USING PRIMARY KEY (symbol=? AND record=?)'; then
 	printf '%s\n' "$symbol_plan" >&2
 	fail "filtered symbol lookup does not use the records primary key"
+fi
+
+variant_plan=$(sqlite3 "$db" "EXPLAIN QUERY PLAN
+SELECT name, repository_root, git_commit FROM variants ORDER BY name")
+if ! printf '%s\n' "$variant_plan" | grep -q 'SCAN variants'; then
+	printf '%s\n' "$variant_plan" >&2
+	fail "variant listing does not use table order"
+fi
+if printf '%s\n' "$variant_plan" | grep -q 'USE TEMP B-TREE'; then
+	printf '%s\n' "$variant_plan" >&2
+	fail "variant listing requires temporary sorting"
 fi

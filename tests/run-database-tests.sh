@@ -82,8 +82,8 @@ disabled_db=$tmpdir/disabled.db
 "$SEMINDEX" compiler --database "$disabled_db" --no-store-command --no-git-commit -- \
 	cc --no-default-config "$git_repo/main.c"
 
-if [ "$(sqlite3 "$disabled_db" "SELECT COUNT(*) FROM variants")" != 0 ]; then
-	fail "disabled Git provenance was stored"
+if [ "$(sqlite3 "$disabled_db" "SELECT COUNT(*) FROM variants WHERE name = 'general' AND git_commit IS NULL AND repository_root = '$git_repo'")" != 1 ]; then
+	fail "variant metadata without Git provenance was not stored"
 fi
 
 if "$SEMINDEX" compiler --git-commit=invalid --no-store-command -- \
@@ -119,6 +119,14 @@ if [ "$(sqlite3 "$repo_db" "SELECT COUNT(*) FROM files WHERE path = 'include/loc
 fi
 if [ "$(sqlite3 "$repo_db" "SELECT COUNT(*) FROM files WHERE path = '$tmpdir/external.h'")" != 1 ]; then
 	fail "header outside the repository was stored as a relative path"
+fi
+
+sqlite3 "$repo_db" "UPDATE variants SET git_commit = '$explicit_commit' WHERE name = 'general'"
+"$SEMINDEX" compiler --database "$repo_db" --no-store-command -- \
+	cc --no-default-config -I"$repo/include" -I"$tmpdir" "$repo/src/main.c"
+
+if [ "$(sqlite3 "$repo_db" "SELECT git_commit FROM variants WHERE name = 'general'")" != "$explicit_commit" ]; then
+	fail "indexing without provenance discarded the recorded commit"
 fi
 
 printf '%s\n' 'struct shared { int pid; int other; };' >"$tmpdir/shared.h"
@@ -164,6 +172,10 @@ printf '%s\n' '#include "shared.h"' \
 	-I"$tmpdir" "$tmpdir/worker-9.c"
 if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM file_fingerprints JOIN files ON files.id = file_fingerprints.file_id WHERE files.path = '$tmpdir/shared.h'")" != 1 ]; then
 	fail "reusing a header added a duplicate fingerprint"
+fi
+if [ -n "$git_commit_option" ] &&
+	[ "$(sqlite3 "$db" "SELECT git_commit FROM variants WHERE name = 'general'")" != "$explicit_commit" ]; then
+	fail "indexing without provenance discarded the recorded commit"
 fi
 
 printf '%s\n' '#include "shared.h"' \

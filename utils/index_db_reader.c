@@ -37,6 +37,14 @@ static const char *column_text(sqlite3_stmt *stmt, int column)
 	return value ? value : "";
 }
 
+static const char *optional_column_text(sqlite3_stmt *stmt, int column)
+{
+	if (sqlite3_column_type(stmt, column) == SQLITE_NULL)
+		return NULL;
+
+	return (const char *)sqlite3_column_text(stmt, column);
+}
+
 static semindex_db_record_type_t record_type(int record, int action)
 {
 	if (record == STORED_RECORD_USE)
@@ -126,6 +134,45 @@ void semindex_db_close(semindex_db_t *db)
 	if (db->handle)
 		sqlite3_close(db->handle);
 	free(db);
+}
+
+int semindex_db_list_variants(semindex_db_t *db, semindex_db_variant_callback_t callback, void *data)
+{
+	static const char *sql = "SELECT name, repository_root, git_commit FROM variants ORDER BY name";
+	sqlite3_stmt *stmt = NULL;
+	int step;
+	int ret = -1;
+
+	if (!db || !callback)
+		return -1;
+
+	if (prepare(db, sql, &stmt) < 0)
+		goto out;
+
+	while ((step = sqlite3_step(stmt)) == SQLITE_ROW) {
+		semindex_db_variant_t variant = {
+			.name = column_text(stmt, 0),
+			.repository_root = optional_column_text(stmt, 1),
+			.git_commit = optional_column_text(stmt, 2),
+		};
+
+		ret = callback(data, &variant);
+
+		if (ret)
+			goto out;
+	}
+
+	if (step != SQLITE_DONE) {
+		fprintf(stderr, "semindex: sqlite: %s\n", sqlite3_errmsg(db->handle));
+		ret = -1;
+		goto out;
+	}
+
+	ret = 0;
+out:
+	sqlite3_finalize(stmt);
+
+	return ret;
 }
 
 int semindex_db_query(semindex_db_t *db, const semindex_db_query_options_t *opts,

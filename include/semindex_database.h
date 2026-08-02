@@ -74,8 +74,17 @@ typedef struct {
 	unsigned long long usr_id;
 } semindex_db_function_t;
 
+typedef struct {
+	const char *name;
+	const char *repository_root;
+	const char *git_commit;
+} semindex_db_variant_t;
+
 /* Record strings remain valid only until the callback returns. */
 typedef int (*semindex_db_record_callback_t)(void *data, const semindex_db_record_t *record);
+
+/* Variant strings remain valid only until the callback returns. */
+typedef int (*semindex_db_variant_callback_t)(void *data, const semindex_db_variant_t *variant);
 
 SEMINDEX_API int semindex_db_open(const char *path, semindex_db_t **result);
 SEMINDEX_API void semindex_db_close(semindex_db_t *db);
@@ -93,6 +102,9 @@ SEMINDEX_API int semindex_db_query_calls(semindex_db_t *db, const semindex_db_ca
 
 SEMINDEX_API int semindex_db_query_functions(semindex_db_t *db, const semindex_db_function_t *functions, size_t count,
 	semindex_db_record_callback_t callback, void *data);
+
+/* Variants are returned in name order. Provenance fields may be NULL. */
+SEMINDEX_API int semindex_db_list_variants(semindex_db_t *db, semindex_db_variant_callback_t callback, void *data);
 
 #ifdef __cplusplus
 }

@@ -13,7 +13,7 @@
 #include "semindex_database.h"
 #include "sqlite.h"
 
-#define INDEX_SCHEMA_VERSION 11
+#define INDEX_SCHEMA_VERSION 12
 #define STRINGIFY_VALUE(value) #value
 #define STRINGIFY(value) STRINGIFY_VALUE(value)
 
@@ -235,7 +235,7 @@ static int init_schema(sqlite3 *db)
 		" WHERE record = 1 AND action = 3 AND kind = 7",
 		"CREATE TABLE variants ("
 		"  name TEXT PRIMARY KEY,"
-		"  git_commit TEXT NOT NULL,"
+		"  git_commit TEXT,"
 		"  repository_root TEXT"
 		") WITHOUT ROWID",
 		"CREATE TABLE file_fingerprints ("
@@ -717,21 +717,19 @@ out:
 	return ret;
 }
 
-static int store_variant_provenance(sqlite3 *db, const char *variant, const char *repository_root,
-	const char *git_commit)
+static int store_variant_metadata(sqlite3 *db, const char *variant, const char *repository_root, const char *git_commit)
 {
 	static const char *sql = "INSERT INTO variants(name, git_commit, repository_root) VALUES(?1, ?2, ?3)"
 				 " ON CONFLICT(name) DO UPDATE SET"
-				 " git_commit = excluded.git_commit,"
-				 " repository_root = excluded.repository_root"
-				 " WHERE variants.git_commit != excluded.git_commit"
-				 " OR variants.repository_root IS NOT excluded.repository_root";
+				 " git_commit = coalesce(excluded.git_commit, variants.git_commit),"
+				 " repository_root = coalesce(excluded.repository_root, variants.repository_root)"
+				 " WHERE (excluded.git_commit IS NOT NULL"
+				 " AND variants.git_commit IS NOT excluded.git_commit)"
+				 " OR (excluded.repository_root IS NOT NULL"
+				 " AND variants.repository_root IS NOT excluded.repository_root)";
 	sqlite3_stmt *stmt = NULL;
 	int step;
 	int ret = -1;
-
-	if (!git_commit)
-		return 0;
 
 	if (prepare(db, sql, &stmt) < 0)
 		goto out;
@@ -739,8 +737,13 @@ static int store_variant_provenance(sqlite3 *db, const char *variant, const char
 	if (semindex_sqlite_bind_text(stmt, 1, variant) < 0)
 		goto out;
 
-	if (semindex_sqlite_bind_text(stmt, 2, git_commit) < 0)
+	if (git_commit) {
+		if (semindex_sqlite_bind_text(stmt, 2, git_commit) < 0)
+			goto out;
+	} else if (sqlite3_bind_null(stmt, 2) != SQLITE_OK) {
+		fprintf(stderr, "semindex: sqlite: %s\n", sqlite3_errmsg(db));
 		goto out;
+	}
 
 	if (repository_root) {
 		if (semindex_sqlite_bind_text(stmt, 3, repository_root) < 0)
@@ -849,15 +852,14 @@ static int merge_staging(sqlite3 *db, const char *variant, uint64_t staged_recor
 		}
 	}
 
-	if (provenance->git_commit) {
+	{
 		semindex_trace_time_t start = semindex_trace_begin(trace);
-		int provenance_ret;
+		int metadata_ret;
 
-		provenance_ret =
-			store_variant_provenance(db, variant, provenance->repository_root, provenance->git_commit);
+		metadata_ret = store_variant_metadata(db, variant, provenance->repository_root, provenance->git_commit);
 		semindex_trace_end(trace, "db.merge.variant", start);
 
-		if (provenance_ret < 0)
+		if (metadata_ret < 0)
 			goto rollback;
 	}
 

@@ -59,20 +59,21 @@ relative to its root. Files outside the repository, including system headers,
 are stored as canonical absolute paths. Path conversion is performed once per
 indexed file rather than once per semantic record.
 
-The `variants` table records optional source provenance when semindex is built
-with libgit2. Use `--git-commit=auto` to resolve the repository's current
+The `variants` table lists every indexed variant and records its repository
+root when one is available. It also records optional source provenance when
+semindex is built with libgit2. Use `--git-commit=auto` to resolve the repository's current
 `HEAD`, or `--git-commit=COMMIT` to record a known 40- or 64-digit object ID
 explicitly. Git provenance is disabled by default so short-lived compiler
 wrapper processes do not pay the libgit2 repository initialization cost. A
-source outside a Git repository is indexed normally and does not create a
-provenance row. `--no-git-commit` explicitly disables provenance.
+source outside a Git repository is indexed normally with `NULL` repository and
+commit fields. `--no-git-commit` explicitly disables provenance.
 
 libgit2 is isolated in an optional runtime-loaded backend. Normal indexing and
 explicit object IDs do not load it; only `--git-commit=auto` opens a repository
 through libgit2. This keeps the compiler-wrapper path independent of libgit2's
 initialization cost unless automatic discovery was requested.
 
-Provenance is one row per variant rather than one value per file or record. It
+Metadata is one row per variant rather than one value per file or record. It
 therefore adds constant database space and one conditional upsert to the
 existing writer transaction. The row describes the commit seen by the most
 recent successful indexing command that recorded provenance for that variant.
@@ -80,6 +81,10 @@ Incremental indexing is not an atomic repository snapshot: if `HEAD` changes
 between translation units, existing records may still have been produced from
 the earlier commit. Consumers must treat a mismatch between the stored commit
 and the current worktree as possible source/index drift.
+
+The public database reader exposes this metadata through the streaming
+`semindex_db_list_variants()` API. Variants are returned in stable name order;
+the repository root and Git commit are `NULL` when unavailable.
 
 A symbol database is therefore intended to describe one repository. Relative
 paths are resolved by consumers against that repository root; the LSP uses the
@@ -123,8 +128,8 @@ rebuilding the index. This is an intentional tradeoff for a reproducible cache.
 
 ## Compatibility
 
-The database is an experimental interface. Schema version 11 adds optional
-Git provenance for variants and does not migrate older databases. Dropping old
+The database is an experimental interface. Schema version 12 lists variants
+even when Git provenance is disabled and does not migrate older databases. Dropping old
 tables in place would also leave their original multi-gigabyte file allocation.
 Remove an old database before indexing:
 

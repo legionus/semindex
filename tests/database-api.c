@@ -25,6 +25,12 @@ struct call_state {
 	int failed;
 };
 
+struct variant_state {
+	const char *repository_root;
+	unsigned count;
+	int failed;
+};
+
 static int check_record(void *data, const semindex_db_record_t *record)
 {
 	struct result_state *state = data;
@@ -85,6 +91,25 @@ static int check_call(void *data, const semindex_db_record_t *record)
 	return 0;
 }
 
+static int check_variant(void *data, const semindex_db_variant_t *variant)
+{
+	struct variant_state *state = data;
+	const char *expected;
+
+	expected = state->count ? "general" : "debug";
+
+	if (strcmp(variant->name, expected) || !variant->repository_root ||
+		strcmp(variant->repository_root, state->repository_root) || variant->git_commit) {
+		state->failed = 1;
+
+		return -1;
+	}
+
+	state->count++;
+
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	semindex_db_t *db = NULL;
@@ -106,12 +131,16 @@ int main(int argc, char **argv)
 	};
 	struct call_state callees = { .caller = "caller" };
 	struct call_state callers = { .caller = "caller", .callee = "leaf" };
+	struct variant_state variants = { 0 };
 	int ret = 1;
 
-	if (argc != 4) {
-		fprintf(stderr, "usage: database-api DATABASE SOURCE CALLGRAPH_SOURCE\n");
+	if (argc != 5) {
+		fprintf(stderr, "usage: database-api DATABASE SOURCE CALLGRAPH_SOURCE REPOSITORY_ROOT\n");
 		return 1;
 	}
+
+	variants.repository_root = argv[4];
+
 	if (semindex_db_open(argv[1], &db) < 0)
 		goto out;
 	if (run_query(db, "Outer.y", SEMINDEX_DB_RECORD_DEFINITION, SEMINDEX_DB_DEFINITION, 8, 1) < 0 ||
@@ -140,6 +169,8 @@ int main(int argc, char **argv)
 	call_options.direction = SEMINDEX_DB_CALLERS;
 	if (semindex_db_query_calls(db, &call_options, check_call, &callers) < 0 || callers.failed ||
 		callers.count != 2)
+		goto unexpected;
+	if (semindex_db_list_variants(db, check_variant, &variants) < 0 || variants.failed || variants.count != 2)
 		goto unexpected;
 	ret = 0;
 	goto out;
