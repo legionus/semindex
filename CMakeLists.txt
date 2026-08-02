@@ -69,6 +69,7 @@ set(SEMINDEX_FORMAT_SOURCES
 	tests/test17.c
 	tests/test18.c
 	tests/test19.c
+	utils/cmd_cc.c
 	utils/cmd_compiler.c
 	utils/cmd_compile_commands.c
 	utils/cmd_callgraph.c
@@ -76,6 +77,8 @@ set(SEMINDEX_FORMAT_SOURCES
 	utils/cmd_search.c
 	utils/cli_common.c
 	utils/command_main.c
+	utils/compiler_command.c
+	utils/compiler_command.h
 	utils/command_db.c
 	utils/command_db_export.c
 	utils/command_db.h
@@ -322,8 +325,17 @@ add_executable(semindex_dispatcher utils/semindex.c)
 set_target_properties(semindex_dispatcher PROPERTIES OUTPUT_NAME semindex)
 
 add_semindex_command(semindex_compiler compiler utils/cmd_compiler.c)
+target_sources(semindex_compiler PRIVATE utils/compiler_command.c)
 target_link_libraries(semindex_compiler PRIVATE semindex_cli_common semindex_pipeline)
 set_target_properties(semindex_compiler PROPERTIES
+	BUILD_RPATH "$ORIGIN"
+	INSTALL_RPATH "${CMAKE_INSTALL_FULL_LIBDIR}"
+)
+
+add_semindex_command(semindex_cc cc utils/cmd_cc.c)
+target_sources(semindex_cc PRIVATE utils/compiler_command.c)
+target_link_libraries(semindex_cc PRIVATE semindex_cli_common semindex_pipeline)
+set_target_properties(semindex_cc PROPERTIES
 	BUILD_RPATH "$ORIGIN"
 	INSTALL_RPATH "${CMAKE_INSTALL_FULL_LIBDIR}"
 )
@@ -345,7 +357,7 @@ add_semindex_command(semindex_compile_commands compile_commands utils/cmd_compil
 set_target_properties(semindex_compile_commands PROPERTIES OUTPUT_NAME semindex-compile-commands)
 target_link_libraries(semindex_compile_commands PRIVATE semindex_query)
 
-install(TARGETS semindex_dispatcher semindex_compiler semindex_index semindex_search semindex_callgraph
+install(TARGETS semindex_dispatcher semindex_cc semindex_compiler semindex_index semindex_search semindex_callgraph
 	semindex_compile_commands semindex_lsp semindex_parser semindex_database
 	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -438,6 +450,7 @@ if(BUILD_TESTING)
 		COMMAND
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-dispatcher-tests.sh
 				$<TARGET_FILE:semindex_dispatcher>
+				$<TARGET_FILE:semindex_cc>
 				$<TARGET_FILE:semindex_compiler>
 				$<TARGET_FILE:semindex_index>
 				$<TARGET_FILE:semindex_search>
@@ -463,6 +476,16 @@ if(BUILD_TESTING)
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			PYTHON=${Python3_EXECUTABLE}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-compiler-tests.sh
+	)
+	add_test(
+		NAME semindex-cc
+		COMMAND
+			${CMAKE_COMMAND} -E env
+			SEMINDEX=$<TARGET_FILE:semindex_dispatcher>
+			SEMINDEX_CC=$<TARGET_FILE:semindex_cc>
+			CC=${CMAKE_C_COMPILER}
+			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-cc-tests.sh
 	)
 	add_test(
 		NAME semindex-search

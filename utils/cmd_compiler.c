@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "command_db.h"
+#include "compiler_command.h"
 #include "index_pipeline.h"
 #include "perf_trace.h"
 #include "semindex_cli.h"
@@ -49,117 +50,6 @@ static void compiler_help(void)
 	       "\n"
 	       "Report bugs to authors.\n"
 	       "\n");
-}
-
-static int has_suffix(const char *str, const char *suffix)
-{
-	size_t str_len;
-	size_t suffix_len;
-
-	if (!str || !suffix)
-		return 0;
-
-	str_len = strlen(str);
-	suffix_len = strlen(suffix);
-
-	if (str_len < suffix_len)
-		return 0;
-
-	return !strcmp(str + str_len - suffix_len, suffix);
-}
-
-static int is_source(const char *arg)
-{
-	return has_suffix(arg, ".c") || has_suffix(arg, ".S");
-}
-
-static int compiler_is_omitted(const char *arg)
-{
-	return !arg[0] || arg[0] == '-' || arg[0] == '@' || is_source(arg);
-}
-
-static int option_takes_joined_or_next_arg(const char *arg)
-{
-	static const char *opts[] = {
-		"-D",
-		"-I",
-		"-U",
-		"-include",
-		"-imacros",
-		"-isystem",
-		"-iquote",
-		"-idirafter",
-		"-iprefix",
-		"-iwithprefix",
-		"-iwithprefixbefore",
-		"-isysroot",
-		"-target",
-		"-x",
-		"-std",
-		"-MF",
-		"-MT",
-		"-MQ",
-		"-o",
-	};
-	size_t i;
-
-	for (i = 0; i < sizeof(opts) / sizeof(opts[0]); i++) {
-		const char *opt = opts[i];
-		size_t len = strlen(opt);
-
-		if (!strcmp(arg, opt))
-			return 1;
-
-		if (!strncmp(arg, opt, len) && arg[len])
-			return 0;
-	}
-
-	return 0;
-}
-
-static int find_source_file(int argc, char **argv, const char **source_file)
-{
-	int preprocess_only = 0;
-	int assemble_only = 0;
-	int sources = 0;
-	int i;
-
-	for (i = 1; i < argc; i++) {
-		const char *arg = argv[i];
-
-		if (!strcmp(arg, "-c"))
-			continue;
-
-		if (!strcmp(arg, "-E")) {
-			preprocess_only = 1;
-			continue;
-		}
-		if (!strcmp(arg, "-S")) {
-			assemble_only = 1;
-			continue;
-		}
-		if (!strcmp(arg, "--")) {
-			continue;
-		}
-		if (arg[0] == '-') {
-			if (option_takes_joined_or_next_arg(arg) && !arg[2])
-				i++;
-			continue;
-		}
-		if (!is_source(arg))
-			continue;
-
-		*source_file = arg;
-		sources++;
-	}
-
-	if (preprocess_only || assemble_only)
-		return -1;
-
-	if (sources != 1)
-		return -1;
-
-	return 0;
 }
 
 int cmd_compiler(int argc, char **argv)
@@ -282,7 +172,7 @@ int cmd_compiler(int argc, char **argv)
 	compiler_argc = argc - optind;
 	compiler_argv = argv + optind;
 
-	if (compiler_is_omitted(compiler_argv[0])) {
+	if (compiler_command_driver_is_omitted(compiler_argv[0])) {
 		default_argv = calloc(compiler_argc + 1, sizeof(*default_argv));
 
 		if (!default_argv) {
@@ -294,7 +184,7 @@ int cmd_compiler(int argc, char **argv)
 		compiler_argv = default_argv;
 		compiler_argc++;
 	}
-	if (find_source_file(compiler_argc, compiler_argv, &source_file) < 0) {
+	if (compiler_command_find_source(compiler_argc, compiler_argv, &source_file) < 0) {
 		fprintf(stderr, "semindex: unsupported compiler command\n");
 		free(default_argv);
 		return 1;

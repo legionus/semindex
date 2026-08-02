@@ -18,6 +18,7 @@ static void help(void)
 	       "\n"
 	       "Commands:\n"
 	       "  callgraph                  query direct caller and callee relationships\n"
+	       "  cc                         index through a transparent compiler wrapper\n"
 	       "  compiler                   index from an explicit compiler argument vector\n"
 	       "  compile-commands           export stored compiler commands as JSON\n"
 	       "  index                      index a source file using `compile_commands.json'\n"

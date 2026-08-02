@@ -9,8 +9,8 @@ fail()
 	exit 1
 }
 
-if [ "$#" != 7 ]; then
-	fail "usage: run-dispatcher-tests.sh DISPATCHER COMPILER INDEX SEARCH CALLGRAPH COMPILE_COMMANDS LSP"
+if [ "$#" != 8 ]; then
+	fail "usage: run-dispatcher-tests.sh DISPATCHER CC COMPILER INDEX SEARCH CALLGRAPH COMPILE_COMMANDS LSP"
 fi
 
 dispatcher=$1
@@ -22,7 +22,7 @@ for helper in "$@"; do
 	fi
 done
 
-for command in compiler index search callgraph compile-commands lsp; do
+for command in cc compiler index search callgraph compile-commands lsp; do
 	if ! "$dispatcher" "$command" --help >/dev/null; then
 		fail "dispatched helper failed: $command"
 	fi
@@ -64,7 +64,7 @@ if ! grep -q 'failed to execute semindex-missing' "$tmpdir/missing.err"; then
 	fail "missing command diagnostic differs"
 fi
 
-for binary in "$dispatcher" "$3" "$4" "$5"; do
+for binary in "$dispatcher" "$4" "$5" "$6"; do
 	if ldd "$binary" | grep -Eq 'libclang|libLLVM'; then
 		fail "query-only executable links against Clang or LLVM: $binary"
 	fi

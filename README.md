@@ -23,6 +23,7 @@ Implemented so far:
 * persistent SQLite storage with parallel writers, incremental file
   replacement, header fingerprints, and named index variants;
 * separate compiler-command capture and `compile_commands.json` export;
+* transparent compiler wrapping for indexing during Make and CMake builds;
 * indexed search by qualified symbol name and access mode;
 * direct caller and callee queries with stable function identities;
 * LSP definition, reference, document-highlight, call-hierarchy, diagnostics,
@@ -108,6 +109,16 @@ The CLI can also index a single compile command directly:
 ```sh
 semindex compiler -- -Iinclude -DDEBUG -c path/to/file.c -o file.o
 ```
+
+To index while running the real compiler, use the transparent wrapper:
+
+```sh
+make CC=semindex-cc REAL_CC=cc
+```
+
+It can also be used as CMake's `CMAKE_C_COMPILER_LAUNCHER`. See
+[Documentation/compiler-wrapper.md](Documentation/compiler-wrapper.md) for
+pass-through behavior, options, and indexing error policies.
 
 After a clean frontend result, the indexing commands replace the source's
 index records in `.semindex/semindex.db`. Partial or failed results make the
