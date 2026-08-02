@@ -2,6 +2,7 @@
 	global:
 		semindex_db_close;
 		semindex_db_find_at;
+		semindex_db_find_file;
 		semindex_db_list_variants;
 		semindex_db_open;
 		semindex_db_query;

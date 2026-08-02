@@ -213,6 +213,54 @@ out:
 	return ret;
 }
 
+int semindex_db_find_file(semindex_db_t *db, const char *variant, const char *path,
+	semindex_db_file_callback_t callback, void *data)
+{
+	static const char *sql = "SELECT variant, path, mtime_ns, size FROM files WHERE variant = ?1 AND path = ?2";
+	sqlite3_stmt *stmt = NULL;
+	int step;
+	int ret = -1;
+
+	if (!db || !variant || !variant[0] || !path || !path[0] || !callback)
+		return -1;
+
+	if (prepare(db, sql, &stmt) < 0)
+		goto out;
+
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 1, variant));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 2, path));
+
+	step = sqlite3_step(stmt);
+
+	if (step == SQLITE_ROW) {
+		semindex_db_file_t file = {
+			.variant = column_text(stmt, 0),
+			.path = column_text(stmt, 1),
+			.mtime_ns = sqlite3_column_int64(stmt, 2),
+			.size = sqlite3_column_int64(stmt, 3),
+		};
+
+		ret = callback(data, &file);
+
+		if (ret)
+			goto out;
+
+		step = sqlite3_step(stmt);
+	}
+
+	if (step != SQLITE_DONE) {
+		fprintf(stderr, "semindex: sqlite: %s\n", sqlite3_errmsg(db->handle));
+		ret = -1;
+		goto out;
+	}
+
+	ret = 0;
+out:
+	sqlite3_finalize(stmt);
+
+	return ret;
+}
+
 int semindex_db_query(semindex_db_t *db, const semindex_db_query_options_t *opts,
 	semindex_db_record_callback_t callback, void *data)
 {

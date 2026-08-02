@@ -101,3 +101,12 @@ if printf '%s\n' "$variant_plan" | grep -q 'USE TEMP B-TREE'; then
 	printf '%s\n' "$variant_plan" >&2
 	fail "variant listing requires temporary sorting"
 fi
+
+file_plan=$(sqlite3 "$db" "EXPLAIN QUERY PLAN
+SELECT variant, path, mtime_ns, size FROM files
+WHERE variant = 'general' AND path = '$source_path'")
+if ! printf '%s\n' "$file_plan" |
+	grep -q 'SEARCH files USING INDEX sqlite_autoindex_files_1 (variant=? AND path=?)'; then
+	printf '%s\n' "$file_plan" >&2
+	fail "file metadata lookup does not use the variant and path index"
+fi

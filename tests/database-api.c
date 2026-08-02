@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "semindex_database.h"
 
@@ -27,6 +29,15 @@ struct call_state {
 
 struct variant_state {
 	const char *repository_root;
+	unsigned count;
+	int failed;
+};
+
+struct file_state {
+	const char *variant;
+	const char *path;
+	long long mtime_ns;
+	long long size;
 	unsigned count;
 	int failed;
 };
@@ -131,6 +142,50 @@ static int check_variant(void *data, const semindex_db_variant_t *variant)
 	}
 
 	state->count++;
+
+	return 0;
+}
+
+static int check_file(void *data, const semindex_db_file_t *file)
+{
+	struct file_state *state = data;
+
+	if (strcmp(file->variant, state->variant) || strcmp(file->path, state->path) ||
+		file->mtime_ns != state->mtime_ns || file->size != state->size) {
+		state->failed = 1;
+
+		return -1;
+	}
+
+	state->count++;
+
+	return 0;
+}
+
+static int check_file_metadata(semindex_db_t *db, const char *root, const char *path)
+{
+	char physical_path[PATH_MAX];
+	struct file_state file = {
+		.variant = "general",
+		.path = path,
+	};
+	struct file_state missing = { 0 };
+	struct stat st;
+	int length;
+
+	length = snprintf(physical_path, sizeof(physical_path), "%s/%s", root, path);
+
+	if (length < 0 || (size_t)length >= sizeof(physical_path) || stat(physical_path, &st) < 0)
+		return -1;
+
+	file.mtime_ns = (long long)st.st_mtim.tv_sec * 1000000000LL + st.st_mtim.tv_nsec;
+	file.size = st.st_size;
+
+	if (semindex_db_find_file(db, file.variant, file.path, check_file, &file) < 0 || file.failed || file.count != 1)
+		return -1;
+
+	if (semindex_db_find_file(db, "general", "tests/missing.c", check_file, &missing) < 0 || missing.count)
+		return -1;
 
 	return 0;
 }
@@ -370,6 +425,8 @@ int main(int argc, char **argv)
 		callers.count != 2)
 		goto unexpected;
 	if (semindex_db_list_variants(db, check_variant, &variants) < 0 || variants.failed || variants.count != 2)
+		goto unexpected;
+	if (check_file_metadata(db, argv[4], argv[2]) < 0)
 		goto unexpected;
 	if (check_pagination(db, argv[3]) < 0)
 		goto unexpected;

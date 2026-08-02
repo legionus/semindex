@@ -49,6 +49,8 @@ These instructions apply to the entire repository.
 * Do not accept a median regression greater than 5 percent in indexing time,
   peak memory, database size, or exact-search latency without explaining the
   tradeoff and obtaining user approval.
+* MCP work may increase the index database size only when necessary. Stop and
+  obtain user approval before implementing a change expected to increase it.
 
 ## Repository hygiene
 

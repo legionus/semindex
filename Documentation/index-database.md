@@ -96,6 +96,13 @@ The public database reader exposes this metadata through the streaming
 `semindex_db_list_variants()` API. Variants are returned in stable name order;
 the repository root and Git commit are `NULL` when unavailable.
 
+`semindex_db_find_file()` returns the indexed modification time and size for an
+exact `(variant, path)` pair. Consumers can compare these values with the
+working-tree file before reading source context. A mismatch proves that the
+source may have drifted; matching metadata is only a fast consistency check and
+does not prove that the contents are identical. The lookup uses the existing
+unique file key and does not add database columns or indexes.
+
 A symbol database is therefore intended to describe one repository. Relative
 paths are resolved by consumers against that repository root; the LSP uses the
 workspace root supplied by the client.
