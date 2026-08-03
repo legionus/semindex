@@ -1,0 +1,72 @@
+name: Benchmark — compare with master
+
+permissions:
+  contents: read
+  pull-requests: read
+
+on:
+  push:
+    branches: [ "for-master" ]
+  pull_request:
+    branches: [ "for-master" ]
+
+jobs:
+  benchmark-compare:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 120
+    env:
+      BUILD_DIR: build
+      BASELINE_DIR: /tmp/baseline
+      LLVM_VERSION: '22'
+
+    steps:
+      - name: Checkout repository (full history)
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install system deps (clang, cmake, python)
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get -qq -y install \
+            build-essential cmake python3 python3-pip \
+            sqlite3 libsqlite3-dev libc++-dev libc++abi-dev
+
+          sudo apt-get -qq -y install \
+            clang-${LLVM_VERSION} lld-${LLVM_VERSION}
+
+      - name: Prepare baseline (master) checkout
+        run: |
+          git clone --no-local --depth=1 --branch=master . ${BASELINE_DIR}
+          (cd ${BASELINE_DIR} && git rev-parse --short HEAD)
+
+      - name: Build baseline (master)
+        run: |
+          set -efu
+          mkdir -p ${BASELINE_DIR}/build
+          cmake -S ${BASELINE_DIR} -B ${BASELINE_DIR}/build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          cmake --build ${BASELINE_DIR}/build -j"$(nproc)"
+
+      - name: Build candidate (current PR/commit)
+        run: |
+          set -efu
+          cmake -S . -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          cmake --build ${BUILD_DIR} -j"$(nproc)"
+
+      - name: Run benchmark comparison
+        run: |
+          set -efu
+          BASE_BIN="${BASELINE_DIR}/build/semindex"
+          CAND_BIN="${BUILD_DIR}/semindex"
+          TRACE="/tmp/semindex-benchmark.jsonl"
+
+          python3 scripts/benchmark.py --baseline="${BASE_BIN}" --candidate="${CAND_BIN}" --trace="${TRACE}" --iterations=5 --passes=3
+          python3 scripts/analyze-trace.py "${TRACE}" 2>&1 | tee /tmp/benchmark-report.txt
+
+      - name: Upload benchmark artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: semindex-benchmark
+          path: |
+            /tmp/semindex-benchmark.jsonl
+            /tmp/benchmark-report.txt
