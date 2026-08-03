@@ -33,6 +33,9 @@ struct SemindexSymbol {
 	std::string owner;
 	std::string type;
 	std::string canonical_type;
+	semindex_symbol_kind_t type_kind = SEMINDEX_SYMBOL_VAR;
+	std::string type_symbol;
+	std::string type_usr;
 	std::string usr;
 	std::string context;
 	SemindexSourceLocation loc;

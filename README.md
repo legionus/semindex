@@ -71,7 +71,7 @@ storage implementation symbols are hidden.
 The remaining long-term work is to deepen the semantic model beyond the
 implemented symbol index, direct call graph, and SQLite queries. This includes:
 
-* richer struct, union, and enum relationships;
+* richer struct, union, and enum relationships beyond field type identities;
 * indirect-call target resolution;
 * semantic queries beyond the original Sparse semind interface.
 

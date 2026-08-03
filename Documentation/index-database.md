@@ -30,7 +30,9 @@ symbol and source file, not on every reference. Its primary key begins with
 types. The file relationship allows stale types to be removed with the same
 replacement rules as semantic records. The declared spelling preserves typedef
 names while the canonical type expands typedef chains through Clang's type
-system.
+system. Fields whose written type names a typedef, record, or enum also store
+the target symbol kind and compact identity. This allows clients to navigate
+from a field to its declared type without matching type-name strings.
 
 ## Reader API
 
@@ -154,8 +156,8 @@ rebuilding the index. This is an intentional tradeoff for a reproducible cache.
 
 ## Compatibility
 
-The database is an experimental interface. Schema version 15 stores declared
-and canonical types for symbols with stable identities and does not migrate older databases.
+The database is an experimental interface. Schema version 16 relates fields to
+the stable identity of their declared type and does not migrate older databases.
 Dropping old tables in place would also leave their original multi-gigabyte file allocation.
 Remove an old database before indexing:
 

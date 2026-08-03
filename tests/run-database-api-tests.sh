@@ -36,6 +36,11 @@ WHERE symbol = 'c' AND kind = 0")" != "counter_t:int" ]; then
 	fail "typedef relationship was not stored"
 fi
 
+if [ "$(sqlite3 "$db" "SELECT DISTINCT type_symbol || ':' || type_kind || ':' || (type_usr_id != 0)
+FROM symbol_types WHERE symbol = 'Outer.inner' AND kind = 1")" != "Inner:2:1" ]; then
+	fail "field type identity was not stored"
+fi
+
 position_plan=$(sqlite3 "$db" "EXPLAIN QUERY PLAN
 SELECT records.symbol FROM files JOIN records ON records.file_id = files.id
 WHERE files.path = '$source_path' AND files.variant = 'general'

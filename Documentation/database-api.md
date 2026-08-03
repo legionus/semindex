@@ -45,6 +45,10 @@ type, and source path. The query accepts a limit and a caller-owned cursor so
 clients can paginate without using `OFFSET`. Type strings remain valid only until the callback
 returns.
 
+For fields whose written type names a typedef, record, or enum, the result also
+contains the target symbol, kind, and compact identity. Builtin and anonymous
+types do not have a target identity.
+
 ## Call queries
 
 `semindex_db_query_calls()` returns direct caller or callee relationships

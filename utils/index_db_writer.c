@@ -13,7 +13,7 @@
 #include "semindex_database.h"
 #include "sqlite.h"
 
-#define INDEX_SCHEMA_VERSION 15
+#define INDEX_SCHEMA_VERSION 16
 #define STRINGIFY_VALUE(value) #value
 #define STRINGIFY(value) STRINGIFY_VALUE(value)
 
@@ -238,7 +238,11 @@ static int init_schema(sqlite3 *db)
 		"  file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,"
 		"  declared_type TEXT NOT NULL,"
 		"  canonical_type TEXT NOT NULL,"
-		"  PRIMARY KEY(symbol, kind, usr_id, file_id, declared_type, canonical_type)"
+		"  type_symbol TEXT NOT NULL,"
+		"  type_kind INTEGER NOT NULL,"
+		"  type_usr_id INTEGER NOT NULL,"
+		"  PRIMARY KEY(symbol, kind, usr_id, file_id, declared_type, canonical_type,"
+		"   type_symbol, type_kind, type_usr_id)"
 		") WITHOUT ROWID",
 		"CREATE INDEX symbol_types_file_idx ON symbol_types(file_id)",
 		"CREATE INDEX records_call_context_idx ON records(context, context_usr_id)"
@@ -386,7 +390,11 @@ static int create_staging(sqlite3 *db)
 		"  path TEXT NOT NULL,"
 		"  declared_type TEXT NOT NULL,"
 		"  canonical_type TEXT NOT NULL,"
-		"  PRIMARY KEY(symbol, kind, usr_id, path, declared_type, canonical_type)"
+		"  type_symbol TEXT NOT NULL,"
+		"  type_kind INTEGER NOT NULL,"
+		"  type_usr_id INTEGER NOT NULL,"
+		"  PRIMARY KEY(symbol, kind, usr_id, path, declared_type, canonical_type,"
+		"   type_symbol, type_kind, type_usr_id)"
 		") WITHOUT ROWID");
 }
 
@@ -460,6 +468,10 @@ static int stage_symbol_type(sqlite3_stmt *stmt, const semindex_symbol_t *symbol
 	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 4, path));
 	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 5, symbol->type));
 	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 6, symbol->canonical_type));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 7, symbol->type_symbol));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out,
+		semindex_sqlite_bind_int(stmt, 8, symbol->type_usr_id ? symbol->type_kind : -1));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int64(stmt, 9, (sqlite3_int64)symbol->type_usr_id));
 
 	if (sqlite3_step(stmt) != SQLITE_DONE) {
 		fprintf(stderr, "semindex: sqlite: %s\n", sqlite3_errmsg(db));
@@ -482,8 +494,8 @@ static int stage_records(sqlite3 *db, semindex_t *s, const struct stored_paths *
 		"context, usr_id, context_usr_id, local) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, "
 		"?12)";
 	static const char *type_sql =
-		"INSERT OR IGNORE INTO staging_symbol_types(symbol, kind, usr_id, path, declared_type, canonical_type)"
-		" VALUES(?1, ?2, ?3, ?4, ?5, ?6)";
+		"INSERT OR IGNORE INTO staging_symbol_types(symbol, kind, usr_id, path, declared_type, canonical_type,"
+		" type_symbol, type_kind, type_usr_id) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)";
 	sqlite3_stmt *stmt = NULL;
 	sqlite3_stmt *type_stmt = NULL;
 	sqlite3_int64 changes_before = sqlite3_total_changes64(db);
@@ -887,9 +899,11 @@ static int merge_staging(sqlite3 *db, const char *variant, uint64_t staged_recor
 		" ON files.path = staging_records.path AND files.variant = %Q",
 		variant);
 	merge[6] = sqlite3_mprintf(
-		"INSERT OR IGNORE INTO symbol_types(symbol, kind, usr_id, file_id, declared_type, canonical_type)"
+		"INSERT OR IGNORE INTO symbol_types(symbol, kind, usr_id, file_id, declared_type, canonical_type,"
+		" type_symbol, type_kind, type_usr_id)"
 		" SELECT staging_symbol_types.symbol, staging_symbol_types.kind, staging_symbol_types.usr_id,"
-		"  files.id, staging_symbol_types.declared_type, staging_symbol_types.canonical_type"
+		"  files.id, staging_symbol_types.declared_type, staging_symbol_types.canonical_type,"
+		"  staging_symbol_types.type_symbol, staging_symbol_types.type_kind, staging_symbol_types.type_usr_id"
 		" FROM staging_symbol_types JOIN files"
 		" ON files.path = staging_symbol_types.path AND files.variant = %Q",
 		variant);

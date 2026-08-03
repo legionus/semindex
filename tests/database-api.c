@@ -71,7 +71,9 @@ struct type_state {
 	const semindex_db_identity_t *identity;
 	const char *declared_type;
 	const char *canonical_type;
+	const char *type_symbol;
 	const char *path;
+	int has_type_identity;
 	unsigned count;
 	int failed;
 };
@@ -343,7 +345,14 @@ static int check_symbol_type(void *data, const semindex_db_symbol_type_t *type)
 	if (strcmp(type->variant, state->identity->variant) || strcmp(type->symbol, state->identity->symbol) ||
 		type->usr_id != state->identity->usr_id || type->kind != state->identity->kind ||
 		strcmp(type->declared_type, state->declared_type) ||
-		strcmp(type->canonical_type, state->canonical_type) || strcmp(type->path, state->path)) {
+		strcmp(type->canonical_type, state->canonical_type) ||
+		type->has_type_identity != state->has_type_identity || strcmp(type->path, state->path)) {
+		state->failed = 1;
+
+		return -1;
+	}
+
+	if (state->has_type_identity && strcmp(type->type_symbol, state->type_symbol)) {
 		state->failed = 1;
 
 		return -1;

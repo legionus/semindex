@@ -35,7 +35,9 @@ compiler command in the command database.
 `find_declared_types` accepts the identity returned by `symbol_at` and returns
 the declared and canonical C types together with the source file that
 contributed them. The canonical type expands typedef chains. Results are
-bounded and cursor-paginated.
+bounded and cursor-paginated. A field whose written type names a typedef,
+record, or enum includes a `typeIdentity` object suitable for definition and
+type queries.
 
 Record results contain the variant, path, one-based byte position, qualified
 symbol, symbol kind, record type, action, access mode, enclosing context, local

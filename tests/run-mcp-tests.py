@@ -256,6 +256,24 @@ def main():
 		]:
 			fail("find_declared_types did not expand the typedef")
 
+		inner_identity = only_record(
+			client.tool("symbol_at", {"path": "tests/test11.c", "line": 7, "column": 15}),
+			"symbol_at record field",
+		)
+		inner_types = client.tool(
+			"find_declared_types",
+			{
+				"symbol": inner_identity["symbol"],
+				"variant": inner_identity["variant"],
+				"usrId": inner_identity["usrId"],
+				"kind": inner_identity["kind"],
+			},
+		)
+		inner_type = inner_types.get("types", [])
+
+		if len(inner_type) != 1 or inner_type[0].get("typeIdentity", {}).get("symbol") != "Inner":
+			fail("find_declared_types did not relate the field to its record type")
+
 		definitions = client.tool(
 			"find_definitions",
 			{"symbol": "Outer.y", "variant": "general", "kind": "field"},

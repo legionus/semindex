@@ -92,9 +92,13 @@ typedef struct {
 	const char *owner;	    /* containing record for fields */
 	const char *type;	    /* textual type */
 	const char *canonical_type; /* canonical textual type */
-	const char *usr;	    /* stable unique id */
-	unsigned long long usr_id;  /* hashed USR */
-	const char *context;	    /* containing function for local symbols */
+	semindex_symbol_kind_t type_kind;
+	const char *type_symbol;
+	const char *type_usr;
+	unsigned long long type_usr_id;
+	const char *usr;	   /* stable unique id */
+	unsigned long long usr_id; /* hashed USR */
+	const char *context;	   /* containing function for local symbols */
 	const char *file;
 	size_t file_index;
 	unsigned line;

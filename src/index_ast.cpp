@@ -293,6 +293,45 @@ static std::string canonicalTypeName(QualType type, const ASTContext &ctx)
 	return stableTypeName(type.getCanonicalType(), ctx);
 }
 
+struct DeclaredTypeIdentity {
+	semindex_symbol_kind_t kind;
+	const NamedDecl *decl = nullptr;
+};
+
+static DeclaredTypeIdentity declaredTypeIdentity(TypeSourceInfo *info)
+{
+	if (!info)
+		return {};
+
+	for (TypeLoc loc = info->getTypeLoc(); !loc.isNull(); loc = loc.getNextTypeLoc()) {
+		if (auto typedefLoc = loc.getAs<TypedefTypeLoc>())
+			return { SEMINDEX_SYMBOL_TYPEDEF, typedefLoc.getTypePtr()->getDecl() };
+
+		if (auto recordLoc = loc.getAs<RecordTypeLoc>()) {
+			const RecordDecl *D = recordLoc.getDecl();
+
+			return { D->isUnion() ? SEMINDEX_SYMBOL_UNION : SEMINDEX_SYMBOL_STRUCT, D };
+		}
+
+		if (auto enumLoc = loc.getAs<EnumTypeLoc>())
+			return { SEMINDEX_SYMBOL_ENUM, enumLoc.getDecl() };
+	}
+
+	return {};
+}
+
+static void setDeclaredTypeIdentity(SemindexSymbol &symbol, TypeSourceInfo *info, const ASTContext &ctx)
+{
+	DeclaredTypeIdentity identity = declaredTypeIdentity(info);
+
+	if (!identity.decl || getName(identity.decl).empty())
+		return;
+
+	symbol.type_kind = identity.kind;
+	symbol.type_symbol = getName(identity.decl);
+	symbol.type_usr = getUSR(identity.decl, ctx);
+}
+
 static std::string typeNameForTypedef(const TypedefNameDecl *D, const ASTContext &ctx)
 {
 	const RecordDecl *anonymousRecord = recordDeclForType(D->getUnderlyingType());
@@ -403,6 +442,7 @@ public:
 		s.owner = getOwnerName(D);
 		s.type = stableTypeName(D->getType(), ctx);
 		s.canonical_type = canonicalTypeName(D->getType(), ctx);
+		setDeclaredTypeIdentity(s, D->getTypeSourceInfo(), ctx);
 		s.usr = getUSR(D, ctx);
 		s.context = "";
 		s.loc = index.location(D->getLocation());
@@ -975,6 +1015,7 @@ private:
 
 			s.type = stableTypeName(field->getType(), ctx);
 			s.canonical_type = canonicalTypeName(field->getType(), ctx);
+			setDeclaredTypeIdentity(s, field->getTypeSourceInfo(), ctx);
 			s.usr = getUSR(field, ctx);
 			s.context = "";
 			s.loc = index.displayLocation(ctx, field->getLocation());

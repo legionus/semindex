@@ -95,8 +95,12 @@ struct SymbolTypeRecord {
 	std::string symbol;
 	std::string declared_type;
 	std::string canonical_type;
+	std::string type_symbol;
 	semindex_symbol_kind_t kind;
+	int type_kind;
 	unsigned long long usr_id;
+	unsigned long long type_usr_id;
+	bool has_type_identity;
 };
 
 struct SymbolTypeCollector {
@@ -108,6 +112,9 @@ struct SymbolTypeCollector {
 struct OwnedTypeCursor {
 	std::string declared_type;
 	std::string canonical_type;
+	std::string type_symbol;
+	int type_kind = -1;
+	unsigned long long type_usr_id = 0;
 	std::string path;
 	semindex_db_symbol_type_cursor_t cursor = {};
 
@@ -115,6 +122,9 @@ struct OwnedTypeCursor {
 	{
 		cursor.declared_type = declared_type.c_str();
 		cursor.canonical_type = canonical_type.c_str();
+		cursor.type_symbol = type_symbol.c_str();
+		cursor.type_kind = type_kind;
+		cursor.type_usr_id = type_usr_id;
 		cursor.path = path.c_str();
 	}
 };
@@ -392,6 +402,9 @@ std::string typeCursor(const SymbolTypeRecord &record)
 	llvm::json::Object cursor{
 		{ "declaredType", record.declared_type },
 		{ "canonicalType", record.canonical_type },
+		{ "typeSymbol", record.type_symbol },
+		{ "typeKind", static_cast<int64_t>(record.type_kind) },
+		{ "typeUsrId", idString(record.type_usr_id) },
 		{ "path", record.path },
 	};
 	std::string serialized;
@@ -425,13 +438,24 @@ bool parseTypeCursor(llvm::StringRef encoded, OwnedTypeCursor &result)
 
 	auto declared_type = object->getString("declaredType");
 	auto canonical_type = object->getString("canonicalType");
+	auto type_symbol = object->getString("typeSymbol");
+	auto type_kind = object->getInteger("typeKind");
+	auto type_usr_id = object->getString("typeUsrId");
 	auto path = object->getString("path");
 
-	if (!declared_type || !canonical_type || !path)
+	if (!declared_type || !canonical_type || !type_symbol || !type_kind || !type_usr_id || !path)
+		return false;
+
+	auto parsed_type_usr_id = parseId(*type_usr_id);
+
+	if (!parsed_type_usr_id || *type_kind < -1 || *type_kind > SEMINDEX_SYMBOL_FILE)
 		return false;
 
 	result.declared_type = declared_type->str();
 	result.canonical_type = canonical_type->str();
+	result.type_symbol = type_symbol->str();
+	result.type_kind = *type_kind;
+	result.type_usr_id = *parsed_type_usr_id;
 	result.path = path->str();
 	result.updatePointers();
 
@@ -576,8 +600,12 @@ int collectSymbolType(void *data, const semindex_db_symbol_type_t *type)
 		.symbol = type->symbol,
 		.declared_type = type->declared_type,
 		.canonical_type = type->canonical_type,
+		.type_symbol = type->type_symbol,
 		.kind = type->kind,
+		.type_kind = type->type_kind,
 		.usr_id = type->usr_id,
+		.type_usr_id = type->type_usr_id,
+		.has_type_identity = type->has_type_identity != 0,
 	});
 
 	return 0;
@@ -688,7 +716,7 @@ llvm::json::Object symbolTypesResult(std::vector<SymbolTypeRecord> &records, siz
 	items.reserve(records.size());
 
 	for (const auto &record : records) {
-		items.push_back(llvm::json::Object{
+		llvm::json::Object item{
 			{ "variant", record.variant },
 			{ "path", record.path },
 			{ "symbol", record.symbol },
@@ -696,7 +724,18 @@ llvm::json::Object symbolTypesResult(std::vector<SymbolTypeRecord> &records, siz
 			{ "usrId", idString(record.usr_id) },
 			{ "declaredType", record.declared_type },
 			{ "canonicalType", record.canonical_type },
-		});
+		};
+
+		if (record.has_type_identity) {
+			item["typeIdentity"] = llvm::json::Object{
+				{ "variant", record.variant },
+				{ "symbol", record.type_symbol },
+				{ "kind", kindName(static_cast<semindex_symbol_kind_t>(record.type_kind)) },
+				{ "usrId", idString(record.type_usr_id) },
+			};
+		}
+
+		items.push_back(std::move(item));
 	}
 
 	llvm::json::Object result{
