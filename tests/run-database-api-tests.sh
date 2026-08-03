@@ -118,7 +118,10 @@ WHERE symbol = 'indirect_a' AND record = 0 LIMIT 1")
 function_type_plan=$(sqlite3 "$db" "EXPLAIN QUERY PLAN
 SELECT files.path FROM function_types JOIN files ON files.id = function_types.file_id
 WHERE function_types.symbol = 'indirect_a' AND function_types.usr_id = 0x$function_id
-AND files.variant = 'general'")
+AND files.variant = 'general'
+AND (-1 IS NULL OR (function_types.position, function_types.declared_type,
+function_types.canonical_type, function_types.type_symbol, function_types.type_kind,
+function_types.type_usr_id, files.path) > (-1, 'void', 'void', '', -1, 0, '$callgraph_source'))")
 if ! printf '%s\n' "$function_type_plan" |
 	grep -q 'SEARCH function_types USING PRIMARY KEY (symbol=? AND usr_id=?)'; then
 	printf '%s\n' "$function_type_plan" >&2

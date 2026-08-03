@@ -23,6 +23,7 @@ The default read-only tool set is:
 * `find_definitions`;
 * `find_references`;
 * `find_declared_types`;
+* `find_function_signature`;
 * `find_callers`;
 * `find_callees`;
 * `read_source_context`;
@@ -38,6 +39,12 @@ contributed them. The canonical type expands typedef chains. Results are
 bounded and cursor-paginated. A field whose written type names a typedef,
 record, or enum includes a `typeIdentity` object suitable for definition and
 type queries.
+
+`find_function_signature` accepts a function identity and returns its return
+type at position `-1` followed by ordered parameters. Each row contains the
+declared and canonical C type, source path, parameter name, and variadic flag.
+Parameters whose written type names a typedef, record, or enum include a
+`typeIdentity`. Results are bounded and cursor-paginated.
 
 Record results contain the variant, path, one-based byte position, qualified
 symbol, symbol kind, record type, action, access mode, enclosing context, local

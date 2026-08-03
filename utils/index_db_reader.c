@@ -533,8 +533,12 @@ int semindex_db_query_function_types(semindex_db_t *db, const semindex_db_functi
 		" function_types.type_usr_id, function_types.variadic"
 		" FROM function_types JOIN files ON files.id = function_types.file_id"
 		" WHERE function_types.symbol = ?1 AND function_types.usr_id = ?2 AND files.variant = ?3"
+		" AND (?4 IS NULL OR (function_types.position, function_types.declared_type,"
+		" function_types.canonical_type, function_types.type_symbol, function_types.type_kind,"
+		" function_types.type_usr_id, files.path) > (?4, ?5, ?6, ?7, ?8, ?9, ?10))"
 		" ORDER BY function_types.position, function_types.declared_type,"
-		" function_types.canonical_type, files.path";
+		" function_types.canonical_type, function_types.type_symbol, function_types.type_kind,"
+		" function_types.type_usr_id, files.path";
 	const semindex_db_identity_t *identity;
 	sqlite3_stmt *stmt = NULL;
 	size_t count = 0;
@@ -558,6 +562,25 @@ int semindex_db_query_function_types(semindex_db_t *db, const semindex_db_functi
 	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 1, identity->symbol));
 	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int64(stmt, 2, (sqlite3_int64)identity->usr_id));
 	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 3, identity->variant));
+
+	if (query->after) {
+		if (!query->after->declared_type || !query->after->canonical_type)
+			goto out;
+
+		if (!query->after->type_symbol || !query->after->path)
+			goto out;
+
+		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int(stmt, 4, query->after->position));
+		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 5, query->after->declared_type));
+		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 6, query->after->canonical_type));
+		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 7, query->after->type_symbol));
+		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int(stmt, 8, query->after->type_kind));
+		SEMINDEX_SQLITE_BIND_OR_GOTO(out,
+			semindex_sqlite_bind_int64(stmt, 9, (sqlite3_int64)query->after->type_usr_id));
+		SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 10, query->after->path));
+	} else {
+		SEMINDEX_SQLITE_BIND_OR_GOTO(out, sqlite3_bind_null(stmt, 4));
+	}
 
 	while ((!query->limit || count < query->limit) && (step = sqlite3_step(stmt)) == SQLITE_ROW) {
 		semindex_db_function_type_t type = {

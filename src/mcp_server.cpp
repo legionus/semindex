@@ -210,6 +210,13 @@ llvm::json::Array McpServer::toolDefinitions(bool allow_reindex)
 	declared_types["kind"] = stringProperty("Symbol kind returned by symbol_at");
 	result.push_back(tool("find_declared_types", "Find declared and canonical C types for a semantic identity",
 		objectSchema(std::move(declared_types), { "symbol", "usrId", "kind" })));
+	llvm::json::Object function_signature = pagingProperties();
+
+	function_signature["symbol"] = stringProperty("Qualified function name");
+	function_signature["variant"] = stringProperty("Index variant");
+	function_signature["usrId"] = stringProperty("Stable hexadecimal function identity");
+	result.push_back(tool("find_function_signature", "Find a structured C function signature",
+		objectSchema(std::move(function_signature), { "symbol", "usrId" })));
 
 	llvm::json::Object calls = pagingProperties();
 

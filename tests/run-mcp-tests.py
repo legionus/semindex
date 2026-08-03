@@ -183,6 +183,7 @@ def main():
 			"find_definitions",
 			"find_references",
 			"find_declared_types",
+			"find_function_signature",
 			"find_callers",
 			"find_callees",
 			"read_source_context",
@@ -273,6 +274,45 @@ def main():
 
 		if len(inner_type) != 1 or inner_type[0].get("typeIdentity", {}).get("symbol") != "Inner":
 			fail("find_declared_types did not relate the field to its record type")
+
+		function_identity = only_record(
+			client.tool("symbol_at", {"path": "tests/callgraph-a.c", "line": 26, "column": 6}),
+			"symbol_at indirect function",
+		)
+		return_type = client.tool(
+			"find_function_signature",
+			{
+				"symbol": function_identity["symbol"],
+				"variant": function_identity["variant"],
+				"usrId": function_identity["usrId"],
+				"limit": 1,
+			},
+		)
+		return_rows = return_type.get("types", [])
+
+		if len(return_rows) != 1 or return_rows[0]["position"] != -1 or return_rows[0]["declaredType"] != "void":
+			fail("find_function_signature returned the wrong return type")
+
+		if not return_type.get("truncated") or "nextCursor" not in return_type:
+			fail("find_function_signature did not paginate the signature")
+
+		parameter_type = client.tool(
+			"find_function_signature",
+			{
+				"symbol": function_identity["symbol"],
+				"variant": function_identity["variant"],
+				"usrId": function_identity["usrId"],
+				"limit": 1,
+				"cursor": return_type["nextCursor"],
+			},
+		)
+		parameter_rows = parameter_type.get("types", [])
+
+		if len(parameter_rows) != 1 or parameter_rows[0]["position"] != 0 or parameter_rows[0]["name"] != "fn":
+			fail("find_function_signature returned the wrong parameter")
+
+		if parameter_rows[0]["declaredType"] != "void (*)(void)" or parameter_type.get("truncated"):
+			fail("find_function_signature returned an incomplete parameter type")
 
 		definitions = client.tool(
 			"find_definitions",

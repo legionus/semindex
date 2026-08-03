@@ -55,7 +55,8 @@ types do not have a target identity.
 parameters for an exact function identity. The return row has position `-1`;
 parameter positions begin at zero. Rows include declared and canonical types,
 parameter names, the variadic flag, and a target type identity when available.
-The query is bounded by an optional limit and does not buffer the signature.
+The query is bounded by an optional limit, supports cursor pagination, and does
+not buffer the signature.
 
 ## Call queries
 

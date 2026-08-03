@@ -161,7 +161,18 @@ typedef struct {
 } semindex_db_function_type_t;
 
 typedef struct {
+	int position;
+	const char *declared_type;
+	const char *canonical_type;
+	const char *type_symbol;
+	int type_kind;
+	unsigned long long type_usr_id;
+	const char *path;
+} semindex_db_function_type_cursor_t;
+
+typedef struct {
 	const semindex_db_identity_t *identity;
+	const semindex_db_function_type_cursor_t *after;
 	size_t limit;
 } semindex_db_function_type_query_t;
 
