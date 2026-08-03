@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
 #include <unordered_map>
 #include <vector>
 
@@ -261,6 +262,26 @@ SemindexSourceLocation SemindexContext::displayLocation(const clang::ASTContext 
 
 	ret.file = internFile(std::move(file));
 	return ret;
+}
+
+std::string SemindexContext::commandPath(std::string path) const
+{
+	std::filesystem::path base(out->command_directory);
+	std::filesystem::path resolved(std::move(path));
+
+	if (base.empty())
+		return resolved.lexically_normal().generic_string();
+
+	if (resolved.is_relative())
+		resolved = base / resolved;
+
+	resolved = resolved.lexically_normal();
+	std::filesystem::path relative = resolved.lexically_relative(base.lexically_normal());
+
+	if (!relative.empty())
+		return relative.generic_string();
+
+	return resolved.generic_string();
 }
 
 void SemindexContext::addSymbolInScope(SemindexSymbol &&s, clang::SourceLocation loc)

@@ -124,6 +124,7 @@ public:
 	clang::SourceLocation spellingLoc(clang::SourceLocation loc) const;
 	SemindexSourceLocation location(clang::SourceLocation loc);
 	SemindexSourceLocation displayLocation(const clang::ASTContext &ast, clang::SourceLocation loc);
+	std::string commandPath(std::string path) const;
 
 	void addSymbolInScope(SemindexSymbol &&s, clang::SourceLocation loc);
 	void addUseInScope(SemindexUse &&u, clang::SourceLocation loc);

@@ -81,19 +81,19 @@ public:
 		CharSourceRange filenameRange, OptionalFileEntryRef file, StringRef, StringRef, const Module *, bool,
 		SrcMgr::CharacteristicKind) override
 	{
-		if (!file)
-			return;
-
 		addIncludeUse(fileName, isAngled, file, filenameRange.getBegin());
 	}
 
 private:
-	static std::string includeTarget(StringRef fileName, bool isAngled, OptionalFileEntryRef file)
+	std::string includeTarget(StringRef fileName, bool isAngled, OptionalFileEntryRef file) const
 	{
 		if (isAngled)
 			return "<" + fileName.str() + ">";
 
-		return file->getName().str();
+		if (!file)
+			return fileName.str();
+
+		return index.commandPath(file->getName().str());
 	}
 
 	void addIncludeUse(StringRef fileName, bool isAngled, OptionalFileEntryRef file, SourceLocation loc)
