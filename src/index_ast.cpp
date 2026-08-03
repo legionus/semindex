@@ -365,6 +365,18 @@ public:
 	{
 	}
 
+	void finishPointsToStats()
+	{
+		if (!index.pointsToAnalysis())
+			return;
+
+		pointsToStats.unique_direct_constraints = directConstraints.size();
+		pointsToStats.unique_copy_constraints = copyConstraints.size();
+		pointsToStats.pointer_identities = pointerIdentities.size();
+		pointsToStats.function_identities = functionIdentities.size();
+		index.setPointsToStats(pointsToStats);
+	}
+
 	bool TraverseFunctionDecl(FunctionDecl *D)
 	{
 		if (!D)
@@ -387,6 +399,9 @@ public:
 
 	bool VisitVarDecl(VarDecl *D)
 	{
+		if (index.pointsToAnalysis() && D->hasInit() && isFunctionPointer(D->getType()))
+			addPointsToConstraints(D, D->getInit());
+
 		if (getName(D).empty() || isNonDefinitionParameter(D))
 			return true;
 
@@ -437,6 +452,60 @@ public:
 			u.local = !currentFunction.empty();
 
 			index.addUseInScope(std::move(u), D->getLocation());
+		}
+
+		return true;
+	}
+
+	bool VisitBinaryOperator(BinaryOperator *E)
+	{
+		if (!index.pointsToAnalysis())
+			return true;
+
+		if (E->getOpcode() != BO_Assign)
+			return true;
+
+		const ValueDecl *target = pointerDecl(E->getLHS());
+
+		if (target)
+			addPointsToConstraints(target, E->getRHS());
+
+		return true;
+	}
+
+	bool VisitInitListExpr(InitListExpr *E)
+	{
+		if (!index.pointsToAnalysis())
+			return true;
+
+		if (InitListExpr *semantic = E->getSemanticForm())
+			E = semantic;
+
+		if (!pointsToInitLists.insert(E).second)
+			return true;
+
+		const RecordDecl *record = recordDeclForType(E->getType());
+
+		if (!record)
+			return true;
+
+		if (const RecordDecl *definition = record->getDefinition())
+			record = definition;
+
+		if (record->isUnion()) {
+			const FieldDecl *field = E->getInitializedFieldInUnion();
+
+			if (field && E->getNumInits() && isFunctionPointer(field->getType()))
+				addPointsToConstraints(field, E->getInit(0));
+
+			return true;
+		}
+
+		auto field = record->field_begin();
+
+		for (unsigned i = 0; i < E->getNumInits() && field != record->field_end(); i++, ++field) {
+			if (isFunctionPointer((*field)->getType()))
+				addPointsToConstraints(*field, E->getInit(i));
 		}
 
 		return true;
@@ -760,8 +829,24 @@ public:
 		const FunctionDecl *FD = E->getDirectCallee();
 		SourceLocation spelling;
 
-		if (!FD)
+		if (!FD) {
+			if (!index.pointsToAnalysis())
+				return true;
+
+			pointsToStats.indirect_callsites++;
+			const ValueDecl *callee = pointerDecl(E->getCallee());
+
+			if (callee) {
+				std::string usr = getUSR(callee, ctx);
+
+				if (!usr.empty()) {
+					pointsToStats.identified_callsites++;
+					pointerIdentities.insert(std::move(usr));
+				}
+			}
+
 			return true; /* indirect call: fp() */
+		}
 
 		spelling = index.spellingLoc(E->getExprLoc());
 		const ValueInfo &info = valueInfo(FD);
@@ -786,6 +871,122 @@ public:
 	}
 
 private:
+	static bool isFunctionPointer(QualType type)
+	{
+		return !type.isNull() && type->isFunctionPointerType();
+	}
+
+	static const Expr *stripPointsToWrappers(const Expr *E)
+	{
+		for (;;) {
+			E = E->IgnoreParens();
+
+			if (const auto *cast = dyn_cast<CastExpr>(E)) {
+				E = cast->getSubExpr();
+				continue;
+			}
+
+			if (const auto *unary = dyn_cast<UnaryOperator>(E)) {
+				if (unary->getOpcode() == UO_AddrOf || unary->getOpcode() == UO_Deref) {
+					E = unary->getSubExpr();
+					continue;
+				}
+			}
+
+			return E;
+		}
+	}
+
+	static const ValueDecl *pointerDecl(const Expr *E)
+	{
+		E = stripPointsToWrappers(E);
+
+		if (const auto *reference = dyn_cast<DeclRefExpr>(E)) {
+			const auto *decl = dyn_cast<ValueDecl>(reference->getDecl());
+
+			return decl && isFunctionPointer(decl->getType()) ? decl : nullptr;
+		}
+
+		if (const auto *member = dyn_cast<MemberExpr>(E)) {
+			const auto *decl = dyn_cast<ValueDecl>(member->getMemberDecl());
+
+			return decl && isFunctionPointer(decl->getType()) ? decl : nullptr;
+		}
+
+		return nullptr;
+	}
+
+	void addDirectConstraint(const std::string &target, const FunctionDecl *function)
+	{
+		pointsToStats.direct_constraints++;
+		const std::string &functionUsr = functionUSR(function);
+
+		if (target.empty() || functionUsr.empty()) {
+			pointsToStats.rejected_constraints++;
+
+			return;
+		}
+
+		pointerIdentities.insert(target);
+		functionIdentities.insert(functionUsr);
+		directConstraints.emplace(target, functionUsr);
+	}
+
+	void addCopyConstraint(const std::string &target, const ValueDecl *source)
+	{
+		pointsToStats.copy_constraints++;
+		std::string sourceUsr = getUSR(source, ctx);
+
+		if (target.empty() || sourceUsr.empty()) {
+			pointsToStats.rejected_constraints++;
+
+			return;
+		}
+
+		pointerIdentities.insert(target);
+		pointerIdentities.insert(sourceUsr);
+		copyConstraints.emplace(target, std::move(sourceUsr));
+	}
+
+	bool collectPointsToConstraints(const std::string &target, const Expr *E)
+	{
+		E = stripPointsToWrappers(E);
+
+		if (const auto *conditional = dyn_cast<ConditionalOperator>(E)) {
+			bool left = collectPointsToConstraints(target, conditional->getTrueExpr());
+			bool right = collectPointsToConstraints(target, conditional->getFalseExpr());
+
+			return left || right;
+		}
+
+		if (E->isNullPointerConstant(ctx, Expr::NPC_ValueDependentIsNotNull))
+			return true;
+
+		if (const auto *reference = dyn_cast<DeclRefExpr>(E)) {
+			if (const auto *function = dyn_cast<FunctionDecl>(reference->getDecl())) {
+				addDirectConstraint(target, function);
+
+				return true;
+			}
+		}
+
+		if (const ValueDecl *source = pointerDecl(E)) {
+			addCopyConstraint(target, source);
+
+			return true;
+		}
+
+		return false;
+	}
+
+	void addPointsToConstraints(const ValueDecl *target, const Expr *value)
+	{
+		std::string targetUsr = getUSR(target, ctx);
+
+		if (!collectPointsToConstraints(targetUsr, value))
+			pointsToStats.unsupported_constraints++;
+	}
+
 	struct ValueInfo {
 		semindex_symbol_kind_t kind;
 		std::string name;
@@ -1074,6 +1275,12 @@ private:
 	std::unordered_multimap<const FieldDecl *, const IndirectFieldDecl *> indirectFields;
 	std::unordered_map<const ValueDecl *, ValueInfo> valueInfoCache;
 	std::unordered_map<const FunctionDecl *, std::string> functionUSRCache;
+	semindex_points_to_stats_t pointsToStats{};
+	std::set<std::pair<std::string, std::string>> directConstraints;
+	std::set<std::pair<std::string, std::string>> copyConstraints;
+	std::set<const InitListExpr *> pointsToInitLists;
+	std::set<std::string> pointerIdentities;
+	std::set<std::string> functionIdentities;
 };
 
 /* ============================================================
@@ -1092,6 +1299,7 @@ public:
 	{
 		out->has_index_data = true;
 		visitor.TraverseDecl(ctx.getTranslationUnitDecl());
+		visitor.finishPointsToStats();
 	}
 
 private:

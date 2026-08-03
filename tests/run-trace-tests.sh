@@ -45,6 +45,12 @@ done
 if ! grep -q '"command":"compiler"' "$trace" || ! grep -q '"command":"index"' "$trace"; then
 	fail "trace omitted an indexing command"
 fi
+for phase in points_to.callsites points_to.direct points_to.copies points_to.rejected \
+	points_to.unsupported points_to.identities; do
+	if [ "$(grep -c "\"phase\":\"$phase\"" "$trace")" != 2 ]; then
+		fail "trace does not contain two $phase events"
+	fi
+done
 if [ "$(grep -c '"phase":"db.stage_records".*"items_in":[0-9][0-9]*,"items_out":[0-9][0-9]*' "$trace")" != 2 ] ||
 	[ "$(grep -c '"phase":"db.merge.records_insert".*"items_in":[0-9][0-9]*,"items_out":[0-9][0-9]*' "$trace")" != 2 ] ||
 	[ "$(grep -c '"phase":"db.merge.fingerprints_insert".*"items_in":[0-9][0-9]*,"items_out":[0-9][0-9]*' "$trace")" != 2 ]; then
@@ -82,6 +88,25 @@ if ! awk '
 ' "$tmpdir/flow.out"; then
 	cat "$tmpdir/flow.out" >&2
 	fail "fingerprint merge counters are incorrect"
+fi
+
+points_trace=$tmpdir/points-to.jsonl
+"$SEMINDEX" compiler --trace="$points_trace" --no-store-command --database="$tmpdir/points-to.db" -- \
+	cc --no-default-config "$SOURCE_DIR/tests/points-to.c"
+"$SOURCE_DIR/scripts/analyze-trace.py" "$points_trace" >"$tmpdir/points-to.out"
+if ! grep -q '^Indirect call prototype:$' "$tmpdir/points-to.out" ||
+	! grep -q '^  indirect callsites: 3$' "$tmpdir/points-to.out" ||
+	! grep -q '^  callsites with pointer identity: 3$' "$tmpdir/points-to.out" ||
+	! grep -q '^  direct target constraints: 4$' "$tmpdir/points-to.out" ||
+	! grep -q '^  unique direct constraints: 4$' "$tmpdir/points-to.out" ||
+	! grep -q '^  pointer copy constraints: 2$' "$tmpdir/points-to.out" ||
+	! grep -q '^  unique copy constraints: 2$' "$tmpdir/points-to.out" ||
+	! grep -q '^  rejected for missing identity: 0$' "$tmpdir/points-to.out" ||
+	! grep -q '^  unsupported assignments: 0$' "$tmpdir/points-to.out" ||
+	! grep -q '^  distinct pointer identities: 5$' "$tmpdir/points-to.out" ||
+	! grep -q '^  distinct function identities: 2$' "$tmpdir/points-to.out"; then
+	cat "$tmpdir/points-to.out" >&2
+	fail "points-to counters are incorrect"
 fi
 
 parallel_trace=$tmpdir/parallel.jsonl

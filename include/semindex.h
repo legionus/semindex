@@ -158,12 +158,26 @@ typedef struct {
 	size_t record_count;
 } semindex_file_fingerprint_t;
 
+typedef struct {
+	size_t indirect_callsites;
+	size_t identified_callsites;
+	size_t direct_constraints;
+	size_t unique_direct_constraints;
+	size_t copy_constraints;
+	size_t unique_copy_constraints;
+	size_t rejected_constraints;
+	size_t unsupported_constraints;
+	size_t pointer_identities;
+	size_t function_identities;
+} semindex_points_to_stats_t;
+
 /* lifecycle */
 SEMINDEX_API semindex_t *semindex_create(void);
 SEMINDEX_API void semindex_destroy(semindex_t *s);
 SEMINDEX_API void semindex_set_scope(semindex_t *s, semindex_scope_t scope);
 SEMINDEX_API void semindex_set_details(semindex_t *s, int enabled);
 SEMINDEX_API void semindex_set_include_local(semindex_t *s, int enabled);
+SEMINDEX_API void semindex_set_points_to_analysis(semindex_t *s, int enabled);
 
 /* indexing */
 SEMINDEX_API int semindex_index_command(semindex_t *s, const semindex_compile_command_t *cmd);
@@ -176,6 +190,8 @@ SEMINDEX_API size_t semindex_diagnostic_count(const semindex_t *s);
 SEMINDEX_API const semindex_diagnostic_t *semindex_get_diagnostic(const semindex_t *s, size_t idx);
 /* returned pointers are valid until the next index operation or destroy */
 SEMINDEX_API const semindex_compile_command_t *semindex_get_compile_command(const semindex_t *s);
+/* Experimental counters for sizing a future indirect-call model. */
+SEMINDEX_API const semindex_points_to_stats_t *semindex_get_points_to_stats(const semindex_t *s);
 
 /* queries */
 SEMINDEX_API size_t semindex_symbol_count(const semindex_t *s);

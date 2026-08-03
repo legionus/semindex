@@ -79,6 +79,10 @@ scripts/benchmark.py \
 Use `--passes=N` only when changing the measured batch duration.  Keep both
 builds on the same iteration and pass counts.
 
+Use `--trace` to compare trace-enabled code paths. The trace file is kept
+outside the database directory and is not included in the reported database
+size. Compare traced runs only with traced runs.
+
 The script alternates baseline and candidate runs and reports:
 
 * wall, user, and system time;
@@ -195,6 +199,12 @@ these values separately as the file fingerprint cache hit rate. The
 to the main database and the number actually inserted. After subtracting early
 cache hits, ignored inserts measure fingerprints that concurrent writers added
 while the process was waiting for the writer lock.
+
+Trace-only indirect-call analysis emits `points_to.*` events. The analyzer
+reports indirect callsites, direct-target and pointer-copy constraints before
+and after in-memory deduplication, missing identities, unsupported assignments,
+and distinct pointer and function identities. These counters estimate a future
+points-to database without storing constraints or changing callgraph queries.
 
 Top-level phases cover Clang parsing and record construction, semantic
 fingerprinting, repository provenance discovery, symbol database storage,

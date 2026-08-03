@@ -241,6 +241,11 @@ bool SemindexContext::includeLocal() const
 	return out->include_local;
 }
 
+bool SemindexContext::pointsToAnalysis() const
+{
+	return out->points_to_analysis;
+}
+
 clang::SourceLocation SemindexContext::spellingLoc(clang::SourceLocation loc) const
 {
 	return sm.getSpellingLoc(loc);
@@ -306,6 +311,11 @@ void SemindexContext::addFunctionSignatureInScope(SemindexFunctionSignature &&si
 		return;
 
 	out->function_signatures.push_back(std::move(signature));
+}
+
+void SemindexContext::setPointsToStats(const semindex_points_to_stats_t &stats)
+{
+	out->points_to_stats = stats;
 }
 
 std::string SemindexContext::locationKey(const SemindexSourceLocation &loc) const

@@ -194,6 +194,27 @@ def main():
     else:
         print("  unavailable (trace was recorded without fingerprint counters)")
 
+    callsites = phases.get("points_to.callsites", PhaseStats())
+    direct = phases.get("points_to.direct", PhaseStats())
+    copies = phases.get("points_to.copies", PhaseStats())
+    rejected = phases.get("points_to.rejected", PhaseStats())
+    unsupported = phases.get("points_to.unsupported", PhaseStats())
+    identities = phases.get("points_to.identities", PhaseStats())
+    print("\nIndirect call prototype:")
+    if all(stats.counter_count for stats in (callsites, direct, copies, rejected, unsupported, identities)):
+        print(f"  indirect callsites: {callsites.items_in}")
+        print(f"  callsites with pointer identity: {callsites.items_out}")
+        print(f"  direct target constraints: {direct.items_in}")
+        print(f"  unique direct constraints: {direct.items_out}")
+        print(f"  pointer copy constraints: {copies.items_in}")
+        print(f"  unique copy constraints: {copies.items_out}")
+        print(f"  rejected for missing identity: {rejected.items_in}")
+        print(f"  unsupported assignments: {unsupported.items_in}")
+        print(f"  distinct pointer identities: {identities.items_in}")
+        print(f"  distinct function identities: {identities.items_out}")
+    else:
+        print("  unavailable (trace was recorded without points-to counters)")
+
     print("\nPhase totals (nested phases overlap):")
     print(f"{'PHASE':<32} {'COUNT':>8} {'TOTAL (s)':>12} {'AVERAGE (ms)':>12} {'MAXIMUM (ms)':>12}")
     for name, stats in sorted(phases.items(), key=lambda item: item[1].total, reverse=True):

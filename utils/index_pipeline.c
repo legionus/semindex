@@ -25,6 +25,32 @@ static int store_command(const index_pipeline_request_t *request, const semindex
 		command->argc, command->argv);
 }
 
+static void trace_points_to(semindex_trace_t *trace, const semindex_t *index)
+{
+	const semindex_points_to_stats_t *stats = semindex_get_points_to_stats(index);
+	semindex_trace_time_t start;
+
+	if (!stats)
+		return;
+
+	start = semindex_trace_begin(trace);
+	semindex_trace_end_counted(trace, "points_to.callsites", start, stats->indirect_callsites,
+		stats->identified_callsites);
+	start = semindex_trace_begin(trace);
+	semindex_trace_end_counted(trace, "points_to.direct", start, stats->direct_constraints,
+		stats->unique_direct_constraints);
+	start = semindex_trace_begin(trace);
+	semindex_trace_end_counted(trace, "points_to.copies", start, stats->copy_constraints,
+		stats->unique_copy_constraints);
+	start = semindex_trace_begin(trace);
+	semindex_trace_end_counted(trace, "points_to.rejected", start, stats->rejected_constraints, 0);
+	start = semindex_trace_begin(trace);
+	semindex_trace_end_counted(trace, "points_to.unsupported", start, stats->unsupported_constraints, 0);
+	start = semindex_trace_begin(trace);
+	semindex_trace_end_counted(trace, "points_to.identities", start, stats->pointer_identities,
+		stats->function_identities);
+}
+
 int index_pipeline_run(const index_pipeline_request_t *request, index_pipeline_result_t *result)
 {
 	char *repository_root = NULL;
@@ -48,11 +74,13 @@ int index_pipeline_run(const index_pipeline_request_t *request, index_pipeline_r
 	semindex_set_scope(result->index, request->scope);
 	semindex_set_details(result->index, request->details);
 	semindex_set_include_local(result->index, request->include_local);
+	semindex_set_points_to_analysis(result->index, request->trace != NULL);
 
 	phase_start = semindex_trace_begin(request->trace);
 	result->frontend_ret = run_frontend(request, result->index);
 	result->frontend = semindex_get_index_result(result->index);
 	semindex_trace_end(request->trace, "parse", phase_start);
+	trace_points_to(request->trace, result->index);
 
 	if (!result->frontend || result->frontend->status == SEMINDEX_INDEX_FAILED) {
 		result->failed_stage = INDEX_PIPELINE_STAGE_FRONTEND;

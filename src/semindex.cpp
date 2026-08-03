@@ -144,6 +144,7 @@ static void clearIndex(semindex_t *s)
 	s->command_arguments.clear();
 	s->command_argv.clear();
 	s->command_record = {};
+	s->points_to_stats = {};
 	s->index_result = { SEMINDEX_INDEX_FAILED, 0, 0, 0 };
 	s->has_index_data = false;
 	s->diagnostics.clear();
@@ -273,6 +274,12 @@ void semindex_set_include_local(semindex_t *s, int enabled)
 		s->include_local = enabled;
 }
 
+void semindex_set_points_to_analysis(semindex_t *s, int enabled)
+{
+	if (s)
+		s->points_to_analysis = enabled;
+}
+
 int semindex_index_command(semindex_t *s, const semindex_compile_command_t *cmd)
 {
 	if (!s || !cmd || !cmd->file || !cmd->argv || !cmd->argc)
@@ -390,6 +397,11 @@ const semindex_compile_command_t *semindex_get_compile_command(const semindex_t 
 		return nullptr;
 
 	return &s->command_record;
+}
+
+const semindex_points_to_stats_t *semindex_get_points_to_stats(const semindex_t *s)
+{
+	return s ? &s->points_to_stats : nullptr;
 }
 
 int semindex_build_file_fingerprints(semindex_t *s)

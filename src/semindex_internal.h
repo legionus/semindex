@@ -92,6 +92,7 @@ struct semindex {
 	semindex_scope_t scope = SEMINDEX_SCOPE_PROJECT;
 	bool details = true;
 	bool include_local = true;
+	bool points_to_analysis = false;
 	unsigned long long next_order = 0;
 	std::set<std::string> files;
 	std::vector<SemindexSymbol> symbols;
@@ -107,6 +108,7 @@ struct semindex {
 	std::vector<std::string> command_arguments;
 	std::vector<const char *> command_argv;
 	semindex_compile_command_t command_record{};
+	semindex_points_to_stats_t points_to_stats{};
 	semindex_index_result_t index_result = { SEMINDEX_INDEX_FAILED, 0, 0, 0 };
 	bool has_index_data = false;
 	std::vector<SemindexDiagnostic> diagnostics;
@@ -121,6 +123,7 @@ public:
 	bool inScope(clang::SourceLocation loc) const;
 	bool details() const;
 	bool includeLocal() const;
+	bool pointsToAnalysis() const;
 	clang::SourceLocation spellingLoc(clang::SourceLocation loc) const;
 	SemindexSourceLocation location(clang::SourceLocation loc);
 	SemindexSourceLocation displayLocation(const clang::ASTContext &ast, clang::SourceLocation loc);
@@ -129,6 +132,7 @@ public:
 	void addSymbolInScope(SemindexSymbol &&s, clang::SourceLocation loc);
 	void addUseInScope(SemindexUse &&u, clang::SourceLocation loc);
 	void addFunctionSignatureInScope(SemindexFunctionSignature &&signature, clang::SourceLocation loc);
+	void setPointsToStats(const semindex_points_to_stats_t &stats);
 
 	std::string locationKey(const SemindexSourceLocation &loc) const;
 

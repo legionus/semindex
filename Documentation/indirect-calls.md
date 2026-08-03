@@ -49,8 +49,9 @@ result as a sound whole-program callgraph.
 
 ## Storage boundary
 
-No schema should be added before measuring extracted constraints. A trace-only
-prototype should count, per translation unit:
+No schema should be added before measuring extracted constraints. The
+trace-only prototype runs when `compiler` or `index` receives `--trace` and
+counts, per translation unit:
 
 * indirect callsites;
 * direct target constraints;
@@ -58,6 +59,11 @@ prototype should count, per translation unit:
 * constraints rejected because either side lacks a stable identity;
 * distinct pointer and function identities;
 * duplicate constraints removed before database staging.
+
+The prototype retains only deduplicated identity pairs in memory for the
+duration of one translation unit. It does not add constraints to fingerprints,
+SQLite, JSON or dissect output, or direct callgraph queries. Normal indexing
+without `--trace` does not run the extraction.
 
 Measurements must include the repository benchmark and a parallel Linux kernel
 indexing run. Report aggregate and per-translation-unit counts together with

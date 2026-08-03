@@ -11,12 +11,14 @@
 		semindex_get_file_fingerprint;
 		semindex_get_function_signature;
 		semindex_get_index_result;
+		semindex_get_points_to_stats;
 		semindex_get_symbol;
 		semindex_get_use;
 		semindex_index_command;
 		semindex_index_file;
 		semindex_set_details;
 		semindex_set_include_local;
+		semindex_set_points_to_analysis;
 		semindex_set_scope;
 		semindex_symbol_count;
 		semindex_use_count;

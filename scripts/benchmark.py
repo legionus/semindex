@@ -57,6 +57,8 @@ def parse_args():
         help="measured iterations per executable (default: 5)")
     parser.add_argument("--passes", type=positive_integer, default=5,
         help="source-set passes per measurement (default: 5)")
+    parser.add_argument("--trace", action="store_true",
+        help="measure indexing with internal tracing enabled")
     return parser.parse_args()
 
 
@@ -131,7 +133,7 @@ def count_records(database):
     return row[0]
 
 
-def run_one(root, temporary, label, binary, iteration, passes, sources):
+def run_one(root, temporary, label, binary, iteration, passes, sources, trace):
     run_directory = temporary / f"{iteration}-{label}"
     state = run_directory / "state"
     state.mkdir(parents=True)
@@ -140,12 +142,15 @@ def run_one(root, temporary, label, binary, iteration, passes, sources):
 
     for _ in range(passes):
         for source in sources:
-            command = (
+            command = [
                 "/usr/bin/time", "-a", "-o", str(timings), "-f", "%e\t%U\t%S\t%M",
                 str(binary), "compiler", f"--database={state / 'semindex.db'}",
-                f"--commands-database={state / 'commands.db'}", "--", "cc",
-                f"-I{root / 'tests/include'}", str(source),
-            )
+                f"--commands-database={state / 'commands.db'}",
+            ]
+            if trace:
+                command.append(f"--trace={run_directory / 'trace.jsonl'}")
+            command.extend(("--", "cc", f"-I{root / 'tests/include'}", str(source)))
+
             try:
                 subprocess.run(command, stdout=subprocess.DEVNULL, check=True)
             except subprocess.CalledProcessError as error:
@@ -214,8 +219,10 @@ def main():
         sources.extend((callgraph, *shared_sources))
 
         # Warm up the loader, Clang, and filesystem metadata caches.
-        run_one(root, temporary, "warmup-baseline", baseline, 0, args.passes, sources)
-        run_one(root, temporary, "warmup-candidate", candidate, 0, args.passes, sources)
+        run_one(root, temporary, "warmup-baseline", baseline, 0, args.passes,
+            sources, args.trace)
+        run_one(root, temporary, "warmup-candidate", candidate, 0, args.passes,
+            sources, args.trace)
 
         results = []
         for iteration in range(1, args.iterations + 1):
@@ -223,7 +230,8 @@ def main():
             if iteration % 2 == 0:
                 order = tuple(reversed(order))
             for label, binary in order:
-                results.append(run_one(root, temporary, label, binary, iteration, args.passes, sources))
+                results.append(run_one(root, temporary, label, binary, iteration,
+                    args.passes, sources, args.trace))
         print_results(results)
 
 
