@@ -78,6 +78,11 @@ struct type_state {
 	int failed;
 };
 
+struct function_type_state {
+	unsigned count;
+	int failed;
+};
+
 static int check_record(void *data, const semindex_db_record_t *record)
 {
 	struct result_state *state = data;
@@ -363,6 +368,31 @@ static int check_symbol_type(void *data, const semindex_db_symbol_type_t *type)
 	return 0;
 }
 
+static int check_function_type(void *data, const semindex_db_function_type_t *type)
+{
+	struct function_type_state *state = data;
+
+	if (strcmp(type->symbol, "indirect_a") || strcmp(type->variant, "general") || type->variadic) {
+		state->failed = 1;
+
+		return -1;
+	}
+
+	if (state->count == 0) {
+		if (type->position != -1 || strcmp(type->declared_type, "void") || type->name[0])
+			state->failed = 1;
+	} else if (state->count == 1) {
+		if (type->position != 0 || strcmp(type->name, "fn") || strcmp(type->declared_type, "void (*)(void)"))
+			state->failed = 1;
+	} else {
+		state->failed = 1;
+	}
+
+	state->count++;
+
+	return state->failed ? -1 : 0;
+}
+
 static int check_identity_queries(semindex_db_t *db, const char *path)
 {
 	struct identity_state identity = { 0 };
@@ -427,6 +457,8 @@ int main(int argc, char **argv)
 	};
 	struct function_state caller = { .symbol = "caller" };
 	struct function_state leaf = { .symbol = "leaf" };
+	struct function_state indirect = { .symbol = "indirect_a" };
+	struct function_type_state function_types = { 0 };
 	semindex_db_query_options_t function_options = {
 		.variant = "general",
 		.record = SEMINDEX_DB_RECORD_DEFINITION,
@@ -436,6 +468,8 @@ int main(int argc, char **argv)
 	semindex_db_call_options_t call_options = {
 		.variant = "general",
 	};
+	semindex_db_identity_t function_identity;
+	semindex_db_function_type_query_t function_type_query;
 	struct call_state callees = { .caller = "caller" };
 	struct call_state callers = { .caller = "caller", .callee = "leaf" };
 	struct variant_state variants = { 0 };
@@ -466,6 +500,23 @@ int main(int argc, char **argv)
 		goto unexpected;
 	function_options.symbol = leaf.symbol;
 	if (semindex_db_query(db, &function_options, collect_function, &leaf) < 0 || leaf.count != 1)
+		goto unexpected;
+	function_options.symbol = indirect.symbol;
+	if (semindex_db_query(db, &function_options, collect_function, &indirect) < 0 || indirect.count != 1)
+		goto unexpected;
+
+	function_identity = (semindex_db_identity_t){
+		.variant = "general",
+		.symbol = indirect.symbol,
+		.usr_id = indirect.usr_id,
+		.kind = SEMINDEX_SYMBOL_FUNCTION,
+	};
+	function_type_query = (semindex_db_function_type_query_t){
+		.identity = &function_identity,
+	};
+
+	if (semindex_db_query_function_types(db, &function_type_query, check_function_type, &function_types) < 0 ||
+		function_types.failed || function_types.count != 2)
 		goto unexpected;
 
 	call_options.function = caller.symbol;

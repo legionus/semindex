@@ -332,6 +332,18 @@ static void setDeclaredTypeIdentity(SemindexSymbol &symbol, TypeSourceInfo *info
 	symbol.type_usr = getUSR(identity.decl, ctx);
 }
 
+static void setDeclaredTypeIdentity(SemindexParameter &parameter, TypeSourceInfo *info, const ASTContext &ctx)
+{
+	DeclaredTypeIdentity identity = declaredTypeIdentity(info);
+
+	if (!identity.decl || getName(identity.decl).empty())
+		return;
+
+	parameter.type_kind = identity.kind;
+	parameter.type_symbol = getName(identity.decl);
+	parameter.type_usr = getUSR(identity.decl, ctx);
+}
+
 static std::string typeNameForTypedef(const TypedefNameDecl *D, const ASTContext &ctx)
 {
 	const RecordDecl *anonymousRecord = recordDeclForType(D->getUnderlyingType());
@@ -450,6 +462,7 @@ public:
 		s.definition = true;
 
 		index.addSymbolInScope(std::move(s), D->getLocation());
+
 		return true;
 	}
 
@@ -715,6 +728,30 @@ public:
 		s.definition = D->isThisDeclarationADefinition();
 
 		index.addSymbolInScope(std::move(s), D->getLocation());
+
+		SemindexFunctionSignature signature;
+
+		signature.name = getName(D);
+		signature.usr = functionUSR(D);
+		signature.return_type = stableTypeName(D->getReturnType(), ctx);
+		signature.canonical_return_type = canonicalTypeName(D->getReturnType(), ctx);
+		signature.loc = index.location(D->getLocation());
+		signature.variadic = D->isVariadic();
+		signature.parameters.reserve(D->getNumParams());
+
+		for (const ParmVarDecl *parameterDecl : D->parameters()) {
+			QualType parameterType = parameterDecl->getOriginalType();
+			SemindexParameter parameter;
+
+			parameter.name = getName(parameterDecl);
+			parameter.type = stableTypeName(parameterType, ctx);
+			parameter.canonical_type = canonicalTypeName(parameterType, ctx);
+			setDeclaredTypeIdentity(parameter, parameterDecl->getTypeSourceInfo(), ctx);
+			signature.parameters.push_back(std::move(parameter));
+		}
+
+		index.addFunctionSignatureInScope(std::move(signature), D->getLocation());
+
 		return true;
 	}
 

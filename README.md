@@ -72,6 +72,7 @@ The remaining long-term work is to deepen the semantic model beyond the
 implemented symbol index, direct call graph, and SQLite queries. This includes:
 
 * richer struct, union, and enum relationships beyond field type identities;
+* protocol queries for the stored structured function signatures;
 * indirect-call target resolution;
 * semantic queries beyond the original Sparse semind interface.
 

@@ -49,6 +49,14 @@ For fields whose written type names a typedef, record, or enum, the result also
 contains the target symbol, kind, and compact identity. Builtin and anonymous
 types do not have a target identity.
 
+## Function type queries
+
+`semindex_db_query_function_types()` streams the return type and ordered
+parameters for an exact function identity. The return row has position `-1`;
+parameter positions begin at zero. Rows include declared and canonical types,
+parameter names, the variadic flag, and a target type identity when available.
+The query is bounded by an optional limit and does not buffer the signature.
+
 ## Call queries
 
 `semindex_db_query_calls()` returns direct caller or callee relationships

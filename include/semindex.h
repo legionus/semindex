@@ -85,6 +85,29 @@ typedef struct {
 	unsigned column;
 } semindex_diagnostic_t;
 
+typedef struct {
+	const char *name;
+	const char *type;
+	const char *canonical_type;
+	semindex_symbol_kind_t type_kind;
+	const char *type_symbol;
+	const char *type_usr;
+	unsigned long long type_usr_id;
+} semindex_parameter_t;
+
+typedef struct {
+	const char *name;
+	const char *usr;
+	unsigned long long usr_id;
+	const char *return_type;
+	const char *canonical_return_type;
+	const semindex_parameter_t *parameters;
+	size_t parameter_count;
+	const char *file;
+	size_t file_index;
+	int variadic;
+} semindex_function_signature_t;
+
 /* symbol record */
 typedef struct {
 	semindex_symbol_kind_t kind;
@@ -162,6 +185,10 @@ SEMINDEX_API const semindex_symbol_t *semindex_get_symbol(const semindex_t *s, s
 SEMINDEX_API size_t semindex_use_count(const semindex_t *s);
 /* returned pointer is valid until the next index operation or destroy */
 SEMINDEX_API const semindex_use_t *semindex_get_use(const semindex_t *s, size_t idx);
+
+SEMINDEX_API size_t semindex_function_signature_count(const semindex_t *s);
+/* returned pointer is valid until the next index operation or destroy */
+SEMINDEX_API const semindex_function_signature_t *semindex_get_function_signature(const semindex_t *s, size_t idx);
 
 SEMINDEX_API size_t semindex_file_fingerprint_count(const semindex_t *s);
 /* returned pointer is valid until the next index operation or destroy */

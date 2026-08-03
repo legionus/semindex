@@ -182,9 +182,18 @@ if [ -n "$git_commit_option" ] &&
 fi
 
 printf '%s\n' '#include "shared.h"' \
-	'int read_1(struct shared *p) { return p->other; }' >"$tmpdir/worker-1.c"
+	'long read_1(struct shared *p, int extra) { return p->other + extra; }' >"$tmpdir/worker-1.c"
 "$SEMINDEX" compiler --database "$db" -- cc --no-default-config \
 	-I"$tmpdir" "$tmpdir/worker-1.c"
+if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM function_types JOIN files ON files.id = function_types.file_id
+WHERE function_types.symbol = 'read_1' AND files.path = '$tmpdir/worker-1.c'")" != 3 ]; then
+	fail "reindexing a function retained stale signature rows"
+fi
+if [ "$(sqlite3 "$db" "SELECT declared_type FROM function_types JOIN files ON files.id = function_types.file_id
+WHERE function_types.symbol = 'read_1' AND function_types.position = -1
+AND files.path = '$tmpdir/worker-1.c'")" != long ]; then
+	fail "reindexing a function retained its old return type"
+fi
 
 if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM records WHERE symbol = 'shared.pid'")" != 9 ]; then
 	fail "reindexing one source damaged records from other sources"

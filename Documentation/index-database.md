@@ -34,6 +34,13 @@ system. Fields whose written type names a typedef, record, or enum also store
 the target symbol kind and compact identity. This allows clients to navigate
 from a field to its declared type without matching type-name strings.
 
+The `function_types` table stores one return row and one row per parameter for
+each function identity and contributing file. Position `-1` is the return type;
+nonnegative positions preserve parameter order and names. Each row stores both
+the declared and canonical spelling. Parameters that name a typedef, record, or
+enum also carry that type's compact identity. A variadic flag belongs to the
+return row, so functions without parameters still have a complete signature.
+
 ## Reader API
 
 `libsemindex_database` exposes a read-only C API in
@@ -156,8 +163,8 @@ rebuilding the index. This is an intentional tradeoff for a reproducible cache.
 
 ## Compatibility
 
-The database is an experimental interface. Schema version 16 relates fields to
-the stable identity of their declared type and does not migrate older databases.
+The database is an experimental interface. Schema version 17 stores structured
+function signatures and does not migrate older databases.
 Dropping old tables in place would also leave their original multi-gigabyte file allocation.
 Remove an old database before indexing:
 

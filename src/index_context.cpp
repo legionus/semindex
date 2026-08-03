@@ -103,6 +103,41 @@ static void updateFingerprints(FileFingerprintState &state, const FingerprintRec
 	}
 }
 
+static void hashFunctionSignature(llvm::BLAKE3 &hash, const semindex_function_signature_t &signature)
+{
+	hashInteger(hash, 2);
+	hashString(hash, signature.name);
+	hashInteger(hash, signature.usr_id);
+	hashString(hash, signature.return_type);
+	hashString(hash, signature.canonical_return_type);
+	hashInteger(hash, signature.variadic);
+	hashInteger(hash, signature.parameter_count);
+
+	for (size_t i = 0; i < signature.parameter_count; i++) {
+		const semindex_parameter_t &parameter = signature.parameters[i];
+
+		hashInteger(hash, i);
+		hashString(hash, parameter.name);
+		hashString(hash, parameter.type);
+		hashString(hash, parameter.canonical_type);
+		hashString(hash, parameter.type_symbol);
+		hashInteger(hash, parameter.type_usr_id ? parameter.type_kind : -1);
+		hashInteger(hash, parameter.type_usr_id);
+	}
+}
+
+static void updateFunctionSignatureFingerprint(FileFingerprintState &state,
+	const semindex_function_signature_t &signature)
+{
+	hashFunctionSignature(state.hash[0], signature);
+	state.records[0]++;
+
+	if (state.has_local) {
+		hashFunctionSignature(state.hash[1], signature);
+		state.records[1]++;
+	}
+}
+
 static std::string locToFile(const clang::ASTContext &ctx, clang::SourceLocation loc, unsigned &line, unsigned &col)
 {
 	const clang::SourceManager &sm = ctx.getSourceManager();
@@ -244,6 +279,14 @@ void SemindexContext::addUseInScope(SemindexUse &&u, clang::SourceLocation loc)
 	addUse(std::move(u));
 }
 
+void SemindexContext::addFunctionSignatureInScope(SemindexFunctionSignature &&signature, clang::SourceLocation loc)
+{
+	if (!inScope(loc))
+		return;
+
+	out->function_signatures.push_back(std::move(signature));
+}
+
 std::string SemindexContext::locationKey(const SemindexSourceLocation &loc) const
 {
 	std::string file = loc.file ? *loc.file : "";
@@ -333,6 +376,42 @@ void rebuildRecords(semindex *s)
 
 		s->use_records.push_back(rec);
 	}
+
+	s->parameter_records.clear();
+	s->parameter_records.reserve(s->function_signatures.size());
+	s->function_signature_records.clear();
+	s->function_signature_records.reserve(s->function_signatures.size());
+
+	for (const auto &signature : s->function_signatures) {
+		auto &parameters = s->parameter_records.emplace_back();
+
+		parameters.reserve(signature.parameters.size());
+
+		for (const auto &parameter : signature.parameters) {
+			parameters.push_back({
+				.name = parameter.name.c_str(),
+				.type = parameter.type.c_str(),
+				.canonical_type = parameter.canonical_type.c_str(),
+				.type_kind = parameter.type_kind,
+				.type_symbol = parameter.type_symbol.c_str(),
+				.type_usr = parameter.type_usr.c_str(),
+				.type_usr_id = parameter.type_usr.empty() ? 0 : llvm::xxHash64(parameter.type_usr),
+			});
+		}
+
+		s->function_signature_records.push_back({
+			.name = signature.name.c_str(),
+			.usr = signature.usr.c_str(),
+			.usr_id = signature.usr.empty() ? 0 : llvm::xxHash64(signature.usr),
+			.return_type = signature.return_type.c_str(),
+			.canonical_return_type = signature.canonical_return_type.c_str(),
+			.parameters = parameters.data(),
+			.parameter_count = parameters.size(),
+			.file = signature.loc.file ? signature.loc.file->c_str() : "",
+			.file_index = signature.loc.file ? file_index.at(signature.loc.file) : s->files.size(),
+			.variadic = signature.variadic,
+		});
+	}
 }
 
 void rebuildFingerprints(semindex *s)
@@ -391,6 +470,12 @@ void rebuildFingerprints(semindex *s)
 			continue;
 
 		updateFingerprints(fingerprints[rec.file_index], record);
+	}
+	for (const auto &signature : s->function_signature_records) {
+		if (signature.file_index >= fingerprints.size())
+			continue;
+
+		updateFunctionSignatureFingerprint(fingerprints[signature.file_index], signature);
 	}
 
 	s->file_fingerprints[0].clear();

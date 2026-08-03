@@ -61,6 +61,25 @@ struct SemindexUse {
 	unsigned long long order;
 };
 
+struct SemindexParameter {
+	std::string name;
+	std::string type;
+	std::string canonical_type;
+	semindex_symbol_kind_t type_kind = SEMINDEX_SYMBOL_VAR;
+	std::string type_symbol;
+	std::string type_usr;
+};
+
+struct SemindexFunctionSignature {
+	std::string name;
+	std::string usr;
+	std::string return_type;
+	std::string canonical_return_type;
+	std::vector<SemindexParameter> parameters;
+	SemindexSourceLocation loc;
+	bool variadic;
+};
+
 struct SemindexDiagnostic {
 	semindex_diagnostic_severity_t severity;
 	std::string message;
@@ -77,8 +96,11 @@ struct semindex {
 	std::set<std::string> files;
 	std::vector<SemindexSymbol> symbols;
 	std::vector<SemindexUse> uses;
+	std::vector<SemindexFunctionSignature> function_signatures;
 	std::vector<semindex_symbol_t> symbol_records;
 	std::vector<semindex_use_t> use_records;
+	std::vector<std::vector<semindex_parameter_t>> parameter_records;
+	std::vector<semindex_function_signature_t> function_signature_records;
 	std::vector<semindex_file_fingerprint_t> file_fingerprints[2];
 	std::string command_directory;
 	std::string command_file;
@@ -105,6 +127,7 @@ public:
 
 	void addSymbolInScope(SemindexSymbol &&s, clang::SourceLocation loc);
 	void addUseInScope(SemindexUse &&u, clang::SourceLocation loc);
+	void addFunctionSignatureInScope(SemindexFunctionSignature &&signature, clang::SourceLocation loc);
 
 	std::string locationKey(const SemindexSourceLocation &loc) const;
 

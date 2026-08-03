@@ -131,8 +131,11 @@ static void clearIndex(semindex_t *s)
 	s->next_order = 0;
 	s->symbols.clear();
 	s->uses.clear();
+	s->function_signatures.clear();
 	s->symbol_records.clear();
 	s->use_records.clear();
+	s->parameter_records.clear();
+	s->function_signature_records.clear();
 	s->file_fingerprints[0].clear();
 	s->file_fingerprints[1].clear();
 	s->files.clear();
@@ -422,6 +425,19 @@ const semindex_use_t *semindex_get_use(const semindex_t *s, size_t idx)
 		return nullptr;
 
 	return &s->use_records[idx];
+}
+
+size_t semindex_function_signature_count(const semindex_t *s)
+{
+	return s ? s->function_signature_records.size() : 0;
+}
+
+const semindex_function_signature_t *semindex_get_function_signature(const semindex_t *s, size_t idx)
+{
+	if (!s || idx >= s->function_signature_records.size())
+		return nullptr;
+
+	return &s->function_signature_records[idx];
 }
 
 size_t semindex_file_fingerprint_count(const semindex_t *s)

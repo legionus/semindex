@@ -5,9 +5,11 @@
 		semindex_destroy;
 		semindex_diagnostic_count;
 		semindex_file_fingerprint_count;
+		semindex_function_signature_count;
 		semindex_get_compile_command;
 		semindex_get_diagnostic;
 		semindex_get_file_fingerprint;
+		semindex_get_function_signature;
 		semindex_get_index_result;
 		semindex_get_symbol;
 		semindex_get_use;

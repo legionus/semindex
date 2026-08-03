@@ -112,6 +112,22 @@ if printf '%s\n' "$type_plan" | grep -q 'SCAN symbol_types'; then
 	printf '%s\n' "$type_plan" >&2
 	fail "declared type lookup scans all symbol types"
 fi
+
+function_id=$(sqlite3 "$db" "SELECT printf('%016x', usr_id) FROM records
+WHERE symbol = 'indirect_a' AND record = 0 LIMIT 1")
+function_type_plan=$(sqlite3 "$db" "EXPLAIN QUERY PLAN
+SELECT files.path FROM function_types JOIN files ON files.id = function_types.file_id
+WHERE function_types.symbol = 'indirect_a' AND function_types.usr_id = 0x$function_id
+AND files.variant = 'general'")
+if ! printf '%s\n' "$function_type_plan" |
+	grep -q 'SEARCH function_types USING PRIMARY KEY (symbol=? AND usr_id=?)'; then
+	printf '%s\n' "$function_type_plan" >&2
+	fail "function type lookup does not use the primary key"
+fi
+if printf '%s\n' "$function_type_plan" | grep -q 'SCAN function_types'; then
+	printf '%s\n' "$function_type_plan" >&2
+	fail "function type lookup scans all function types"
+fi
 if printf '%s\n' "$identity_plan" | grep -q 'SCAN records'; then
 	printf '%s\n' "$identity_plan" >&2
 	fail "identity lookup scans all records"
