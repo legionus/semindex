@@ -77,7 +77,9 @@ Indirect calls such as `fn()` or `ops->read()` are not resolved to possible
 function targets and are not returned by `semindex callgraph`.  semindex does
 not infer edges from compatible function types because doing so would create a
 large number of false relationships.  Capturing unresolved indirect callsites
-and later adding points-to analysis are separate future steps.
+and later adding points-to analysis are separate future steps. The proposed
+constraint model and its measurement gate are documented in
+[`indirect-calls.md`](indirect-calls.md).
 
 As with the symbol index, only code active under the compiler arguments for an
 indexed variant appears in the graph.  Index multiple variants to combine
