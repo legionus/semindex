@@ -20,6 +20,26 @@ struct FileFingerprintState {
 	bool has_local = false;
 };
 
+struct FingerprintRecord {
+	int record;
+	int action;
+	int kind;
+	uint64_t mode;
+	const char *owner;
+	const char *name;
+	unsigned line;
+	unsigned column;
+	const char *context;
+	uint64_t usr_id;
+	uint64_t context_usr_id;
+	int local;
+	const char *type;
+	const char *canonical_type;
+	const char *type_symbol;
+	int type_kind;
+	uint64_t type_usr_id;
+};
+
 static void hashInteger(llvm::BLAKE3 &hash, uint64_t value)
 {
 	uint8_t bytes[8];
@@ -39,52 +59,46 @@ static void hashString(llvm::BLAKE3 &hash, const char *value)
 	hash.update(str);
 }
 
-static void hashRecord(llvm::BLAKE3 &hash, int record, int action, int kind, uint64_t mode, const char *owner,
-	const char *name, unsigned line, unsigned column, const char *context, uint64_t usr_id, uint64_t context_usr_id,
-	int local, const char *type, const char *canonical_type, const char *type_symbol, uint64_t type_usr_id)
+static void hashRecord(llvm::BLAKE3 &hash, const FingerprintRecord &record)
 {
-	hashInteger(hash, record);
-	hashInteger(hash, action);
-	hashInteger(hash, kind);
-	hashInteger(hash, mode);
-	hashString(hash, owner);
-	hashString(hash, name);
-	hashInteger(hash, line);
-	hashInteger(hash, column);
-	hashString(hash, context);
-	hashInteger(hash, usr_id);
-	hashInteger(hash, context_usr_id);
-	hashInteger(hash, local);
-	hashString(hash, type);
-	hashString(hash, canonical_type);
-	hashString(hash, type_symbol);
-	hashInteger(hash, type_usr_id);
+	hashInteger(hash, record.record);
+	hashInteger(hash, record.action);
+	hashInteger(hash, record.kind);
+	hashInteger(hash, record.mode);
+	hashString(hash, record.owner);
+	hashString(hash, record.name);
+	hashInteger(hash, record.line);
+	hashInteger(hash, record.column);
+	hashString(hash, record.context);
+	hashInteger(hash, record.usr_id);
+	hashInteger(hash, record.context_usr_id);
+	hashInteger(hash, record.local);
+	hashString(hash, record.type);
+	hashString(hash, record.canonical_type);
+	hashString(hash, record.type_symbol);
+	hashInteger(hash, record.type_kind);
+	hashInteger(hash, record.type_usr_id);
 }
 
-static void updateFingerprints(FileFingerprintState &state, int local, int record, int action, int kind, uint64_t mode,
-	const char *owner, const char *name, unsigned line, unsigned column, const char *context, uint64_t usr_id,
-	uint64_t context_usr_id, const char *type, const char *canonical_type, const char *type_symbol,
-	uint64_t type_usr_id)
+static void updateFingerprints(FileFingerprintState &state, const FingerprintRecord &record)
 {
-	if (local) {
+	if (record.local) {
 		if (!state.has_local) {
 			state.hash[1] = state.hash[0];
 			state.records[1] = state.records[0];
 			state.has_local = true;
 		}
-		hashRecord(state.hash[1], record, action, kind, mode, owner, name, line, column, context, usr_id,
-			context_usr_id, local, type, canonical_type, type_symbol, type_usr_id);
+		hashRecord(state.hash[1], record);
 		state.records[1]++;
+
 		return;
 	}
 
-	hashRecord(state.hash[0], record, action, kind, mode, owner, name, line, column, context, usr_id,
-		context_usr_id, local, type, canonical_type, type_symbol, type_usr_id);
+	hashRecord(state.hash[0], record);
 	state.records[0]++;
 
 	if (state.has_local) {
-		hashRecord(state.hash[1], record, action, kind, mode, owner, name, line, column, context, usr_id,
-			context_usr_id, local, type, canonical_type, type_symbol, type_usr_id);
+		hashRecord(state.hash[1], record);
 		state.records[1]++;
 	}
 }
@@ -327,16 +341,56 @@ void rebuildFingerprints(semindex *s)
 	size_t index = 0;
 
 	for (const auto &rec : s->symbol_records) {
-		if (rec.file_index < fingerprints.size())
-			updateFingerprints(fingerprints[rec.file_index], rec.local, 0, rec.definition, rec.kind, 0,
-				rec.owner, rec.name, rec.line, rec.column, rec.context, rec.usr_id, 0, rec.type,
-				rec.canonical_type, rec.type_symbol, rec.type_usr_id);
+		FingerprintRecord record = {
+			.record = 0,
+			.action = rec.definition,
+			.kind = rec.kind,
+			.mode = 0,
+			.owner = rec.owner,
+			.name = rec.name,
+			.line = rec.line,
+			.column = rec.column,
+			.context = rec.context,
+			.usr_id = rec.usr_id,
+			.context_usr_id = 0,
+			.local = rec.local,
+			.type = rec.type,
+			.canonical_type = rec.canonical_type,
+			.type_symbol = rec.type_symbol,
+			.type_kind = rec.type_usr_id ? rec.type_kind : -1,
+			.type_usr_id = rec.type_usr_id,
+		};
+
+		if (rec.file_index >= fingerprints.size())
+			continue;
+
+		updateFingerprints(fingerprints[rec.file_index], record);
 	}
 	for (const auto &rec : s->use_records) {
-		if (rec.file_index < fingerprints.size())
-			updateFingerprints(fingerprints[rec.file_index], rec.local, 1, rec.kind, rec.symbol_kind,
-				rec.mode, rec.owner, rec.name, rec.line, rec.column, rec.context, rec.usr_id,
-				rec.context_usr_id, "", "", "", 0);
+		FingerprintRecord record = {
+			.record = 1,
+			.action = rec.kind,
+			.kind = rec.symbol_kind,
+			.mode = rec.mode,
+			.owner = rec.owner,
+			.name = rec.name,
+			.line = rec.line,
+			.column = rec.column,
+			.context = rec.context,
+			.usr_id = rec.usr_id,
+			.context_usr_id = rec.context_usr_id,
+			.local = rec.local,
+			.type = "",
+			.canonical_type = "",
+			.type_symbol = "",
+			.type_kind = -1,
+			.type_usr_id = 0,
+		};
+
+		if (rec.file_index >= fingerprints.size())
+			continue;
+
+		updateFingerprints(fingerprints[rec.file_index], record);
 	}
 
 	s->file_fingerprints[0].clear();
