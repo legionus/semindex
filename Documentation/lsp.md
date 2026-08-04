@@ -82,3 +82,20 @@ is selected, saves update the `general` variant while navigation continues to
 query all variants. Use `--variant=NAME` to update and query another variant.
 Save updates preserve local symbols by default. Use `--no-include-local` when
 the existing index intentionally omits them.
+
+## Integration with Editor
+
+### Vim
+
+If you're using [vim-lsp](https://github.com/prabirshrestha/vim-lsp), to use
+`semindex-lsp` you'll need to add something like this to your `~/.vimrc`:
+
+```vim
+if executable('semindex-lsp')
+    au User lsp_setup call lsp#register_server({
+                \ 'name': 'semindex-lsp',
+                \ 'cmd': {server_info->['semindex-lsp']},
+                \ 'allowlist': ['c', 'cpp'],
+                \ })
+endif
+```
