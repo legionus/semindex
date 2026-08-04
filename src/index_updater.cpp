@@ -138,6 +138,7 @@ SemindexIndexUpdateResult SemindexIndexUpdater::update(const SemindexIndexUpdate
 	pipeline_request.source_file = command->file;
 	pipeline_request.symbol_database = options.database.c_str();
 	pipeline_request.variant = request.variant.c_str();
+	pipeline_request.repository_root = options.repository_root.empty() ? nullptr : options.repository_root.c_str();
 	pipeline_request.scope = SEMINDEX_SCOPE_PROJECT;
 	pipeline_request.include_local = options.include_local;
 	pipeline_request.details = 1;

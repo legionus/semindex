@@ -2,11 +2,13 @@
 #include <git2.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "git_provenance.h"
 
 static char *source_directory(const char *path)
 {
+	struct stat path_stat;
 	char *directory;
 	char *slash;
 
@@ -14,6 +16,9 @@ static char *source_directory(const char *path)
 
 	if (!directory)
 		return NULL;
+
+	if (stat(directory, &path_stat) == 0 && S_ISDIR(path_stat.st_mode))
+		return directory;
 
 	slash = strrchr(directory, '/');
 

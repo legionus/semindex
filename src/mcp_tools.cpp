@@ -1774,6 +1774,7 @@ McpToolService::McpToolService(McpToolOptions options)
     : options(std::move(options)), updater(std::make_unique<SemindexIndexUpdater>(SemindexIndexUpdaterOptions{
 					   .database = this->options.database,
 					   .commands_database = this->options.commands_database,
+					   .repository_root = this->options.workspace.string(),
 					   .include_local = this->options.include_local,
 				   }))
 {

@@ -23,6 +23,7 @@ struct cc_options {
 	const char *database;
 	const char *commands_database;
 	const char *variant;
+	const char *repository_root;
 	const char *trace_path;
 	const char *git_commit;
 	semindex_scope_t scope;
@@ -53,6 +54,7 @@ static void cc_help(void)
 	       "      --commands-database=PATH\n"
 	       "                             path to the compiler command database\n"
 	       "      --variant=NAME          store records in the named variant\n"
+	       "      --root=DIR              project root for stored source paths\n"
 	       "      --index-errors=POLICY   indexing failure policy: warn, fail, ignore\n"
 	       "                             (default: warn)\n");
 #ifdef SEMINDEX_HAVE_LIBGIT2
@@ -94,6 +96,7 @@ static int parse_options(int argc, char **argv, struct cc_options *options, int 
 		{ "no-store-command", no_argument, NULL, 4 },
 		{ "trace", required_argument, NULL, 5 },
 		{ "index-errors", required_argument, NULL, 6 },
+		{ "root", required_argument, NULL, 9 },
 #ifdef SEMINDEX_HAVE_LIBGIT2
 		{ "git-commit", required_argument, NULL, 7 },
 		{ "no-git-commit", no_argument, NULL, 8 },
@@ -152,6 +155,9 @@ static int parse_options(int argc, char **argv, struct cc_options *options, int 
 
 				return -1;
 			}
+			break;
+		case 9:
+			options->repository_root = optarg;
 			break;
 #ifdef SEMINDEX_HAVE_LIBGIT2
 		case 7:
@@ -258,6 +264,7 @@ static int run_index(const struct cc_options *options, int argc, char **argv, co
 		.symbol_database = options->database,
 		.commands_database = commands_database,
 		.variant = options->variant,
+		.repository_root = options->repository_root,
 		.git_commit = options->git_commit,
 		.scope = options->scope,
 		.git_commit_mode = options->git_commit_mode,
@@ -266,6 +273,9 @@ static int run_index(const struct cc_options *options, int argc, char **argv, co
 	};
 
 	ret = index_pipeline_run(&request, &result);
+
+	if (ret < 0 && result.failed_stage == INDEX_PIPELINE_STAGE_REPOSITORY_ROOT)
+		fprintf(stderr, "semindex-cc: invalid project root: %s\n", options->repository_root);
 
 out:
 	index_pipeline_result_destroy(&result, trace);

@@ -6,6 +6,23 @@
 
 #include "repository.h"
 
+char *semindex_repository_root_explicit(const char *input)
+{
+	struct stat input_stat;
+	char *path;
+
+	if (!input || !(path = realpath(input, NULL)))
+		return NULL;
+
+	if (stat(path, &input_stat) < 0 || !S_ISDIR(input_stat.st_mode)) {
+		free(path);
+
+		return NULL;
+	}
+
+	return path;
+}
+
 char *semindex_repository_root(const char *input)
 {
 	struct stat input_stat;

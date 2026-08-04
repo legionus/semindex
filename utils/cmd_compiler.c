@@ -37,7 +37,8 @@ static void compiler_help(void)
 	       "                             path to the compiler command database\n"
 	       "                             (default: commands.db beside --database)\n"
 	       "      --variant=NAME          store records in the named variant\n"
-	       "                             (default: general)\n");
+	       "                             (default: general)\n"
+	       "      --root=DIR              project root for stored source paths\n");
 #ifdef SEMINDEX_HAVE_LIBGIT2
 	printf("      --git-commit=COMMIT     store COMMIT as variant provenance; COMMIT may\n"
 	       "                             be a 40- or 64-digit hash, or auto\n"
@@ -60,6 +61,7 @@ int cmd_compiler(int argc, char **argv)
 		{ "commands-database", required_argument, NULL, 3 },
 		{ "no-store-command", no_argument, NULL, 4 },
 		{ "trace", required_argument, NULL, 5 },
+		{ "root", required_argument, NULL, 8 },
 #ifdef SEMINDEX_HAVE_LIBGIT2
 		{ "git-commit", required_argument, NULL, 6 },
 		{ "no-git-commit", no_argument, NULL, 7 },
@@ -77,6 +79,7 @@ int cmd_compiler(int argc, char **argv)
 	const char *variant = "general";
 	const char *source_file = NULL;
 	const char *trace_path = NULL;
+	const char *repository_root = NULL;
 	const char *git_commit = NULL;
 
 	semindex_trace_t *trace = NULL;
@@ -130,6 +133,9 @@ int cmd_compiler(int argc, char **argv)
 		case 7:
 			git_commit_mode = INDEX_PIPELINE_GIT_COMMIT_DISABLED;
 			git_commit = NULL;
+			break;
+		case 8:
+			repository_root = optarg;
 			break;
 		case 'd':
 			database = optarg;
@@ -230,6 +236,7 @@ int cmd_compiler(int argc, char **argv)
 		.symbol_database = database,
 		.commands_database = commands_database,
 		.variant = variant,
+		.repository_root = repository_root,
 		.git_commit = git_commit,
 		.scope = scope,
 		.git_commit_mode = git_commit_mode,
@@ -241,6 +248,8 @@ int cmd_compiler(int argc, char **argv)
 	if (index_pipeline_run(&request, &result) < 0) {
 		if (result.failed_stage == INDEX_PIPELINE_STAGE_CREATE)
 			fprintf(stderr, "semindex: failed to create indexer\n");
+		else if (result.failed_stage == INDEX_PIPELINE_STAGE_REPOSITORY_ROOT)
+			fprintf(stderr, "semindex: invalid project root: %s\n", repository_root);
 		else if (result.failed_stage == INDEX_PIPELINE_STAGE_FRONTEND)
 			fprintf(stderr, "semindex: failed to index compiler command for '%s'\n", source_file);
 		else if (result.failed_stage == INDEX_PIPELINE_STAGE_FINGERPRINT)

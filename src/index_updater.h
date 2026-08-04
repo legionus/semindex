@@ -41,6 +41,7 @@ struct SemindexIndexUpdateResult {
 struct SemindexIndexUpdaterOptions {
 	std::string database;
 	std::string commands_database;
+	std::string repository_root;
 	bool include_local = true;
 };
 

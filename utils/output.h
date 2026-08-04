@@ -18,6 +18,7 @@ typedef struct output_search output_search_t;
 typedef struct {
 	const char *file;
 	const char *variant;
+	const char *root;
 	int line;
 	int column;
 	int symbol_record;

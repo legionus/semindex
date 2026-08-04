@@ -32,12 +32,12 @@ if ! grep -q 'int repository_value;' "$tmpdir/repository-search.out"; then
 	fail "search omitted the source line for a repository-relative path"
 fi
 
-cd "$SOURCE_DIR"
-
-"$SEMINDEX" index --database "$db" --compile-commands "$COMPILE_COMMANDS" \
+"$SEMINDEX" index --root "$SOURCE_DIR" --database "$db" --compile-commands "$COMPILE_COMMANDS" \
 	"$SOURCE_DIR/tests/test11.c" >/dev/null
-"$SEMINDEX" index --database "$db" --compile-commands "$COMPILE_COMMANDS" \
+"$SEMINDEX" index --root "$SOURCE_DIR" --database "$db" --compile-commands "$COMPILE_COMMANDS" \
 	"$SOURCE_DIR/tests/test15.c" >/dev/null
+
+cd "$tmpdir"
 
 if ! "$SEMINDEX" search --database "$db" Outer.y >"$tmpdir/search.out"; then
 	fail "exact field search failed"
@@ -61,7 +61,7 @@ if ! cmp -s "$tmpdir/custom.expect" "$tmpdir/custom.out"; then
 	fail "custom search output differs"
 fi
 
-"$SEMINDEX" index --variant=arm64-defconfig --database "$db" \
+"$SEMINDEX" index --root "$SOURCE_DIR" --variant=arm64-defconfig --database "$db" \
 	--compile-commands "$COMPILE_COMMANDS" "$SOURCE_DIR/tests/test11.c" \
 	>/dev/null
 if ! "$SEMINDEX" search --database "$db" \

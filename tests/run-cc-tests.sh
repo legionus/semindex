@@ -35,10 +35,14 @@ run_explicit_case()
 	object=$tmpdir/explicit.o
 
 	make_source "$source" explicit_symbol
-	"$SEMINDEX" cc --database "$database" -- "$CC" -c "$source" -o "$object"
+	"$SEMINDEX" cc --root "$tmpdir" --database "$database" -- \
+		"$CC" -c "$source" -o "$object"
 
 	[ -f "$object" ] || fail "explicit wrapper did not run the compiler"
 	check_index "$database" explicit_symbol
+	if [ "$(sqlite3 "$database" "SELECT path FROM files WHERE path = 'explicit.c'")" != explicit.c ]; then
+		fail "wrapper --root did not store a project-relative source path"
+	fi
 
 	if [ "$(sqlite3 "$commands" "SELECT COUNT(*) FROM commands")" != 1 ]; then
 		fail "explicit wrapper did not store the compiler command"

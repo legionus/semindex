@@ -16,7 +16,7 @@ run_quiet_case()
 	out=$tmpdir/quiet.out
 	err=$tmpdir/quiet.err
 
-	if ! "$SEMINDEX" compiler --database "$db" -- cc --no-default-config \
+	if ! "$SEMINDEX" compiler --root "$SOURCE_DIR" --database "$db" -- cc --no-default-config \
 	     -I"$SOURCE_DIR/tests/include" -c "$SOURCE_DIR/tests/test.c" \
 	     -o "$tmpdir/quiet.o" >"$out" 2>"$err"; then
 		cat "$err" >&2
@@ -31,6 +31,9 @@ run_quiet_case()
 	fi
 	if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM records WHERE local != 0")" -lt 1 ]; then
 		fail "compiler omitted local records by default"
+	fi
+	if [ "$(sqlite3 "$db" "SELECT path FROM files WHERE path = 'tests/test.c'")" != tests/test.c ]; then
+		fail "compiler --root did not store a project-relative source path"
 	fi
 	if sqlite3 "$db" "SELECT 1 FROM compile_commands" >/dev/null 2>&1; then
 		fail "compiler command storage is still enabled"
@@ -60,14 +63,33 @@ run_no_store_command_case()
 	fi
 }
 
+run_invalid_root_case()
+{
+	db=$tmpdir/invalid-root/.semindex/semindex.db
+	err=$tmpdir/invalid-root.err
+
+	if "$SEMINDEX" compiler --root "$SOURCE_DIR/tests/test.c" --no-store-command \
+	   --database "$db" -- cc --no-default-config "$SOURCE_DIR/tests/test.c" \
+	   >/dev/null 2>"$err"; then
+		fail "compiler accepted a non-directory project root"
+	fi
+	if ! grep -q 'invalid project root' "$err"; then
+		cat "$err" >&2
+		fail "compiler omitted the invalid project root diagnostic"
+	fi
+}
+
 run_index_command_case()
 {
 	db=$tmpdir/index/.semindex/semindex.db
 	commands_db=$tmpdir/index/.semindex/commands.db
 
-	if ! "$SEMINDEX" index --database "$db" --compile-commands "$COMPILE_COMMANDS" \
+	if ! "$SEMINDEX" index --root "$SOURCE_DIR" --database "$db" --compile-commands "$COMPILE_COMMANDS" \
 	     --variant=index-variant "$SOURCE_DIR/tests/test.c" >/dev/null; then
 		fail "index command failed"
+	fi
+	if [ "$(sqlite3 "$db" "SELECT path FROM files WHERE path = 'tests/test.c'")" != tests/test.c ]; then
+		fail "index --root did not store a project-relative source path"
 	fi
 	if [ "$(sqlite3 "$commands_db" "SELECT COUNT(*) FROM commands WHERE variant = 'index-variant'")" != 1 ]; then
 		fail "index did not store its selected compile command"
@@ -263,6 +285,7 @@ trap 'rm -rf "$tmpdir"' EXIT
 
 run_quiet_case
 run_no_store_command_case
+run_invalid_root_case
 run_index_command_case
 run_index_format_case
 run_no_include_local_case

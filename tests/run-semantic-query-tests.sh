@@ -16,7 +16,8 @@ database=$tmpdir/semindex.db
 cd "$SOURCE_DIR"
 
 for variant in general debug; do
-	"$SEMINDEX_COMPILER" --database="$database" --variant="$variant" --no-store-command -- \
+	"$SEMINDEX_COMPILER" --root="$SOURCE_DIR" --database="$database" \
+		--variant="$variant" --no-store-command -- \
 		cc --no-default-config tests/test11.c
 done
 

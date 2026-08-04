@@ -31,8 +31,9 @@ printf '%s\n' 'int git_repository_symbol;' >"$git_repo/main.c"
 git -C "$git_repo" add main.c
 git -C "$git_repo" commit -qm initial
 git_commit=$(git -C "$git_repo" rev-parse HEAD)
-"$SEMINDEX" compiler --database "$git_db" --no-store-command --git-commit=auto -- \
-	cc --no-default-config "$git_repo/main.c"
+	"$SEMINDEX" compiler --root "$git_repo" --database "$git_db" --no-store-command \
+		--git-commit=auto -- \
+		cc --no-default-config "$git_repo/main.c"
 
 if [ "$(sqlite3 "$git_db" "SELECT git_commit FROM variants WHERE name = 'general'")" != "$git_commit" ]; then
 	fail "compiler did not store the repository commit"

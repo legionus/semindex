@@ -30,6 +30,7 @@ typedef enum {
 typedef enum {
 	INDEX_PIPELINE_STAGE_NONE,
 	INDEX_PIPELINE_STAGE_CREATE,
+	INDEX_PIPELINE_STAGE_REPOSITORY_ROOT,
 	INDEX_PIPELINE_STAGE_FRONTEND,
 	INDEX_PIPELINE_STAGE_FINGERPRINT,
 	INDEX_PIPELINE_STAGE_SYMBOL_DATABASE,
@@ -46,6 +47,7 @@ typedef struct {
 	const char *symbol_database;
 	const char *commands_database;
 	const char *variant;
+	const char *repository_root;
 	const char *git_commit;
 	semindex_scope_t scope;
 	index_pipeline_git_commit_t git_commit_mode;

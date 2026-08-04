@@ -122,6 +122,7 @@ def index_fixture(semindex, database, workspace, source, store_command=False):
 			semindex,
 			"compiler",
 			f"--database={database}",
+			f"--root={workspace}",
 			"--",
 			"cc",
 			"--no-default-config",
@@ -129,7 +130,7 @@ def index_fixture(semindex, database, workspace, source, store_command=False):
 		]
 
 	if not store_command:
-		arguments.insert(3, "--no-store-command")
+		arguments.insert(4, "--no-store-command")
 
 	subprocess.run(
 		arguments,

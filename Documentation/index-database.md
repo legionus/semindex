@@ -87,6 +87,13 @@ relative to its root. Files outside the repository, including system headers,
 are stored as canonical absolute paths. Path conversion is performed once per
 indexed file rather than once per semantic record.
 
+The `compiler`, `index`, and `cc` commands accept `--root=DIR` to select the
+project root explicitly. The directory must exist and is canonicalized before
+storage. This is useful for release tarballs and other source trees without a
+`.git` marker. Without the option, upward `.git` discovery remains the default.
+The `search` command resolves relative source paths against the root stored for
+each variant rather than against its current working directory.
+
 The `variants` table lists every indexed variant and records its repository
 root when one is available. It also records optional source provenance when
 semindex is built with libgit2. Use `--git-commit=auto` to resolve the repository's current

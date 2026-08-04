@@ -32,40 +32,40 @@ static void print_mode(FILE *out, const output_search_record_t *record)
 	fputs(str, out);
 }
 
-static int open_source(output_search_t *search, const char *path)
+static int open_source(output_search_t *search, const char *root, const char *path)
 {
 	char *source_path;
 
-	if (search->source && search->path && !strcmp(search->path, path))
-		return 0;
-
-	if (search->source)
-		fclose(search->source);
-	free(search->path);
-	search->path = strdup(path);
-	search->source = NULL;
-	search->line = 0;
-	search->length = 0;
-
-	if (!search->path)
-		return -1;
-
-	if (path[0] == '/' || !search->root)
+	if (path[0] == '/' || (!root && !search->root))
 		source_path = strdup(path);
 	else {
-		size_t length = strlen(search->root) + strlen(path) + 2;
+		const char *base = root ? root : search->root;
+		size_t length = strlen(base) + strlen(path) + 2;
 
 		source_path = malloc(length);
 
 		if (source_path)
-			snprintf(source_path, length, "%s/%s", search->root, path);
+			snprintf(source_path, length, "%s/%s", base, path);
 	}
 
 	if (!source_path)
 		return -1;
 
+	if (search->source && search->path && !strcmp(search->path, source_path)) {
+		free(source_path);
+
+		return 0;
+	}
+
+	if (search->source)
+		fclose(search->source);
+	free(search->path);
+	search->path = source_path;
+	search->source = NULL;
+	search->line = 0;
+	search->length = 0;
+
 	search->source = fopen(source_path, "r");
-	free(source_path);
 
 	if (!search->source) {
 		fprintf(stderr, "semindex: failed to open source file '%s': %s\n", path, strerror(errno));
@@ -75,9 +75,9 @@ static int open_source(output_search_t *search, const char *path)
 	return 0;
 }
 
-static int print_source_line(output_search_t *search, const char *path, int line)
+static int print_source_line(output_search_t *search, const char *root, const char *path, int line)
 {
-	if (open_source(search, path) < 0)
+	if (open_source(search, root, path) < 0)
 		return -1;
 
 	if (line < search->line) {
@@ -212,7 +212,7 @@ int output_search_write(output_search_t *search, const output_search_record_t *r
 			fputc(output_symbol_kind_char(record->kind), search->out);
 			break;
 		case 's':
-			if (print_source_line(search, record->file, record->line) < 0)
+			if (print_source_line(search, record->root, record->file, record->line) < 0)
 				return -1;
 
 			break;

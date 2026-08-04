@@ -22,12 +22,13 @@ callgraph_source=$SOURCE_DIR/tests/callgraph-a.c
 source_path=tests/test11.c
 callgraph_path=tests/callgraph-a.c
 
-"$SEMINDEX" index --database="$db" --compile-commands="$COMPILE_COMMANDS" "$source" >/dev/null
-"$SEMINDEX" compiler --database="$db" --no-store-command -- \
+"$SEMINDEX" index --root="$SOURCE_DIR" --database="$db" \
+	--compile-commands="$COMPILE_COMMANDS" "$source" >/dev/null
+"$SEMINDEX" compiler --root="$SOURCE_DIR" --database="$db" --no-store-command -- \
 	cc --no-default-config "$callgraph_source"
-"$SEMINDEX" compiler --database="$db" --variant=debug --no-store-command -- \
+"$SEMINDEX" compiler --root="$SOURCE_DIR" --database="$db" --variant=debug --no-store-command -- \
 	cc --no-default-config "$source"
-"$SEMINDEX" compiler --database="$db" --no-store-command -- \
+"$SEMINDEX" compiler --root="$SOURCE_DIR" --database="$db" --no-store-command -- \
 	cc --no-default-config "$SOURCE_DIR/tests/test8.c"
 "$DATABASE_API_TEST" "$db" "$source_path" "$callgraph_path" "$SOURCE_DIR"
 

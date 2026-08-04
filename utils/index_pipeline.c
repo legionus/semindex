@@ -57,7 +57,6 @@ int index_pipeline_run(const index_pipeline_request_t *request, index_pipeline_r
 	const char *git_commit = NULL;
 	index_db_store_request_t store_request;
 	semindex_trace_time_t phase_start;
-	int repository_root_owned_by_git = 0;
 	int ret = -1;
 
 	semindex_git_provenance_t git_provenance = { 0 };
@@ -116,12 +115,25 @@ int index_pipeline_run(const index_pipeline_request_t *request, index_pipeline_r
 
 	phase_start = semindex_trace_begin(request->trace);
 
+	if (request->repository_root) {
+		repository_root = semindex_repository_root_explicit(request->repository_root);
+
+		if (!repository_root) {
+			result->failed_stage = INDEX_PIPELINE_STAGE_REPOSITORY_ROOT;
+			semindex_trace_end(request->trace, "provenance", phase_start);
+
+			goto out;
+		}
+	}
+
 	if (request->git_commit_mode == INDEX_PIPELINE_GIT_COMMIT_AUTO) {
-		semindex_git_provenance(request->source_file, &git_provenance);
-		repository_root = git_provenance.data.repository_root;
-		repository_root_owned_by_git = repository_root != NULL;
-	} else
-		repository_root = semindex_repository_root(request->source_file);
+		const char *input = repository_root ? repository_root : request->source_file;
+
+		semindex_git_provenance(input, &git_provenance);
+	}
+
+	if (!repository_root && git_provenance.data.repository_root)
+		repository_root = strdup(git_provenance.data.repository_root);
 
 	if (!repository_root)
 		repository_root = semindex_repository_root(request->source_file);
@@ -176,9 +188,7 @@ int index_pipeline_run(const index_pipeline_request_t *request, index_pipeline_r
 	ret = 0;
 out:
 	semindex_git_provenance_destroy(&git_provenance);
-
-	if (!repository_root_owned_by_git)
-		free(repository_root);
+	free(repository_root);
 
 	return ret;
 }
