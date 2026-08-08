@@ -83,6 +83,7 @@ set(SEMINDEX_FORMAT_SOURCES
 	tests/test17.c
 	tests/test18.c
 	tests/test19.c
+	utils/array_size.h
 	utils/cmd_cc.c
 	utils/cmd_compiler.c
 	utils/cmd_compile_commands.c
@@ -425,7 +426,7 @@ set_target_properties(semindex_index PROPERTIES
 )
 
 add_semindex_command(semindex_search search utils/cmd_search.c)
-target_link_libraries(semindex_search PRIVATE semindex_query)
+target_link_libraries(semindex_search PRIVATE semindex_cli_common semindex_query)
 
 add_semindex_command(semindex_callgraph callgraph utils/cmd_callgraph.c)
 target_link_libraries(semindex_callgraph PRIVATE semindex_query)

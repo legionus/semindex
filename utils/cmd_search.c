@@ -48,59 +48,6 @@ static void search_help(void)
 	       "\n");
 }
 
-static int parse_record(const char *value, index_db_record_t *record)
-{
-	if (!strcmp(value, "all"))
-		*record = INDEX_DB_RECORD_ALL;
-
-	else if (!strcmp(value, "symbol"))
-		*record = INDEX_DB_RECORD_SYMBOL;
-
-	else if (!strcmp(value, "use"))
-		*record = INDEX_DB_RECORD_USE;
-	else
-		return -1;
-
-	return 0;
-}
-
-static int parse_kind(const char *value, int *kind)
-{
-	if (!strcmp(value, "var"))
-		*kind = SEMINDEX_SYMBOL_VAR;
-
-	else if (!strcmp(value, "field"))
-		*kind = SEMINDEX_SYMBOL_FIELD;
-
-	else if (!strcmp(value, "struct"))
-		*kind = SEMINDEX_SYMBOL_STRUCT;
-
-	else if (!strcmp(value, "union"))
-		*kind = SEMINDEX_SYMBOL_UNION;
-
-	else if (!strcmp(value, "enum"))
-		*kind = SEMINDEX_SYMBOL_ENUM;
-
-	else if (!strcmp(value, "enumerator"))
-		*kind = SEMINDEX_SYMBOL_ENUM_CONSTANT;
-
-	else if (!strcmp(value, "typedef"))
-		*kind = SEMINDEX_SYMBOL_TYPEDEF;
-
-	else if (!strcmp(value, "function"))
-		*kind = SEMINDEX_SYMBOL_FUNCTION;
-
-	else if (!strcmp(value, "macro"))
-		*kind = SEMINDEX_SYMBOL_MACRO;
-
-	else if (!strcmp(value, "file"))
-		*kind = SEMINDEX_SYMBOL_FILE;
-	else
-		return -1;
-
-	return 0;
-}
-
 static int parse_mode(const char *value, index_db_search_options_t *opts)
 {
 	static const unsigned modes[] = {
@@ -210,13 +157,13 @@ int cmd_search(int argc, char **argv)
 			}
 			break;
 		case 'r':
-			if (parse_record(optarg, &opts.record) < 0) {
+			if (parse_index_db_record(optarg, &opts.record) < 0) {
 				fprintf(stderr, "semindex: unknown record type: %s\n", optarg);
 				return 1;
 			}
 			break;
 		case 'k':
-			if (parse_kind(optarg, &opts.kind) < 0) {
+			if (parse_symbol_kind(optarg, &opts.kind) < 0) {
 				fprintf(stderr, "semindex: unknown symbol kind: %s\n", optarg);
 				return 1;
 			}

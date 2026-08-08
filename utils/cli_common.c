@@ -2,7 +2,38 @@
 #include <ctype.h>
 #include <string.h>
 
+#include "array_size.h"
 #include "semindex_cli.h"
+
+struct index_db_record_name {
+	index_db_record_t record;
+	const char *name;
+};
+
+struct symbol_kind_name {
+	semindex_symbol_kind_t kind;
+	const char *cli_name;
+	const char *name;
+};
+
+static const struct index_db_record_name index_db_record_names[] = {
+	{ INDEX_DB_RECORD_ALL, "all" },
+	{ INDEX_DB_RECORD_SYMBOL, "symbol" },
+	{ INDEX_DB_RECORD_USE, "use" },
+};
+
+static const struct symbol_kind_name symbol_kind_names[] = {
+	{ SEMINDEX_SYMBOL_VAR, "var", "variable" },
+	{ SEMINDEX_SYMBOL_FIELD, "field", "field" },
+	{ SEMINDEX_SYMBOL_STRUCT, "struct", "struct" },
+	{ SEMINDEX_SYMBOL_UNION, "union", "union" },
+	{ SEMINDEX_SYMBOL_ENUM, "enum", "enum" },
+	{ SEMINDEX_SYMBOL_ENUM_CONSTANT, "enumerator", "enumerator" },
+	{ SEMINDEX_SYMBOL_TYPEDEF, "typedef", "typedef" },
+	{ SEMINDEX_SYMBOL_FUNCTION, "function", "function" },
+	{ SEMINDEX_SYMBOL_MACRO, "macro", "macro" },
+	{ SEMINDEX_SYMBOL_FILE, "file", "file" },
+};
 
 int parse_format(const char *value, enum output_format *format)
 {
@@ -65,4 +96,46 @@ int output_index(enum output_format format, semindex_t *s)
 		return output_json(stdout, s);
 
 	return output_dissect(stdout, s);
+}
+
+int parse_index_db_record(const char *value, index_db_record_t *record)
+{
+	size_t i;
+
+	for (i = 0; i < ARRAY_SIZE(index_db_record_names); i++) {
+		if (!strcmp(value, index_db_record_names[i].name)) {
+			*record = index_db_record_names[i].record;
+
+			return 0;
+		}
+	}
+
+	return -1;
+}
+
+int parse_symbol_kind(const char *value, int *kind)
+{
+	size_t i;
+
+	for (i = 0; i < ARRAY_SIZE(symbol_kind_names); i++) {
+		if (!strcmp(value, symbol_kind_names[i].cli_name)) {
+			*kind = symbol_kind_names[i].kind;
+
+			return 0;
+		}
+	}
+
+	return -1;
+}
+
+const char *symbol_kind_name(semindex_symbol_kind_t kind)
+{
+	size_t i;
+
+	for (i = 0; i < ARRAY_SIZE(symbol_kind_names); i++) {
+		if (kind == symbol_kind_names[i].kind)
+			return symbol_kind_names[i].name;
+	}
+
+	return "unknown";
 }

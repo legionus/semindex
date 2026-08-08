@@ -1,42 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "output.h"
-
-static const char *symbol_kind_string(semindex_symbol_kind_t kind)
-{
-	switch (kind) {
-	case SEMINDEX_SYMBOL_VAR:
-		return "variable";
-
-	case SEMINDEX_SYMBOL_FIELD:
-		return "field";
-
-	case SEMINDEX_SYMBOL_STRUCT:
-		return "struct";
-
-	case SEMINDEX_SYMBOL_UNION:
-		return "union";
-
-	case SEMINDEX_SYMBOL_ENUM:
-		return "enum";
-
-	case SEMINDEX_SYMBOL_ENUM_CONSTANT:
-		return "enumerator";
-
-	case SEMINDEX_SYMBOL_TYPEDEF:
-		return "typedef";
-
-	case SEMINDEX_SYMBOL_FUNCTION:
-		return "function";
-
-	case SEMINDEX_SYMBOL_MACRO:
-		return "macro";
-
-	case SEMINDEX_SYMBOL_FILE:
-		return "file";
-	}
-
-	return "unknown";
-}
+#include "semindex_cli.h"
 
 static const char *use_kind_string(semindex_use_kind_t kind)
 {
@@ -121,7 +85,7 @@ static void print_json_id(FILE *out, unsigned long long id)
 static void print_json_symbol(FILE *out, const semindex_symbol_t *symbol)
 {
 	fputs("    {\"kind\":", out);
-	print_json_string(out, symbol_kind_string(symbol->kind));
+	print_json_string(out, symbol_kind_name(symbol->kind));
 	fputs(",\"name\":", out);
 	print_json_string(out, symbol->name);
 	fputs(",\"owner\":", out);
@@ -148,7 +112,7 @@ static void print_json_use(FILE *out, const semindex_use_t *use)
 	fputs("    {\"kind\":", out);
 	print_json_string(out, use_kind_string(use->kind));
 	fputs(",\"symbol_kind\":", out);
-	print_json_string(out, symbol_kind_string(use->symbol_kind));
+	print_json_string(out, symbol_kind_name(use->symbol_kind));
 	fputs(",\"mode\":", out);
 	print_json_string(out, mode);
 	fprintf(out, ",\"mode_bits\":%u,\"name\":", use->mode);

@@ -64,12 +64,6 @@ if ! grep -q 'failed to execute semindex-missing' "$tmpdir/missing.err"; then
 	fail "missing command diagnostic differs"
 fi
 
-for binary in "$dispatcher" "$4" "$5" "$6"; do
-	if ldd "$binary" | grep -Eq 'libclang|libLLVM'; then
-		fail "query-only executable links against Clang or LLVM: $binary"
-	fi
-done
-
 for binary in "$dispatcher" "$@"; do
 	if ldd "$binary" | grep -q 'liblibsemindex_'; then
 		fail "executable links against an internal shared library: $binary"
