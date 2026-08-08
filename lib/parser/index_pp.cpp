@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "index_pp.h"
+#include "index_asm.h"
 
 #include <clang/Lex/MacroInfo.h>
 #include <clang/Lex/PPCallbacks.h>
@@ -175,9 +176,11 @@ protected:
 	{
 		CompilerInstance &CI = getCompilerInstance();
 		SemindexContext index(out, CI.getSourceManager());
+		auto finish_asm_index = installSemindexAsmIndexer(index, CI.getPreprocessor());
 
 		CI.getPreprocessor().addPPCallbacks(createSemindexPPCallbacks(index, CI.getDiagnostics()));
 		PreprocessOnlyAction::ExecuteAction();
+		finish_asm_index();
 		out->has_index_data = true;
 	}
 

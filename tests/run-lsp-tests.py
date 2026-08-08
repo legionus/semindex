@@ -164,6 +164,48 @@ def main():
         if indexed.returncode != 0:
             fail("failed to create the macro call index", indexed)
 
+        asm_source = directory / "asm-target.S"
+        asm_source.write_text(
+            "\t.type asm_target, @function\n"
+            "asm_target:\n",
+            encoding="utf-8",
+        )
+        asm_caller = directory / "asm-caller.c"
+        asm_caller.write_text(
+            "int asm_target(void);\n"
+            "int call_asm(void) { return asm_target(); }\n",
+            encoding="utf-8",
+        )
+        asm_collision = directory / "asm-collision.c"
+        asm_collision.write_text("int asm_target;\n", encoding="utf-8")
+        for asm_input in (asm_source, asm_caller, asm_collision):
+            indexed = subprocess.run(
+                [
+                    sys.argv[2], "compiler", f"--database={database}",
+                    "--no-store-command", "--", "cc", "--no-default-config",
+                    asm_input.name,
+                ],
+                cwd=directory,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            if indexed.returncode != 0:
+                fail(f"failed to index {asm_input.name}", indexed)
+
+        with sqlite3.connect(database) as connection:
+            plan = connection.execute(
+                "EXPLAIN QUERY PLAN SELECT files.variant, files.path, "
+                "records.line, records.column FROM records JOIN files "
+                "ON files.id = records.file_id WHERE records.symbol = ? "
+                "AND records.record = 0 AND records.action != 0 "
+                "AND records.kind = 7 AND files.variant = 'general'",
+                ("asm_target",),
+            ).fetchall()
+        plan_details = "\n".join(row[3] for row in plan)
+        if "SEARCH records USING PRIMARY KEY (symbol=? AND record=?)" not in plan_details:
+            fail(f"asm definition lookup does not use the primary key:\n{plan_details}")
+
         with sqlite3.connect(database) as connection:
             plan = connection.execute(
                 "EXPLAIN QUERY PLAN SELECT files.variant, files.path, "
@@ -223,6 +265,32 @@ def main():
         reference_character = len(
             reference_line[:reference_line.index("field")].encode("utf-16-le")
         ) // 2
+
+        asm_uri = asm_caller.resolve().as_uri()
+        process, responses = run_server(sys.argv[1], options[:3], [
+            {
+                "jsonrpc": "2.0", "id": 76, "method": "initialize",
+                "params": {"rootUri": root_uri},
+            },
+            {
+                "jsonrpc": "2.0", "id": 77,
+                "method": "textDocument/definition",
+                "params": {
+                    "textDocument": {"uri": asm_uri},
+                    "position": {"line": 1, "character": 31},
+                },
+            },
+            {"jsonrpc": "2.0", "id": 78, "method": "shutdown"},
+            {"jsonrpc": "2.0", "method": "exit"},
+        ])
+        expected_asm_definition = {
+            "uri": asm_source.resolve().as_uri(),
+            "range": source_range(1, 0, len("asm_target")),
+        }
+        if process.returncode != 0 or len(responses) != 3:
+            fail("asm definition lifecycle failed", process)
+        if responses[1].get("result") != [expected_asm_definition]:
+            fail(f"C call did not resolve its asm definition: {responses[1]}")
 
         fresh_database = directory / "fresh" / ".semindex" / "semindex.db"
         fresh_options = [

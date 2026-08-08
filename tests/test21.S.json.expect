@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "symbols": [
+    {"kind":"macro","name":"ASM_NL","owner":null,"type":null,"usr":"macro:ASM_NL","usr_id":"6ef550a9fc95ef32","context":null,"file":"tests/test21.S","line":3,"column":9,"local":false,"definition":true},
+    {"kind":"macro","name":"DEFINE_FUNCTION","owner":null,"type":null,"usr":"macro:DEFINE_FUNCTION","usr_id":"91ff35be425b04e6","context":null,"file":"tests/test21.S","line":4,"column":9,"local":false,"definition":true},
+    {"kind":"function","name":"direct_before","owner":null,"type":null,"usr":null,"usr_id":null,"context":null,"file":"tests/test21.S","line":10,"column":1,"local":false,"definition":true},
+    {"kind":"function","name":"direct_after","owner":null,"type":null,"usr":null,"usr_id":null,"context":null,"file":"tests/test21.S","line":12,"column":1,"local":false,"definition":true},
+    {"kind":"function","name":"hash_function","owner":null,"type":null,"usr":null,"usr_id":null,"context":null,"file":"tests/test21.S","line":16,"column":1,"local":false,"definition":true},
+    {"kind":"function","name":"stt_function","owner":null,"type":null,"usr":null,"usr_id":null,"context":null,"file":"tests/test21.S","line":18,"column":1,"local":false,"definition":true},
+    {"kind":"function","name":"macro_function","owner":null,"type":null,"usr":null,"usr_id":null,"context":null,"file":"tests/test21.S","line":21,"column":17,"local":false,"definition":true},
+    {"kind":"function","name":"x86_caller","owner":null,"type":null,"usr":null,"usr_id":null,"context":null,"file":"tests/test21.S","line":28,"column":1,"local":false,"definition":true},
+    {"kind":"function","name":"arm64_caller","owner":null,"type":null,"usr":null,"usr_id":null,"context":null,"file":"tests/test21.S","line":33,"column":1,"local":false,"definition":true},
+    {"kind":"function","name":"riscv_caller","owner":null,"type":null,"usr":null,"usr_id":null,"context":null,"file":"tests/test21.S","line":38,"column":1,"local":false,"definition":true},
+    {"kind":"function","name":"s390_caller","owner":null,"type":null,"usr":null,"usr_id":null,"context":null,"file":"tests/test21.S","line":44,"column":1,"local":false,"definition":true},
+    {"kind":"function","name":"m68k_caller","owner":null,"type":null,"usr":null,"usr_id":null,"context":null,"file":"tests/test21.S","line":48,"column":1,"local":false,"definition":true},
+    {"kind":"function","name":"ent_caller","owner":null,"type":null,"usr":null,"usr_id":null,"context":null,"file":"tests/test21.S","line":54,"column":1,"local":false,"definition":true}
+  ],
+  "uses": [
+    {"kind":"read","symbol_kind":"macro","mode":"-r-","mode_bits":4,"name":"DEFINE_FUNCTION","owner":null,"type":null,"usr":"macro:DEFINE_FUNCTION","usr_id":"91ff35be425b04e6","context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test21.S","line":21,"column":1,"local":false},
+    {"kind":"read","symbol_kind":"macro","mode":"-r-","mode_bits":4,"name":"ASM_NL","owner":null,"type":null,"usr":"macro:ASM_NL","usr_id":"6ef550a9fc95ef32","context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test21.S","line":5,"column":14,"local":false},
+    {"kind":"read","symbol_kind":"macro","mode":"-r-","mode_bits":4,"name":"ASM_NL","owner":null,"type":null,"usr":"macro:ASM_NL","usr_id":"6ef550a9fc95ef32","context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test21.S","line":6,"column":8,"local":false},
+    {"kind":"call","symbol_kind":"function","mode":"--r","mode_bits":16,"name":"x86_target","owner":null,"type":null,"usr":null,"usr_id":null,"context":"x86_caller","context_usr":null,"context_usr_id":null,"file":"tests/test21.S","line":29,"column":7,"local":false},
+    {"kind":"call","symbol_kind":"function","mode":"--r","mode_bits":16,"name":"arm64_target","owner":null,"type":null,"usr":null,"usr_id":null,"context":"arm64_caller","context_usr":null,"context_usr_id":null,"file":"tests/test21.S","line":34,"column":5,"local":false},
+    {"kind":"call","symbol_kind":"function","mode":"--r","mode_bits":16,"name":"riscv_target","owner":null,"type":null,"usr":null,"usr_id":null,"context":"riscv_caller","context_usr":null,"context_usr_id":null,"file":"tests/test21.S","line":39,"column":7,"local":false},
+    {"kind":"call","symbol_kind":"function","mode":"--r","mode_bits":16,"name":"riscv_jal_target","owner":null,"type":null,"usr":null,"usr_id":null,"context":"riscv_caller","context_usr":null,"context_usr_id":null,"file":"tests/test21.S","line":40,"column":6,"local":false},
+    {"kind":"call","symbol_kind":"function","mode":"--r","mode_bits":16,"name":"s390_target","owner":null,"type":null,"usr":null,"usr_id":null,"context":"s390_caller","context_usr":null,"context_usr_id":null,"file":"tests/test21.S","line":45,"column":14,"local":false},
+    {"kind":"call","symbol_kind":"function","mode":"--r","mode_bits":16,"name":"m68k_target","owner":null,"type":null,"usr":null,"usr_id":null,"context":"m68k_caller","context_usr":null,"context_usr_id":null,"file":"tests/test21.S","line":49,"column":7,"local":false},
+    {"kind":"call","symbol_kind":"function","mode":"--r","mode_bits":16,"name":"ent_target","owner":null,"type":null,"usr":null,"usr_id":null,"context":"ent_caller","context_usr":null,"context_usr_id":null,"file":"tests/test21.S","line":55,"column":7,"local":false}
+  ]
+}

@@ -177,6 +177,8 @@ static int querySymbol(semindex_db_t *database, const LspOverlay &overlay, const
 	options.variant = cursor.variant.c_str();
 	options.context = cursor.local ? cursor.context.c_str() : nullptr;
 	options.record = filter;
+	options.kind = cursor.kind;
+	options.has_kind = 1;
 	options.has_local = 1;
 	options.local = cursor.local;
 

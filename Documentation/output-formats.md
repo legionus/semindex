@@ -223,3 +223,15 @@ change with the indexed source, compiler version, or compile flags.
 
 In-process tooling can use the C API in `include/semindex.h` instead of parsing
 command output.
+
+Function definitions marked with `.type` or `.ent` in preprocessed assembly
+sources have symbol kind `function` and an empty type. They do not have a Clang
+USR because no C or C++ declaration exists in the assembly translation unit.
+Name and symbol kind allow queries and language-server definition lookup to
+associate them with matching C declarations.
+
+Direct calls within marked assembly functions are emitted as `call` uses with
+the containing function name as their context. The indexer recognizes common
+direct-call instructions after C preprocessing and omits register-indirect
+forms. Assembly calls have no Clang USR or context USR, so they are available
+to symbol and mode searches but not to identity-based call-graph queries.

@@ -9,5 +9,17 @@
       "-c",
       "@CMAKE_CURRENT_SOURCE_DIR@/tests/test.c"
     ]
+  },
+  {
+    "directory": "@CMAKE_CURRENT_SOURCE_DIR@",
+    "file": "@CMAKE_CURRENT_SOURCE_DIR@/tests/test21.S",
+    "arguments": [
+      "@CMAKE_C_COMPILER@",
+      "--no-default-config",
+      "-x",
+      "assembler-with-cpp",
+      "-c",
+      "@CMAKE_CURRENT_SOURCE_DIR@/tests/test21.S"
+    ]
   }
 ]

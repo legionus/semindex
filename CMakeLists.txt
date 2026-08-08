@@ -19,6 +19,8 @@ set(SEMINDEX_FORMAT_SOURCES
 	include/semindex_database.h
 	include/semindex_export.h
 	lib/parser/index_ast.cpp
+	lib/parser/index_asm.cpp
+	lib/parser/index_asm.h
 	lib/parser/index_context.cpp
 	lib/index-update/index_command_resolver.cpp
 	lib/index-update/index_command_resolver.h
@@ -301,6 +303,7 @@ target_link_libraries(semindex_storage
 
 # Clang parser and index construction
 add_library(semindex_parser SHARED
+	lib/parser/index_asm.cpp
 	lib/parser/index_ast.cpp
 	lib/parser/index_context.cpp
 	lib/parser/index_pp.cpp
@@ -550,6 +553,7 @@ if(BUILD_TESTING)
 		tests/test18.c
 		tests/test19.c
 		tests/test20.c
+		tests/test21.S
 	)
 		get_filename_component(test_name ${test_source} NAME)
 		add_test(
@@ -719,6 +723,13 @@ if(BUILD_TESTING)
 			SEMINDEX=$<TARGET_FILE:semindex_dispatcher>
 			SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
 			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-callgraph-tests.sh
+	)
+	add_test(
+		NAME semindex-asm
+		COMMAND
+			sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-asm-tests.sh
+				$<TARGET_FILE:semindex_dispatcher>
+				${CMAKE_CURRENT_SOURCE_DIR}
 	)
 	add_test(
 		NAME semindex-trace

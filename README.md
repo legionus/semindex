@@ -11,7 +11,7 @@ This repository is an early prototype.
 Implemented so far:
 
 * parsing C translation units with Clang LibTooling and preprocessing `.S`
-  sources;
+  sources, including explicitly marked assembler functions and direct calls;
 * indexing declarations, definitions, and references for variables, fields,
   records, enums, enumerators, typedefs, functions, macros, and included files;
 * access classification:
@@ -202,8 +202,9 @@ Among the missing features are:
   explicitly to combine different configurations;
 * queryable separation of header preprocessing contexts within one variant;
   their records are currently merged;
-* assembly labels, directives, and references in `.S` files; only
-  preprocessor-level entities are indexed;
+* general assembly labels, directives, and references in `.S` files; functions
+  marked with `.type` or `.ent` and common direct-call instructions are
+  recognized, but indirect calls and assembler `.macro` expansion are not;
 * LSP support for unsaved buffers, completion, hover, rename, and workspace
   symbols.
 

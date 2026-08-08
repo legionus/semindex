@@ -1,0 +1,26 @@
+
+FILE: tests/test21.S
+
+   3:9                    def   d ASM_NL
+   4:9                    def   d DEFINE_FUNCTION
+  10:1                    def   f direct_before
+  12:1                    def   f direct_after
+  16:1                    def   f hash_function
+  18:1                    def   f stt_function
+  21:1                    -r-   d DEFINE_FUNCTION
+   5:14                   -r-   d ASM_NL
+   6:8                    -r-   d ASM_NL
+  21:17                   def   f macro_function
+  28:1                    def   f x86_caller
+  33:1                    def   f arm64_caller
+  38:1                    def   f riscv_caller
+  44:1                    def   f s390_caller
+  48:1                    def   f m68k_caller
+  54:1                    def   f ent_caller
+  29:7   x86_caller       --r   f x86_target
+  34:5   arm64_caller     --r   f arm64_target
+  39:7   riscv_caller     --r   f riscv_target
+  40:6   riscv_caller     --r   f riscv_jal_target
+  45:14  s390_caller      --r   f s390_target
+  49:7   m68k_caller      --r   f m68k_target
+  55:7   ent_caller       --r   f ent_target
