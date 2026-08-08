@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <sqlite3.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 
 #include "repository.h"
+#include "semindex_paths.h"
 
 char *semindex_repository_root_explicit(const char *input)
 {
@@ -114,5 +116,29 @@ char *semindex_repository_path(const char *root, const char *path)
 		result = strdup(resolved + root_len + 1);
 
 	free(resolved);
+	return result;
+}
+
+char *semindex_default_database_path(const char *path, const char *name)
+{
+	char *allocated_root;
+	const char *root;
+	char *result;
+	size_t size;
+
+	if (!name || !name[0])
+		return NULL;
+
+	allocated_root = semindex_repository_root(path ? path : ".");
+	root = allocated_root ? allocated_root : ".";
+
+	size = strlen(root) + strlen(SEMINDEX_STATE_DIRECTORY) + strlen(name) + 3;
+	result = malloc(size);
+
+	if (result)
+		snprintf(result, size, "%s/" SEMINDEX_STATE_DIRECTORY "/%s", root, name);
+
+	free(allocated_root);
+
 	return result;
 }

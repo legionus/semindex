@@ -1,8 +1,10 @@
 # Index database
 
 `semindex compiler` and `semindex index` store symbol records in
-`.semindex/semindex.db` by default. The database contains only source files,
-semantic records, and optional repository provenance. Compiler commands are
+`.semindex/semindex.db` by default. All commands resolve this path below the
+repository root when a `.git` marker is found, or below the current directory
+otherwise. The database contains only source files, semantic records, and
+optional repository provenance. Compiler commands are
 stored separately in `.semindex/commands.db`. Local symbols and their uses are
 stored by default; indexing with `--no-include-local` omits them.
 

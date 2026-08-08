@@ -10,6 +10,9 @@ directory contains:
 .semindex/commands.db
 ```
 
+The default paths are below the repository root when a `.git` marker is found,
+or below the current directory otherwise.
+
 Both indexing commands accept `--commands-database=PATH` to select another
 command database and `--no-store-command` to disable command storage.  Commands
 are keyed by index variant and canonical source path, so indexing the same

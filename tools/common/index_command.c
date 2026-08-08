@@ -5,12 +5,13 @@
 
 #include "command_db.h"
 #include "index_command.h"
+#include "repository.h"
 #include "semindex_cli.h"
+#include "semindex_paths.h"
 
 void index_command_options_init(struct index_command_options *options)
 {
 	*options = (struct index_command_options){
-		.database = ".semindex/semindex.db",
 		.variant = "general",
 		.scope = SEMINDEX_SCOPE_PROJECT,
 		.git_commit_mode = INDEX_PIPELINE_GIT_COMMIT_DISABLED,
@@ -74,6 +75,18 @@ int index_command_parse_option(struct index_command_options *options, int option
 int index_command_prepare(struct index_command_options *options, const char *command, const char *source_file,
 	int output_only, const char *program)
 {
+	if (!options->database) {
+		options->allocated_database = semindex_default_database_path(source_file, SEMINDEX_SYMBOL_DATABASE);
+
+		if (!options->allocated_database) {
+			fprintf(stderr, "%s: failed to allocate symbol database path\n", program);
+
+			return -1;
+		}
+
+		options->database = options->allocated_database;
+	}
+
 	if (!options->variant[0]) {
 		fprintf(stderr, "%s: variant name must not be empty\n", program);
 
@@ -135,6 +148,7 @@ int index_command_finish(struct index_command_options *options)
 
 	semindex_trace_end(options->trace, "total", options->total_start);
 	ret = semindex_trace_close(options->trace);
+	free(options->allocated_database);
 	free(options->allocated_commands_database);
 
 	return ret;

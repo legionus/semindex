@@ -7,6 +7,8 @@
 #include <string.h>
 
 #include "index_db.h"
+#include "repository.h"
+#include "semindex_paths.h"
 
 static void callgraph_usage(FILE *f)
 {
@@ -27,7 +29,7 @@ static void callgraph_help(void)
 	       "      --variant=PATTERN       limit results to matching variants\n"
 	       "  -p, --path=PATTERN          limit results to matching callsite paths\n"
 	       "  -d, --database=PATH         path to the semindex database\n"
-	       "                              (default: .semindex/semindex.db)\n"
+	       "                              (default: " SEMINDEX_DEFAULT_SYMBOL_DATABASE ")\n"
 	       "  -h, --help                  display this help and exit\n"
 	       "\n"
 	       "Variant and path patterns containing `*', `?', or `[]' use SQLite\n"
@@ -51,8 +53,10 @@ int cmd_callgraph(int argc, char **argv)
 		{ NULL, 0, NULL, 0 },
 	};
 	index_db_callgraph_options_t opts = { 0 };
-	const char *database = ".semindex/semindex.db";
+	char *default_database = NULL;
+	const char *database = NULL;
 	int have_direction = 0;
+	int ret;
 	int opt;
 
 	optind = 1;
@@ -131,5 +135,20 @@ int cmd_callgraph(int argc, char **argv)
 		callgraph_usage(stderr);
 		return 1;
 	}
-	return index_db_callgraph(database, &opts, stdout) < 0 ? 1 : 0;
+	if (!database) {
+		default_database = semindex_default_database_path(".", SEMINDEX_SYMBOL_DATABASE);
+		database = default_database;
+	}
+
+	if (!database) {
+		fprintf(stderr, "semindex: failed to allocate database path\n");
+
+		return 1;
+	}
+
+	ret = index_db_callgraph(database, &opts, stdout) < 0 ? 1 : 0;
+
+	free(default_database);
+
+	return ret;
 }

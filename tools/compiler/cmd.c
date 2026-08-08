@@ -8,6 +8,7 @@
 #include "index_command.h"
 #include "index_pipeline.h"
 #include "semindex_cli.h"
+#include "semindex_paths.h"
 
 static void compiler_usage(FILE *f)
 {
@@ -31,7 +32,7 @@ static void compiler_help(void)
 	       "  -s, --scope=SCOPE          select indexed source scope: file, project, all\n"
 	       "                             (default: project)\n"
 	       "  -d, --database=PATH        path to the semindex database\n"
-	       "                             (default: .semindex/semindex.db)\n"
+	       "                             (default: " SEMINDEX_DEFAULT_SYMBOL_DATABASE ")\n"
 	       "      --commands-database=PATH\n"
 	       "                             path to the compiler command database\n"
 	       "                             (default: commands.db beside --database)\n"

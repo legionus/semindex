@@ -4,6 +4,8 @@
 #include "lsp_server.h"
 #include "lsp_transport.h"
 #include "semindex_database.h"
+#include "repository.h"
+#include "semindex_paths.h"
 
 #include <cstdlib>
 #include <filesystem>
@@ -30,7 +32,7 @@ static void help()
 		     "\n"
 		     "Options:\n"
 		     "  -d, --database=PATH        path to the semindex database\n"
-		     "                             (default: .semindex/semindex.db)\n"
+		     "                             (default: " SEMINDEX_DEFAULT_SYMBOL_DATABASE ")\n"
 		     "      --commands-database=PATH\n"
 		     "                             path to the compiler command database\n"
 		     "                             (default: commands.db beside --database)\n"
@@ -40,6 +42,19 @@ static void help()
 		     "      --logfile=FILE         append JSON-RPC requests and responses to FILE\n"
 		     "  -h, --help                 display this help and exit\n"
 		     "\n";
+}
+
+static std::string defaultDatabasePath()
+{
+	char *allocated = semindex_default_database_path(".", SEMINDEX_SYMBOL_DATABASE);
+	std::string path;
+
+	if (allocated) {
+		path = allocated;
+		free(allocated);
+	}
+
+	return path;
 }
 
 int main(int argc, char **argv)
@@ -61,11 +76,12 @@ int main(int argc, char **argv)
 		{ "help", no_argument, nullptr, 'h' },
 		{ nullptr, 0, nullptr, 0 },
 	};
-	std::string database_path = ".semindex/semindex.db";
+	std::string database_path;
 	std::string commands_database_path;
 	std::string compile_commands_path;
 	std::string variant;
 	std::string logfile_path;
+	bool database_explicit = false;
 	bool include_local = true;
 	bool logfile_requested = false;
 
@@ -78,6 +94,7 @@ int main(int argc, char **argv)
 		switch (opt) {
 		case 'd':
 			database_path = optarg;
+			database_explicit = true;
 			break;
 		case 'h':
 			help();
@@ -116,6 +133,16 @@ int main(int argc, char **argv)
 		std::cerr << "semindex-lsp: empty log file path\n";
 		return 1;
 	}
+
+	if (!database_explicit)
+		database_path = defaultDatabasePath();
+
+	if (database_path.empty()) {
+		std::cerr << "semindex-lsp: failed to allocate database path\n";
+
+		return 1;
+	}
+
 	if (commands_database_path.empty()) {
 		char *path = command_db_default_path(database_path.c_str());
 

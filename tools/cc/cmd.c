@@ -11,6 +11,7 @@
 #include "index_command.h"
 #include "index_pipeline.h"
 #include "semindex_cli.h"
+#include "semindex_paths.h"
 
 enum index_error_policy {
 	INDEX_ERRORS_WARN,
@@ -40,7 +41,7 @@ static void cc_help(void)
 	       "  -s, --scope=SCOPE          select indexed source scope: file, project, all\n"
 	       "                             (default: project)\n"
 	       "  -d, --database=PATH        path to the semindex database\n"
-	       "                             (default: .semindex/semindex.db)\n"
+	       "                             (default: " SEMINDEX_DEFAULT_SYMBOL_DATABASE ")\n"
 	       "      --commands-database=PATH\n"
 	       "                             path to the compiler command database\n"
 	       "      --variant=NAME          store records in the named variant\n"

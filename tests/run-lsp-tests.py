@@ -47,12 +47,13 @@ def parse_messages(data):
     return messages
 
 
-def run_server(binary, options, messages):
+def run_server(binary, options, messages, cwd=None):
     process = subprocess.run(
         [binary, *options],
         input=b"".join(frame(message) for message in messages),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        cwd=cwd,
         check=False,
     )
     return process, parse_messages(process.stdout)
@@ -111,6 +112,26 @@ def main():
         database = directory / "semindex.db"
         commands_database = directory / "commands.db"
         logfile = directory / "semindex-lsp.log"
+
+        repository = directory / "repository"
+        nested = repository / "src" / "nested"
+        nested.mkdir(parents=True)
+        (repository / ".git").mkdir()
+
+        process, responses = run_server(sys.argv[1], [], [
+            {
+                "jsonrpc": "2.0", "id": 70, "method": "initialize",
+                "params": {"rootUri": repository.resolve().as_uri()},
+            },
+            {"jsonrpc": "2.0", "id": 71, "method": "shutdown"},
+            {"jsonrpc": "2.0", "method": "exit"},
+        ], cwd=nested)
+        if process.returncode != 0 or len(responses) != 2:
+            fail("default repository database lifecycle failed", process)
+        if not (repository / ".semindex" / "semindex.db").is_file():
+            fail("LSP did not create its database at the repository root")
+        if (nested / ".semindex").exists():
+            fail("LSP created its database below the repository root")
         source.write_text(
             "struct Nav {\n"
             "\tint field;\n"

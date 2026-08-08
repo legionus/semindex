@@ -7,6 +7,7 @@
 
 #include "command_db.h"
 #include "command_db_internal.h"
+#include "semindex_paths.h"
 
 char *command_db_default_path(const char *index_database)
 {
@@ -16,16 +17,16 @@ char *command_db_default_path(const char *index_database)
 	char *path;
 
 	if (!slash)
-		return strdup("commands.db");
+		return strdup(SEMINDEX_COMMAND_DATABASE);
 
 	dir_len = slash - index_database + 1;
-	path = malloc(dir_len + sizeof("commands.db"));
+	path = malloc(dir_len + sizeof(SEMINDEX_COMMAND_DATABASE));
 
 	if (!path)
 		return NULL;
 
 	memcpy(path, index_database, dir_len);
-	memcpy(path + dir_len, "commands.db", sizeof("commands.db"));
+	memcpy(path + dir_len, SEMINDEX_COMMAND_DATABASE, sizeof(SEMINDEX_COMMAND_DATABASE));
 
 	return path;
 }

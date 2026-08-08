@@ -5,6 +5,8 @@
 
 extern "C" {
 #include "command_db.h"
+#include "repository.h"
+#include "semindex_paths.h"
 }
 
 #include <chrono>
@@ -28,7 +30,7 @@ static void help()
 		     "\n"
 		     "Options:\n"
 		     "  -d, --database=PATH        path to the semindex database\n"
-		     "                             (default: .semindex/semindex.db)\n"
+		     "                             (default: " SEMINDEX_DEFAULT_SYMBOL_DATABASE ")\n"
 		     "      --commands-database=PATH\n"
 		     "                             path to the compiler command database\n"
 		     "                             (default: commands.db beside --database)\n"
@@ -65,12 +67,13 @@ int main(int argc, char **argv)
 		{ "help", no_argument, nullptr, 'h' },
 		{ nullptr, 0, nullptr, 0 },
 	};
-	std::string database = ".semindex/semindex.db";
+	std::string database;
 	std::string commands_database;
 	std::string workspace = std::filesystem::current_path().string();
 	std::string variant;
 	std::string logfile_path;
 	bool allow_reindex = false;
+	bool database_explicit = false;
 	bool include_local = true;
 	int opt;
 
@@ -80,6 +83,7 @@ int main(int argc, char **argv)
 		switch (opt) {
 		case 'd':
 			database = optarg;
+			database_explicit = true;
 			break;
 		case 'h':
 			help();
@@ -116,10 +120,32 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if (database.empty() || workspace.empty()) {
+	if (workspace.empty() || (database_explicit && database.empty())) {
 		std::cerr << "semindex-mcp: database and workspace paths must not be empty\n";
 
 		return 1;
+	}
+
+	std::error_code error;
+	std::filesystem::path workspace_path = std::filesystem::canonical(workspace, error);
+
+	if (error || !std::filesystem::is_directory(workspace_path)) {
+		std::cerr << "semindex-mcp: invalid workspace: " << workspace << '\n';
+
+		return 1;
+	}
+
+	if (!database_explicit) {
+		char *path = semindex_default_database_path(workspace_path.c_str(), SEMINDEX_SYMBOL_DATABASE);
+
+		if (!path) {
+			std::cerr << "semindex-mcp: failed to allocate database path\n";
+
+			return 1;
+		}
+
+		database = path;
+		free(path);
 	}
 
 	if (commands_database.empty()) {
@@ -133,15 +159,6 @@ int main(int argc, char **argv)
 
 		commands_database = path;
 		free(path);
-	}
-
-	std::error_code error;
-	std::filesystem::path workspace_path = std::filesystem::canonical(workspace, error);
-
-	if (error || !std::filesystem::is_directory(workspace_path)) {
-		std::cerr << "semindex-mcp: invalid workspace: " << workspace << '\n';
-
-		return 1;
 	}
 
 	database = std::filesystem::absolute(database).lexically_normal().string();

@@ -18,6 +18,7 @@ set(SEMINDEX_FORMAT_SOURCES
 	include/semindex.h
 	include/semindex_database.h
 	include/semindex_export.h
+	lib/common/semindex_paths.h
 	lib/parser/index_ast.cpp
 	lib/parser/index_asm.cpp
 	lib/parser/index_asm.h

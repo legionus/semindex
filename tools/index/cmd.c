@@ -6,6 +6,7 @@
 #include "index_command.h"
 #include "index_pipeline.h"
 #include "semindex_cli.h"
+#include "semindex_paths.h"
 
 static void index_usage(FILE *f)
 {
@@ -33,7 +34,7 @@ static void index_help(void)
 	       "its directory\n"
 	       "                             (default: .)\n"
 	       "  -d, --database=PATH        path to the semindex database\n"
-	       "                             (default: .semindex/semindex.db)\n"
+	       "                             (default: " SEMINDEX_DEFAULT_SYMBOL_DATABASE ")\n"
 	       "      --commands-database=PATH\n"
 	       "                             path to the compiler command database\n"
 	       "                             (default: commands.db beside --database)\n"

@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <getopt.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "command_db.h"
+#include "repository.h"
+#include "semindex_paths.h"
 
 static void compile_commands_usage(FILE *f)
 {
@@ -17,7 +20,7 @@ static void compile_commands_help(void)
 	       "\n"
 	       "Options:\n"
 	       "  -d, --database=PATH        path to the compiler command database\n"
-	       "                             (default: .semindex/commands.db)\n"
+	       "                             (default: " SEMINDEX_DEFAULT_COMMAND_DATABASE ")\n"
 	       "      --variant=NAME          export commands from the named variant\n"
 	       "                             (default: general)\n"
 	       "  -o, --output=PATH          write output to PATH instead of stdout\n"
@@ -36,7 +39,8 @@ int cmd_compile_commands(int argc, char **argv)
 		{ "help", no_argument, NULL, 'h' },
 		{ NULL, 0, NULL, 0 },
 	};
-	const char *database = ".semindex/commands.db";
+	char *default_database = NULL;
+	const char *database = NULL;
 	const char *variant = "general";
 	const char *output = NULL;
 
@@ -75,11 +79,25 @@ int cmd_compile_commands(int argc, char **argv)
 		fprintf(stderr, "semindex: variant name must not be empty\n");
 		return 1;
 	}
+
+	if (!database) {
+		default_database = semindex_default_database_path(".", SEMINDEX_COMMAND_DATABASE);
+		database = default_database;
+	}
+
+	if (!database) {
+		fprintf(stderr, "semindex: failed to allocate database path\n");
+
+		return 1;
+	}
+
 	if (output) {
 		out = fopen(output, "w");
 
 		if (!out) {
 			perror("semindex: failed to open output file");
+			free(default_database);
+
 			return 1;
 		}
 	}
@@ -90,5 +108,8 @@ int cmd_compile_commands(int argc, char **argv)
 		perror("semindex: failed to close output file");
 		ret = -1;
 	}
+
+	free(default_database);
+
 	return ret ? 1 : 0;
 }

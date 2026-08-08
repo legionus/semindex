@@ -25,6 +25,7 @@ struct index_command_options {
 	index_pipeline_git_commit_t git_commit_mode;
 	semindex_trace_t *trace;
 	semindex_trace_time_t total_start;
+	char *allocated_database;
 	char *allocated_commands_database;
 	int include_local;
 	int store_command;
