@@ -7,12 +7,14 @@
 LspIndexer::LspIndexer(std::string database, std::string commands_database, std::string compile_commands,
 	std::string variant, bool include_local)
     : variant(std::move(variant)), compile_commands_explicit(!compile_commands.empty()),
-      updater(SemindexIndexUpdaterOptions{
+	      updater(SemindexIndexUpdaterOptions{
 	      .database = std::move(database),
-	      .commands_database = std::move(commands_database),
-	      .compile_commands = std::move(compile_commands),
+	      .command_resolver = {
+		      .commands_database = std::move(commands_database),
+		      .compile_commands = std::move(compile_commands),
+		      .allow_fallback = true,
+	      },
 	      .include_local = include_local,
-	      .allow_fallback_command = true,
       })
 {
 }

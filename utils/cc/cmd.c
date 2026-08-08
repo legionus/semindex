@@ -7,10 +7,9 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "command_db.h"
 #include "compiler_command.h"
+#include "index_command.h"
 #include "index_pipeline.h"
-#include "perf_trace.h"
 #include "semindex_cli.h"
 
 enum index_error_policy {
@@ -20,17 +19,8 @@ enum index_error_policy {
 };
 
 struct cc_options {
-	const char *database;
-	const char *commands_database;
-	const char *variant;
-	const char *repository_root;
-	const char *trace_path;
-	const char *git_commit;
-	semindex_scope_t scope;
-	index_pipeline_git_commit_t git_commit_mode;
+	struct index_command_options index;
 	enum index_error_policy error_policy;
-	int include_local;
-	int store_command;
 };
 
 static void cc_usage(FILE *f)
@@ -90,16 +80,16 @@ static int parse_error_policy(const char *value, enum index_error_policy *policy
 static int parse_options(int argc, char **argv, struct cc_options *options, int *compiler_index)
 {
 	static const struct option long_options[] = {
-		{ "no-include-local", no_argument, NULL, 1 },
-		{ "variant", required_argument, NULL, 2 },
-		{ "commands-database", required_argument, NULL, 3 },
-		{ "no-store-command", no_argument, NULL, 4 },
-		{ "trace", required_argument, NULL, 5 },
+		{ "no-include-local", no_argument, NULL, INDEX_COMMAND_OPT_NO_INCLUDE_LOCAL },
+		{ "variant", required_argument, NULL, INDEX_COMMAND_OPT_VARIANT },
+		{ "commands-database", required_argument, NULL, INDEX_COMMAND_OPT_COMMANDS_DATABASE },
+		{ "no-store-command", no_argument, NULL, INDEX_COMMAND_OPT_NO_STORE_COMMAND },
+		{ "trace", required_argument, NULL, INDEX_COMMAND_OPT_TRACE },
 		{ "index-errors", required_argument, NULL, 6 },
-		{ "root", required_argument, NULL, 9 },
+		{ "root", required_argument, NULL, INDEX_COMMAND_OPT_ROOT },
 #ifdef SEMINDEX_HAVE_LIBGIT2
-		{ "git-commit", required_argument, NULL, 7 },
-		{ "no-git-commit", no_argument, NULL, 8 },
+		{ "git-commit", required_argument, NULL, INDEX_COMMAND_OPT_GIT_COMMIT },
+		{ "no-git-commit", no_argument, NULL, INDEX_COMMAND_OPT_NO_GIT_COMMIT },
 #endif
 		{ "database", required_argument, NULL, 'd' },
 		{ "scope", required_argument, NULL, 's' },
@@ -107,6 +97,7 @@ static int parse_options(int argc, char **argv, struct cc_options *options, int 
 		{ NULL, 0, NULL, 0 },
 	};
 	int separator = 0;
+	int parsed;
 	int i;
 	int opt;
 
@@ -134,53 +125,9 @@ static int parse_options(int argc, char **argv, struct cc_options *options, int 
 
 	while ((opt = getopt_long(argc, argv, "+d:s:h", long_options, NULL)) != -1) {
 		switch (opt) {
-		case 1:
-			options->include_local = 0;
-			break;
-		case 2:
-			options->variant = optarg;
-			break;
-		case 3:
-			options->commands_database = optarg;
-			break;
-		case 4:
-			options->store_command = 0;
-			break;
-		case 5:
-			options->trace_path = optarg;
-			break;
 		case 6:
 			if (parse_error_policy(optarg, &options->error_policy) < 0) {
 				fprintf(stderr, "semindex-cc: unknown index error policy: %s\n", optarg);
-
-				return -1;
-			}
-			break;
-		case 9:
-			options->repository_root = optarg;
-			break;
-#ifdef SEMINDEX_HAVE_LIBGIT2
-		case 7:
-			if (parse_git_commit(optarg, &options->git_commit_mode) < 0) {
-				fprintf(stderr, "semindex-cc: invalid Git commit: %s\n", optarg);
-
-				return -1;
-			}
-
-			options->git_commit =
-				options->git_commit_mode == INDEX_PIPELINE_GIT_COMMIT_EXPLICIT ? optarg : NULL;
-			break;
-		case 8:
-			options->git_commit_mode = INDEX_PIPELINE_GIT_COMMIT_DISABLED;
-			options->git_commit = NULL;
-			break;
-#endif
-		case 'd':
-			options->database = optarg;
-			break;
-		case 's':
-			if (parse_scope(optarg, &options->scope) < 0) {
-				fprintf(stderr, "semindex-cc: unknown scope: %s\n", optarg);
 
 				return -1;
 			}
@@ -190,6 +137,14 @@ static int parse_options(int argc, char **argv, struct cc_options *options, int 
 
 			return 1;
 		default:
+			parsed = index_command_parse_option(&options->index, opt, optarg, "semindex-cc");
+
+			if (parsed > 0)
+				break;
+
+			if (parsed < 0)
+				return -1;
+
 			cc_usage(stderr);
 
 			return -1;
@@ -207,29 +162,14 @@ static int parse_options(int argc, char **argv, struct cc_options *options, int 
 	return 0;
 }
 
-static int run_index(const struct cc_options *options, int argc, char **argv, const char *source_file)
+static int run_index(struct cc_options *options, int argc, char **argv, const char *source_file)
 {
 	index_pipeline_request_t request;
 	index_pipeline_result_t result = { 0 };
-	index_pipeline_storage_t storage;
 	semindex_compile_command_t command;
-	semindex_trace_t *trace = NULL;
-	semindex_trace_time_t total_start = 0;
-	const char *commands_database = options->commands_database;
-	char *allocated_commands_database = NULL;
 	int stderr_copy = -1;
 	int null_fd = -1;
 	int ret = -1;
-
-	if (options->store_command) {
-		if (!commands_database) {
-			allocated_commands_database = command_db_default_path(options->database);
-			commands_database = allocated_commands_database;
-		}
-
-		if (!commands_database)
-			goto out;
-	}
 
 	if (options->error_policy == INDEX_ERRORS_IGNORE) {
 		stderr_copy = dup(STDERR_FILENO);
@@ -239,14 +179,8 @@ static int run_index(const struct cc_options *options, int argc, char **argv, co
 			goto out;
 	}
 
-	if (options->trace_path) {
-		trace = semindex_trace_open(options->trace_path, "cc", source_file);
-
-		if (!trace)
-			goto out;
-
-		total_start = semindex_trace_begin(trace);
-	}
+	if (index_command_prepare(&options->index, "cc", source_file, 0, "semindex-cc") < 0)
+		goto out;
 
 	command = (semindex_compile_command_t){
 		.directory = ".",
@@ -254,34 +188,24 @@ static int run_index(const struct cc_options *options, int argc, char **argv, co
 		.argc = argc,
 		.argv = (const char *const *)argv,
 	};
-	storage = options->store_command ? INDEX_PIPELINE_STORE_SYMBOLS_AND_COMMAND : INDEX_PIPELINE_STORE_SYMBOLS;
 	request = (index_pipeline_request_t){
 		.input = INDEX_PIPELINE_COMMAND,
-		.storage = storage,
+		.storage = index_command_storage(&options->index, 0),
 		.partial = INDEX_PIPELINE_STORE_PARTIAL,
 		.command = &command,
 		.source_file = source_file,
-		.symbol_database = options->database,
-		.commands_database = commands_database,
-		.variant = options->variant,
-		.repository_root = options->repository_root,
-		.git_commit = options->git_commit,
-		.scope = options->scope,
-		.git_commit_mode = options->git_commit_mode,
-		.trace = trace,
-		.include_local = options->include_local,
 	};
+	index_command_fill_request(&options->index, &request);
 
 	ret = index_pipeline_run(&request, &result);
 
 	if (ret < 0 && result.failed_stage == INDEX_PIPELINE_STAGE_REPOSITORY_ROOT)
-		fprintf(stderr, "semindex-cc: invalid project root: %s\n", options->repository_root);
+		fprintf(stderr, "semindex-cc: invalid project root: %s\n", options->index.repository_root);
 
 out:
-	index_pipeline_result_destroy(&result, trace);
-	semindex_trace_end(trace, "total", total_start);
+	index_pipeline_result_destroy(&result, options->index.trace);
 
-	if (semindex_trace_close(trace) < 0)
+	if (index_command_finish(&options->index) < 0)
 		ret = -1;
 
 	if (stderr_copy >= 0) {
@@ -294,8 +218,6 @@ out:
 
 	if (stderr_copy >= 0)
 		close(stderr_copy);
-
-	free(allocated_commands_database);
 
 	return ret;
 }
@@ -319,14 +241,7 @@ static int exec_compiler(char **argv)
 
 int cmd_cc(int argc, char **argv)
 {
-	struct cc_options options = {
-		.database = ".semindex/semindex.db",
-		.variant = "general",
-		.scope = SEMINDEX_SCOPE_PROJECT,
-		.error_policy = INDEX_ERRORS_WARN,
-		.include_local = 1,
-		.store_command = 1,
-	};
+	struct cc_options options;
 	const char *real_cc;
 	const char *source_file = NULL;
 	char **compiler_argv;
@@ -337,6 +252,9 @@ int cmd_cc(int argc, char **argv)
 	int index_ret;
 	const char *value;
 
+	index_command_options_init(&options.index);
+	options.error_policy = INDEX_ERRORS_WARN;
+
 	if (getenv("SEMINDEX_CC_ACTIVE")) {
 		fprintf(stderr, "semindex-cc: recursive compiler invocation\n");
 
@@ -346,17 +264,17 @@ int cmd_cc(int argc, char **argv)
 	value = getenv("SEMINDEX_DATABASE");
 
 	if (value && value[0])
-		options.database = value;
+		options.index.database = value;
 
 	value = getenv("SEMINDEX_COMMANDS_DATABASE");
 
 	if (value && value[0])
-		options.commands_database = value;
+		options.index.commands_database = value;
 
 	value = getenv("SEMINDEX_VARIANT");
 
 	if (value)
-		options.variant = value;
+		options.index.variant = value;
 
 	value = getenv("SEMINDEX_INDEX_ERRORS");
 
@@ -371,7 +289,7 @@ int cmd_cc(int argc, char **argv)
 	if (parse_ret != 0)
 		return parse_ret < 0;
 
-	if (!options.variant[0]) {
+	if (!options.index.variant[0]) {
 		fprintf(stderr, "semindex-cc: variant name must not be empty\n");
 
 		return 1;

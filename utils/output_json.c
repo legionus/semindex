@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "output.h"
+#include "semantic_names.h"
 #include "semindex_cli.h"
 
 static const char *use_kind_string(semindex_use_kind_t kind)
@@ -85,7 +86,7 @@ static void print_json_id(FILE *out, unsigned long long id)
 static void print_json_symbol(FILE *out, const semindex_symbol_t *symbol)
 {
 	fputs("    {\"kind\":", out);
-	print_json_string(out, symbol_kind_name(symbol->kind));
+	print_json_string(out, semindex_symbol_kind_name(symbol->kind));
 	fputs(",\"name\":", out);
 	print_json_string(out, symbol->name);
 	fputs(",\"owner\":", out);
@@ -112,7 +113,7 @@ static void print_json_use(FILE *out, const semindex_use_t *use)
 	fputs("    {\"kind\":", out);
 	print_json_string(out, use_kind_string(use->kind));
 	fputs(",\"symbol_kind\":", out);
-	print_json_string(out, symbol_kind_name(use->symbol_kind));
+	print_json_string(out, semindex_symbol_kind_name(use->symbol_kind));
 	fputs(",\"mode\":", out);
 	print_json_string(out, mode);
 	fprintf(out, ",\"mode_bits\":%u,\"name\":", use->mode);

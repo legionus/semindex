@@ -20,6 +20,8 @@ set(SEMINDEX_FORMAT_SOURCES
 	include/semindex_export.h
 	src/index_ast.cpp
 	src/index_context.cpp
+	src/index_command_resolver.cpp
+	src/index_command_resolver.h
 	src/index_updater.cpp
 	src/index_updater.h
 	src/lsp_call_hierarchy.cpp
@@ -85,12 +87,12 @@ set(SEMINDEX_FORMAT_SOURCES
 	tests/test19.c
 	tests/test20.c
 	utils/array_size.h
-	utils/cmd_cc.c
-	utils/cmd_compiler.c
-	utils/cmd_compile_commands.c
-	utils/cmd_callgraph.c
-	utils/cmd_index.c
-	utils/cmd_search.c
+	utils/callgraph/cmd.c
+	utils/cc/cmd.c
+	utils/compile_commands/cmd.c
+	utils/compiler/cmd.c
+	utils/index/cmd.c
+	utils/search/cmd.c
 	utils/cli_common.c
 	utils/command_main.c
 	utils/compiler_command.c
@@ -107,6 +109,8 @@ set(SEMINDEX_FORMAT_SOURCES
 	utils/git_provenance.h
 	utils/git_provenance_loader.c
 	utils/git_provenance_stub.c
+	utils/index_command.c
+	utils/index_command.h
 	utils/index_db_callgraph.c
 	utils/index_db.h
 	utils/index_db_reader.c
@@ -124,10 +128,12 @@ set(SEMINDEX_FORMAT_SOURCES
 	utils/perf_trace.h
 	utils/sqlite.c
 	utils/sqlite.h
-	utils/semindex.c
+	utils/dispatcher/main.c
 	utils/semindex_cli.h
-	utils/semindex_lsp.cpp
-	utils/semindex_mcp.cpp
+	utils/semantic_names.c
+	utils/semantic_names.h
+	utils/lsp/main.cpp
+	utils/mcp/main.cpp
 )
 
 find_program(CLANG_FORMAT clang-format)
@@ -231,6 +237,15 @@ target_include_directories(semindex_source PUBLIC
 )
 target_link_libraries(semindex_source PUBLIC semindex_database semindex_git)
 
+# Canonical semantic names
+add_library(semindex_names STATIC
+	utils/semantic_names.c
+)
+target_include_directories(semindex_names PUBLIC
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
+)
+
 # Protocol-neutral semantic queries
 add_library(semindex_semantic STATIC
 	src/semantic_query.cpp
@@ -324,6 +339,7 @@ target_link_libraries(semindex_pipeline PUBLIC
 )
 
 add_library(semindex_index_update STATIC
+	src/index_command_resolver.cpp
 	src/index_updater.cpp
 )
 target_include_directories(semindex_index_update PUBLIC
@@ -340,7 +356,7 @@ add_executable(semindex_lsp
 	src/lsp_source.cpp
 	src/lsp_server.cpp
 	src/lsp_transport.cpp
-	utils/semindex_lsp.cpp
+	utils/lsp/main.cpp
 )
 set_target_properties(semindex_lsp PROPERTIES OUTPUT_NAME semindex-lsp)
 
@@ -364,7 +380,7 @@ add_executable(semindex_mcp
 	src/mcp_server.cpp
 	src/mcp_tools.cpp
 	src/mcp_transport.cpp
-	utils/semindex_mcp.cpp
+	utils/mcp/main.cpp
 )
 set_target_properties(semindex_mcp PROPERTIES OUTPUT_NAME semindex-mcp)
 target_include_directories(semindex_mcp PRIVATE
@@ -374,6 +390,7 @@ target_include_directories(semindex_mcp PRIVATE
 target_compile_definitions(semindex_mcp PRIVATE ${LLVM_DEFINITIONS})
 target_link_libraries(semindex_mcp PRIVATE
 	semindex_index_update
+	semindex_names
 	semindex_semantic
 	Threads::Threads
 	LLVM
@@ -385,11 +402,12 @@ set_target_properties(semindex_mcp PROPERTIES
 
 add_library(semindex_cli_common STATIC
 	utils/cli_common.c
+	utils/index_command.c
 	utils/output_dissect.c
 	utils/output_json.c
 )
 target_include_directories(semindex_cli_common PRIVATE include)
-target_link_libraries(semindex_cli_common PUBLIC semindex_parser)
+target_link_libraries(semindex_cli_common PUBLIC semindex_names semindex_parser)
 
 function(add_semindex_command target command source)
 	add_executable(${target}
@@ -400,10 +418,10 @@ function(add_semindex_command target command source)
 	set_target_properties(${target} PROPERTIES OUTPUT_NAME semindex-${command})
 endfunction()
 
-add_executable(semindex_dispatcher utils/semindex.c)
+add_executable(semindex_dispatcher utils/dispatcher/main.c)
 set_target_properties(semindex_dispatcher PROPERTIES OUTPUT_NAME semindex)
 
-add_semindex_command(semindex_compiler compiler utils/cmd_compiler.c)
+add_semindex_command(semindex_compiler compiler utils/compiler/cmd.c)
 target_sources(semindex_compiler PRIVATE utils/compiler_command.c)
 target_link_libraries(semindex_compiler PRIVATE semindex_cli_common semindex_pipeline)
 set_target_properties(semindex_compiler PROPERTIES
@@ -411,7 +429,7 @@ set_target_properties(semindex_compiler PROPERTIES
 	INSTALL_RPATH "${CMAKE_INSTALL_FULL_LIBDIR}"
 )
 
-add_semindex_command(semindex_cc cc utils/cmd_cc.c)
+add_semindex_command(semindex_cc cc utils/cc/cmd.c)
 target_sources(semindex_cc PRIVATE utils/compiler_command.c)
 target_link_libraries(semindex_cc PRIVATE semindex_cli_common semindex_pipeline)
 set_target_properties(semindex_cc PROPERTIES
@@ -419,20 +437,20 @@ set_target_properties(semindex_cc PROPERTIES
 	INSTALL_RPATH "${CMAKE_INSTALL_FULL_LIBDIR}"
 )
 
-add_semindex_command(semindex_index index utils/cmd_index.c)
+add_semindex_command(semindex_index index utils/index/cmd.c)
 target_link_libraries(semindex_index PRIVATE semindex_cli_common semindex_pipeline)
 set_target_properties(semindex_index PROPERTIES
 	BUILD_RPATH "$ORIGIN"
 	INSTALL_RPATH "${CMAKE_INSTALL_FULL_LIBDIR}"
 )
 
-add_semindex_command(semindex_search search utils/cmd_search.c)
+add_semindex_command(semindex_search search utils/search/cmd.c)
 target_link_libraries(semindex_search PRIVATE semindex_cli_common semindex_query)
 
-add_semindex_command(semindex_callgraph callgraph utils/cmd_callgraph.c)
+add_semindex_command(semindex_callgraph callgraph utils/callgraph/cmd.c)
 target_link_libraries(semindex_callgraph PRIVATE semindex_query)
 
-add_semindex_command(semindex_compile_commands compile_commands utils/cmd_compile_commands.c)
+add_semindex_command(semindex_compile_commands compile_commands utils/compile_commands/cmd.c)
 set_target_properties(semindex_compile_commands PROPERTIES OUTPUT_NAME semindex-compile-commands)
 target_link_libraries(semindex_compile_commands PRIVATE semindex_query)
 

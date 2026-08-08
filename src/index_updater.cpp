@@ -2,7 +2,6 @@
 #include "index_updater.h"
 
 extern "C" {
-#include "command_db.h"
 #include "index_pipeline.h"
 }
 
@@ -57,51 +56,40 @@ void SemindexIndexDeleter::operator()(semindex_t *index) const
 	semindex_destroy(index);
 }
 
-SemindexIndexUpdater::SemindexIndexUpdater(SemindexIndexUpdaterOptions options) : options(std::move(options))
+SemindexIndexUpdater::SemindexIndexUpdater(SemindexIndexUpdaterOptions options)
+    : database(std::move(options.database)), repository_root(std::move(options.repository_root)),
+      command_resolver(std::move(options.command_resolver)), include_local(options.include_local)
 {
+	command_resolver.setRepositoryRoot(repository_root);
 }
 
 void SemindexIndexUpdater::setCompileCommands(std::string path)
 {
-	options.compile_commands = std::move(path);
+	command_resolver.setCompileCommands(std::move(path));
 }
 
 void SemindexIndexUpdater::setRepositoryRoot(std::string path)
 {
-	options.repository_root = std::move(path);
+	repository_root = path;
+	command_resolver.setRepositoryRoot(std::move(path));
 }
 
 int SemindexIndexUpdater::commandAvailable(const std::string &file, const std::string &variant) const
 {
-	command_db_command_t *command = nullptr;
-	std::error_code error;
-
-	if (!std::filesystem::exists(options.commands_database, error))
-		return error ? -1 : 1;
-
-	int ret = command_db_load(options.commands_database.c_str(), variant.c_str(), file.c_str(), &command);
-
-	command_db_command_free(command);
-
-	return ret;
+	return command_resolver.commandAvailable(file, variant);
 }
 
 SemindexIndexUpdateResult SemindexIndexUpdater::update(const SemindexIndexUpdateRequest &request) const
 {
 	std::lock_guard<std::mutex> guard(update_mutex);
-	command_db_command_t *saved = nullptr;
-	const semindex_compile_command_t *command = nullptr;
 	index_pipeline_request_t pipeline_request = {};
 	index_pipeline_result_t pipeline = {};
 	SemindexIndexUpdateResult result;
+	SemindexCommandResolution resolution;
+	const SemindexResolvedCommand *resolved;
 	std::error_code fs_error;
 	std::filesystem::path old_directory;
-	std::string fallback_directory;
-	std::string fallback_include;
-	const char *fallback_argv[7];
-	semindex_compile_command_t fallback_command = {};
 	bool changed_directory = false;
-	int loaded;
 
 	if (request.stopped && request.stopped()) {
 		result.error = "index update cancelled";
@@ -109,29 +97,19 @@ SemindexIndexUpdateResult SemindexIndexUpdater::update(const SemindexIndexUpdate
 		return result;
 	}
 
-	if (std::filesystem::exists(options.commands_database, fs_error))
-		loaded = command_db_load(options.commands_database.c_str(), request.variant.c_str(),
-			request.file.c_str(), &saved);
-	else
-		loaded = fs_error ? -1 : 1;
+	resolution = command_resolver.resolve(request.file, request.variant);
 
-	if (loaded < 0) {
-		result.error = "failed to load compiler command for '" + request.file + "'";
+	if (!resolution.command) {
+		result.error = std::move(resolution.error);
 
-		goto out;
+		return result;
 	}
 
-	if (loaded > 0 && options.compile_commands.empty() && !options.allow_fallback_command) {
-		result.error =
-			"no saved compiler command for '" + request.file + "' in variant '" + request.variant + "'";
+	resolved = resolution.command.get();
+	result.command_available = resolved->commandAvailable();
+	result.directory = resolved->directory();
 
-		goto out;
-	}
-
-	if (!loaded) {
-		result.command_available = true;
-		command = command_db_command_get(saved);
-		result.directory = command->directory;
+	if (resolved->source() == SemindexResolvedCommand::Source::Saved) {
 		old_directory = std::filesystem::current_path(fs_error);
 
 		if (fs_error) {
@@ -140,10 +118,10 @@ SemindexIndexUpdateResult SemindexIndexUpdater::update(const SemindexIndexUpdate
 			goto out;
 		}
 
-		std::filesystem::current_path(command->directory, fs_error);
+		std::filesystem::current_path(resolved->directory(), fs_error);
 
 		if (fs_error) {
-			result.error = "failed to enter compiler directory '" + std::string(command->directory) +
+			result.error = "failed to enter compiler directory '" + resolved->directory() +
 				"': " + fs_error.message();
 
 			goto out;
@@ -152,52 +130,31 @@ SemindexIndexUpdateResult SemindexIndexUpdater::update(const SemindexIndexUpdate
 		changed_directory = true;
 		pipeline_request.input = INDEX_PIPELINE_COMMAND;
 		pipeline_request.storage = INDEX_PIPELINE_STORE_SYMBOLS;
-		pipeline_request.command = command;
-		pipeline_request.source_file = command->file;
-	} else if (!options.compile_commands.empty()) {
-		result.directory = options.repository_root;
+		pipeline_request.command = resolved->command();
+		pipeline_request.source_file = resolved->command()->file;
+	} else if (resolved->source() == SemindexResolvedCommand::Source::CompilationDatabase) {
 		pipeline_request.input = INDEX_PIPELINE_COMPILE_COMMANDS;
 		pipeline_request.storage = INDEX_PIPELINE_STORE_SYMBOLS_AND_COMMAND;
-		pipeline_request.compile_commands = options.compile_commands.c_str();
+		pipeline_request.compile_commands = resolved->compileCommands().c_str();
 		pipeline_request.source_file = request.file.c_str();
-		pipeline_request.commands_database = options.commands_database.c_str();
+		pipeline_request.commands_database = resolved->commandsDatabase().c_str();
 	} else {
-		fallback_directory = options.repository_root.empty()
-			? std::filesystem::path(request.file).parent_path().string()
-			: options.repository_root;
-		fallback_argv[0] = "cc";
-		fallback_argv[1] = "--no-default-config";
-		fallback_argv[2] = "-I";
-		fallback_argv[3] = fallback_directory.c_str();
-		fallback_command.argc = 4;
-		fallback_include = (std::filesystem::path(fallback_directory) / "include").string();
-
-		if (std::filesystem::is_directory(fallback_include)) {
-			fallback_argv[fallback_command.argc++] = "-I";
-			fallback_argv[fallback_command.argc++] = fallback_include.c_str();
-		}
-
-		fallback_argv[fallback_command.argc++] = request.file.c_str();
-		fallback_command.directory = fallback_directory.c_str();
-		fallback_command.file = request.file.c_str();
-		fallback_command.argv = fallback_argv;
-		result.directory = fallback_directory;
 		pipeline_request.input = INDEX_PIPELINE_COMMAND;
 		pipeline_request.storage = INDEX_PIPELINE_STORE_SYMBOLS;
-		pipeline_request.command = &fallback_command;
+		pipeline_request.command = resolved->command();
 		pipeline_request.source_file = request.file.c_str();
 	}
 
 	pipeline_request.partial = request.store_partial ? INDEX_PIPELINE_STORE_PARTIAL : INDEX_PIPELINE_RETURN_PARTIAL;
-	pipeline_request.symbol_database = options.database.c_str();
+	pipeline_request.symbol_database = database.c_str();
 	pipeline_request.variant = request.variant.c_str();
-	pipeline_request.repository_root = options.repository_root.empty() ? nullptr : options.repository_root.c_str();
+	pipeline_request.repository_root = repository_root.empty() ? nullptr : repository_root.c_str();
 	pipeline_request.scope = SEMINDEX_SCOPE_PROJECT;
-	pipeline_request.include_local = options.include_local;
+	pipeline_request.include_local = include_local;
 	pipeline_request.details = 1;
 
 	if (index_pipeline_run(&pipeline_request, &pipeline) < 0) {
-		copyDiagnostics(pipeline.index, command->directory, request.diagnostic_limit, result);
+		copyDiagnostics(pipeline.index, result.directory.c_str(), request.diagnostic_limit, result);
 
 		if (pipeline.failed_stage == INDEX_PIPELINE_STAGE_CREATE)
 			result.error = "failed to create indexer";
@@ -238,7 +195,6 @@ SemindexIndexUpdateResult SemindexIndexUpdater::update(const SemindexIndexUpdate
 	result.status = SemindexIndexUpdateResult::Status::Clean;
 out:
 	index_pipeline_result_destroy(&pipeline, nullptr);
-	command_db_command_free(saved);
 
 	if (changed_directory) {
 		std::filesystem::current_path(old_directory, fs_error);

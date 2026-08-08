@@ -2,6 +2,7 @@
 #pragma once
 
 #include "semindex.h"
+#include "index_command_resolver.h"
 
 #include <functional>
 #include <memory>
@@ -40,11 +41,9 @@ struct SemindexIndexUpdateResult {
 
 struct SemindexIndexUpdaterOptions {
 	std::string database;
-	std::string commands_database;
-	std::string compile_commands;
 	std::string repository_root;
+	SemindexCommandResolverOptions command_resolver;
 	bool include_local = true;
-	bool allow_fallback_command = false;
 };
 
 struct SemindexIndexUpdateRequest {
@@ -66,5 +65,8 @@ public:
 	SemindexIndexUpdateResult update(const SemindexIndexUpdateRequest &request) const;
 
 private:
-	SemindexIndexUpdaterOptions options;
+	std::string database;
+	std::string repository_root;
+	SemindexCommandResolver command_resolver;
+	bool include_local;
 };

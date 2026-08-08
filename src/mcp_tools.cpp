@@ -3,6 +3,7 @@
 
 #include "index_updater.h"
 #include "semantic_query.h"
+#include "semantic_names.h"
 #include "semindex_database.h"
 #include "source_resolver.h"
 
@@ -188,42 +189,13 @@ struct VariantCollector {
 	bool stopped = false;
 };
 
-const char *kindName(semindex_symbol_kind_t kind)
-{
-	switch (kind) {
-	case SEMINDEX_SYMBOL_VAR:
-		return "variable";
-	case SEMINDEX_SYMBOL_FIELD:
-		return "field";
-	case SEMINDEX_SYMBOL_STRUCT:
-		return "struct";
-	case SEMINDEX_SYMBOL_UNION:
-		return "union";
-	case SEMINDEX_SYMBOL_ENUM:
-		return "enum";
-	case SEMINDEX_SYMBOL_ENUM_CONSTANT:
-		return "enumerator";
-	case SEMINDEX_SYMBOL_TYPEDEF:
-		return "typedef";
-	case SEMINDEX_SYMBOL_FUNCTION:
-		return "function";
-	case SEMINDEX_SYMBOL_MACRO:
-		return "macro";
-	case SEMINDEX_SYMBOL_FILE:
-		return "file";
-	}
-
-	return "unknown";
-}
-
 std::optional<semindex_symbol_kind_t> parseKind(llvm::StringRef value)
 {
-	for (int kind = SEMINDEX_SYMBOL_VAR; kind <= SEMINDEX_SYMBOL_FILE; kind++) {
-		auto parsed = static_cast<semindex_symbol_kind_t>(kind);
+	semindex_symbol_kind_t kind;
+	std::string name = value.str();
 
-		if (value == kindName(parsed))
-			return parsed;
-	}
+	if (semindex_symbol_kind_parse(name.c_str(), &kind) == 0)
+		return kind;
 
 	return std::nullopt;
 }
@@ -296,7 +268,7 @@ llvm::json::Object recordObject(const SemindexQueryRecord &record)
 		{ "line", record.line },
 		{ "column", record.column },
 		{ "symbol", record.symbol },
-		{ "kind", kindName(record.kind) },
+		{ "kind", semindex_symbol_kind_name(record.kind) },
 		{ "record", recordName(record.record) },
 		{ "action", actionName(record) },
 		{ "mode", modeName(record.mode) },
@@ -867,7 +839,7 @@ llvm::json::Object symbolTypesResult(std::vector<SymbolTypeRecord> &records, siz
 			{ "variant", record.variant },
 			{ "path", record.path },
 			{ "symbol", record.symbol },
-			{ "kind", kindName(record.kind) },
+			{ "kind", semindex_symbol_kind_name(record.kind) },
 			{ "usrId", idString(record.usr_id) },
 			{ "declaredType", record.declared_type },
 			{ "canonicalType", record.canonical_type },
@@ -877,7 +849,9 @@ llvm::json::Object symbolTypesResult(std::vector<SymbolTypeRecord> &records, siz
 			item["typeIdentity"] = llvm::json::Object{
 				{ "variant", record.variant },
 				{ "symbol", record.type_symbol },
-				{ "kind", kindName(static_cast<semindex_symbol_kind_t>(record.type_kind)) },
+				{ "kind",
+					semindex_symbol_kind_name(
+						static_cast<semindex_symbol_kind_t>(record.type_kind)) },
 				{ "usrId", idString(record.type_usr_id) },
 			};
 		}
@@ -924,7 +898,9 @@ llvm::json::Object functionTypesResult(std::vector<FunctionTypeRecord> &records,
 			item["typeIdentity"] = llvm::json::Object{
 				{ "variant", record.variant },
 				{ "symbol", record.type_symbol },
-				{ "kind", kindName(static_cast<semindex_symbol_kind_t>(record.type_kind)) },
+				{ "kind",
+					semindex_symbol_kind_name(
+						static_cast<semindex_symbol_kind_t>(record.type_kind)) },
 				{ "usrId", idString(record.type_usr_id) },
 			};
 		}
@@ -1773,8 +1749,10 @@ void McpRequestControl::complete()
 McpToolService::McpToolService(McpToolOptions options)
     : options(std::move(options)), updater(std::make_unique<SemindexIndexUpdater>(SemindexIndexUpdaterOptions{
 					   .database = this->options.database,
-					   .commands_database = this->options.commands_database,
 					   .repository_root = this->options.workspace.string(),
+					   .command_resolver = {
+						   .commands_database = this->options.commands_database,
+					   },
 					   .include_local = this->options.include_local,
 				   }))
 {

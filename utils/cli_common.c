@@ -13,7 +13,6 @@ struct index_db_record_name {
 struct symbol_kind_name {
 	semindex_symbol_kind_t kind;
 	const char *cli_name;
-	const char *name;
 };
 
 static const struct index_db_record_name index_db_record_names[] = {
@@ -23,16 +22,16 @@ static const struct index_db_record_name index_db_record_names[] = {
 };
 
 static const struct symbol_kind_name symbol_kind_names[] = {
-	{ SEMINDEX_SYMBOL_VAR, "var", "variable" },
-	{ SEMINDEX_SYMBOL_FIELD, "field", "field" },
-	{ SEMINDEX_SYMBOL_STRUCT, "struct", "struct" },
-	{ SEMINDEX_SYMBOL_UNION, "union", "union" },
-	{ SEMINDEX_SYMBOL_ENUM, "enum", "enum" },
-	{ SEMINDEX_SYMBOL_ENUM_CONSTANT, "enumerator", "enumerator" },
-	{ SEMINDEX_SYMBOL_TYPEDEF, "typedef", "typedef" },
-	{ SEMINDEX_SYMBOL_FUNCTION, "function", "function" },
-	{ SEMINDEX_SYMBOL_MACRO, "macro", "macro" },
-	{ SEMINDEX_SYMBOL_FILE, "file", "file" },
+	{ SEMINDEX_SYMBOL_VAR, "var" },
+	{ SEMINDEX_SYMBOL_FIELD, "field" },
+	{ SEMINDEX_SYMBOL_STRUCT, "struct" },
+	{ SEMINDEX_SYMBOL_UNION, "union" },
+	{ SEMINDEX_SYMBOL_ENUM, "enum" },
+	{ SEMINDEX_SYMBOL_ENUM_CONSTANT, "enumerator" },
+	{ SEMINDEX_SYMBOL_TYPEDEF, "typedef" },
+	{ SEMINDEX_SYMBOL_FUNCTION, "function" },
+	{ SEMINDEX_SYMBOL_MACRO, "macro" },
+	{ SEMINDEX_SYMBOL_FILE, "file" },
 };
 
 int parse_format(const char *value, enum output_format *format)
@@ -126,16 +125,4 @@ int parse_symbol_kind(const char *value, int *kind)
 	}
 
 	return -1;
-}
-
-const char *symbol_kind_name(semindex_symbol_kind_t kind)
-{
-	size_t i;
-
-	for (i = 0; i < ARRAY_SIZE(symbol_kind_names); i++) {
-		if (kind == symbol_kind_names[i].kind)
-			return symbol_kind_names[i].name;
-	}
-
-	return "unknown";
 }
