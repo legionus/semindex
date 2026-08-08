@@ -18,44 +18,44 @@ set(SEMINDEX_FORMAT_SOURCES
 	include/semindex.h
 	include/semindex_database.h
 	include/semindex_export.h
-	src/index_ast.cpp
-	src/index_context.cpp
-	src/index_command_resolver.cpp
-	src/index_command_resolver.h
-	src/index_updater.cpp
-	src/index_updater.h
-	src/lsp_call_hierarchy.cpp
-	src/lsp_call_hierarchy.h
-	src/lsp_indexer.cpp
-	src/lsp_indexer.h
-	src/lsp_overlay.cpp
-	src/lsp_overlay.h
-	src/lsp_source.cpp
-	src/lsp_source.h
-	src/lsp_server.cpp
-	src/lsp_server.h
-	src/lsp_transport.cpp
-	src/lsp_transport.h
-	src/mcp_callgraph_tools.cpp
-	src/mcp_server.cpp
-	src/mcp_server.h
-	src/mcp_source_tools.cpp
-	src/mcp_symbol_tools.cpp
-	src/mcp_tools.cpp
-	src/mcp_tools.h
-	src/mcp_tools_internal.h
-	src/mcp_transport.cpp
-	src/mcp_transport.h
-	src/protocol_logger.cpp
-	src/protocol_logger.h
-	src/semantic_query.cpp
-	src/semantic_query.h
-	src/index_pp.cpp
-	src/index_pp.h
-	src/semindex.cpp
-	src/semindex_internal.h
-	src/source_resolver.cpp
-	src/source_resolver.h
+	lib/parser/index_ast.cpp
+	lib/parser/index_context.cpp
+	lib/index-update/index_command_resolver.cpp
+	lib/index-update/index_command_resolver.h
+	lib/index-update/index_updater.cpp
+	lib/index-update/index_updater.h
+	tools/lsp/lsp_call_hierarchy.cpp
+	tools/lsp/lsp_call_hierarchy.h
+	tools/lsp/lsp_indexer.cpp
+	tools/lsp/lsp_indexer.h
+	tools/lsp/lsp_overlay.cpp
+	tools/lsp/lsp_overlay.h
+	tools/lsp/lsp_source.cpp
+	tools/lsp/lsp_source.h
+	tools/lsp/lsp_server.cpp
+	tools/lsp/lsp_server.h
+	tools/lsp/lsp_transport.cpp
+	tools/lsp/lsp_transport.h
+	tools/mcp/mcp_callgraph_tools.cpp
+	tools/mcp/mcp_server.cpp
+	tools/mcp/mcp_server.h
+	tools/mcp/mcp_source_tools.cpp
+	tools/mcp/mcp_symbol_tools.cpp
+	tools/mcp/mcp_tools.cpp
+	tools/mcp/mcp_tools.h
+	tools/mcp/mcp_tools_internal.h
+	tools/mcp/mcp_transport.cpp
+	tools/mcp/mcp_transport.h
+	lib/protocol/protocol_logger.cpp
+	lib/protocol/protocol_logger.h
+	lib/semantic/semantic_query.cpp
+	lib/semantic/semantic_query.h
+	lib/parser/index_pp.cpp
+	lib/parser/index_pp.h
+	lib/parser/semindex.cpp
+	lib/parser/semindex_internal.h
+	lib/source/source_resolver.cpp
+	lib/source/source_resolver.h
 	tests/include/test14.h
 	tests/scope/api.h
 	tests/scope/use.c
@@ -92,54 +92,54 @@ set(SEMINDEX_FORMAT_SOURCES
 	tests/test18.c
 	tests/test19.c
 	tests/test20.c
-	utils/array_size.h
-	utils/callgraph/cmd.c
-	utils/cc/cmd.c
-	utils/compile_commands/cmd.c
-	utils/compiler/cmd.c
-	utils/index/cmd.c
-	utils/search/cmd.c
-	utils/cli_common.c
-	utils/command_main.c
-	utils/compiler_command.c
-	utils/compiler_command.h
-	utils/command_db.c
-	utils/command_db_export.c
-	utils/command_db.h
-	utils/command_db_internal.h
-	utils/command_db_reader.c
-	utils/command_db_writer.c
-	utils/filesystem.c
-	utils/filesystem.h
-	utils/git_provenance.c
-	utils/git_provenance.h
-	utils/git_provenance_loader.c
-	utils/git_provenance_stub.c
-	utils/index_command.c
-	utils/index_command.h
-	utils/index_db_callgraph.c
-	utils/index_db.h
-	utils/index_db_reader.c
-	utils/index_db_search.c
-	utils/index_db_writer.c
-	utils/index_pipeline.c
-	utils/index_pipeline.h
-	utils/output.h
-	utils/output_common.c
-	utils/output_dissect.c
-	utils/output_json.c
-	utils/output_search.c
-	utils/repository.c
-	utils/perf_trace.c
-	utils/perf_trace.h
-	utils/sqlite.c
-	utils/sqlite.h
-	utils/dispatcher/main.c
-	utils/semindex_cli.h
-	utils/semantic_names.c
-	utils/semantic_names.h
-	utils/lsp/main.cpp
-	utils/mcp/main.cpp
+	lib/common/array_size.h
+	tools/callgraph/cmd.c
+	tools/cc/cmd.c
+	tools/compile-commands/cmd.c
+	tools/compiler/cmd.c
+	tools/index/cmd.c
+	tools/search/cmd.c
+	tools/common/cli_common.c
+	tools/common/command_main.c
+	tools/common/compiler_command.c
+	tools/common/compiler_command.h
+	lib/query/command_db.c
+	lib/query/command_db_export.c
+	lib/query/command_db.h
+	lib/query/command_db_internal.h
+	lib/query/command_db_reader.c
+	lib/storage/command_db_writer.c
+	lib/storage/filesystem.c
+	lib/storage/filesystem.h
+	lib/git/git_provenance.c
+	lib/git/git_provenance.h
+	lib/git/git_provenance_loader.c
+	lib/git/git_provenance_stub.c
+	tools/common/index_command.c
+	tools/common/index_command.h
+	lib/query/index_db_callgraph.c
+	lib/query/index_db.h
+	lib/database/index_db_reader.c
+	lib/query/index_db_search.c
+	lib/storage/index_db_writer.c
+	lib/pipeline/index_pipeline.c
+	lib/pipeline/index_pipeline.h
+	lib/common/output.h
+	lib/query/output_common.c
+	tools/common/output_dissect.c
+	tools/common/output_json.c
+	lib/query/output_search.c
+	lib/query/repository.c
+	lib/storage/perf_trace.c
+	lib/common/perf_trace.h
+	lib/sqlite/sqlite.c
+	lib/sqlite/sqlite.h
+	tools/semindex/main.c
+	tools/common/semindex_cli.h
+	lib/names/semantic_names.c
+	lib/names/semantic_names.h
+	tools/lsp/main.cpp
+	tools/mcp/main.cpp
 )
 
 find_program(CLANG_FORMAT clang-format)
@@ -181,45 +181,44 @@ find_package(Threads REQUIRED)
 
 # Internal SQLite helpers
 add_library(semindex_sqlite STATIC
-	utils/sqlite.c
+	lib/sqlite/sqlite.c
 )
 set_target_properties(semindex_sqlite PROPERTIES
 	C_VISIBILITY_PRESET hidden
 	POSITION_INDEPENDENT_CODE YES
 )
 target_include_directories(semindex_sqlite PUBLIC
-	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/sqlite>
 )
 target_link_libraries(semindex_sqlite PUBLIC SQLite3::SQLite3)
 
 # Streaming database reader
 add_library(semindex_database SHARED
-	utils/index_db_reader.c
+	lib/database/index_db_reader.c
 )
 set_target_properties(semindex_database PROPERTIES
 	C_VISIBILITY_PRESET hidden
-	LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/utils/libsemindex_database.map
+	LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/lib/database/libsemindex_database.map
 )
 target_link_options(semindex_database PRIVATE
-	-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/utils/libsemindex_database.map
+	-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/lib/database/libsemindex_database.map
 )
 target_include_directories(semindex_database PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
 )
 target_link_libraries(semindex_database PRIVATE semindex_sqlite)
 
 # Optional Git backend loader
 add_library(semindex_git STATIC)
 if(TARGET PkgConfig::LibGit2)
-	add_library(semindex_git_backend MODULE utils/git_provenance.c)
+	add_library(semindex_git_backend MODULE lib/git/git_provenance.c)
 	set_target_properties(semindex_git_backend PROPERTIES
 		OUTPUT_NAME semindex_git_backend
 	)
-	target_include_directories(semindex_git_backend PRIVATE utils)
+	target_include_directories(semindex_git_backend PRIVATE lib/git)
 	target_link_libraries(semindex_git_backend PRIVATE PkgConfig::LibGit2)
 
-	target_sources(semindex_git PRIVATE utils/git_provenance_loader.c)
+	target_sources(semindex_git PRIVATE lib/git/git_provenance_loader.c)
 	target_compile_definitions(semindex_git PUBLIC SEMINDEX_HAVE_LIBGIT2=1)
 	target_compile_definitions(semindex_git PRIVATE
 		SEMINDEX_GIT_BACKEND_NAME="$<TARGET_FILE_NAME:semindex_git_backend>"
@@ -227,55 +226,57 @@ if(TARGET PkgConfig::LibGit2)
 	target_link_libraries(semindex_git PRIVATE ${CMAKE_DL_LIBS})
 	add_dependencies(semindex_git semindex_git_backend)
 else()
-	target_sources(semindex_git PRIVATE utils/git_provenance_stub.c)
+	target_sources(semindex_git PRIVATE lib/git/git_provenance_stub.c)
 endif()
 target_include_directories(semindex_git PUBLIC
-	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/git>
 )
 
 # Source path resolution and working-tree access
 add_library(semindex_source STATIC
-	src/source_resolver.cpp
+	lib/source/source_resolver.cpp
 )
 target_include_directories(semindex_source PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/source>
 )
 target_link_libraries(semindex_source PUBLIC semindex_database semindex_git)
 
 # Canonical semantic names
 add_library(semindex_names STATIC
-	utils/semantic_names.c
+	lib/names/semantic_names.c
 )
 target_include_directories(semindex_names PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/common>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/names>
 )
 
 # Protocol-neutral semantic queries
 add_library(semindex_semantic STATIC
-	src/semantic_query.cpp
+	lib/semantic/semantic_query.cpp
 )
 target_include_directories(semindex_semantic PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/semantic>
 )
 target_link_libraries(semindex_semantic PUBLIC semindex_database semindex_source)
 
 # SQLite query adapters
 add_library(semindex_query STATIC
-	utils/command_db.c
-	utils/command_db_export.c
-	utils/command_db_reader.c
-	utils/index_db_callgraph.c
-	utils/index_db_search.c
-	utils/output_common.c
-	utils/output_search.c
-	utils/repository.c
+	lib/query/command_db.c
+	lib/query/command_db_export.c
+	lib/query/command_db_reader.c
+	lib/query/index_db_callgraph.c
+	lib/query/index_db_search.c
+	lib/query/output_common.c
+	lib/query/output_search.c
+	lib/query/repository.c
 )
 target_include_directories(semindex_query PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/common>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/query>
 )
 target_link_libraries(semindex_query
 	PUBLIC semindex_database
@@ -284,14 +285,14 @@ target_link_libraries(semindex_query
 
 # SQLite storage adapters
 add_library(semindex_storage STATIC
-	utils/command_db_writer.c
-	utils/filesystem.c
-	utils/index_db_writer.c
-	utils/perf_trace.c
+	lib/storage/command_db_writer.c
+	lib/storage/filesystem.c
+	lib/storage/index_db_writer.c
+	lib/storage/perf_trace.c
 )
 target_include_directories(semindex_storage PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/storage>
 )
 target_link_libraries(semindex_storage
 	PUBLIC semindex_query
@@ -300,19 +301,19 @@ target_link_libraries(semindex_storage
 
 # Clang parser and index construction
 add_library(semindex_parser SHARED
-	src/index_ast.cpp
-	src/index_context.cpp
-	src/index_pp.cpp
-	src/semindex.cpp
+	lib/parser/index_ast.cpp
+	lib/parser/index_context.cpp
+	lib/parser/index_pp.cpp
+	lib/parser/semindex.cpp
 )
 set_target_properties(semindex_parser PROPERTIES
 	CXX_VISIBILITY_PRESET hidden
-	LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/libsemindex.map
+	LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/lib/parser/libsemindex.map
 	OUTPUT_NAME semindex
 	VISIBILITY_INLINES_HIDDEN YES
 )
 target_link_options(semindex_parser PRIVATE
-	-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/src/libsemindex.map
+	-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/lib/parser/libsemindex.map
 )
 
 target_include_directories(semindex_parser PUBLIC
@@ -332,11 +333,11 @@ target_link_libraries(semindex_parser PRIVATE
 
 # Indexing orchestration
 add_library(semindex_pipeline STATIC
-	utils/index_pipeline.c
+	lib/pipeline/index_pipeline.c
 )
 target_include_directories(semindex_pipeline PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/pipeline>
 )
 target_link_libraries(semindex_pipeline PUBLIC
 	semindex_git
@@ -345,36 +346,36 @@ target_link_libraries(semindex_pipeline PUBLIC
 )
 
 add_library(semindex_index_update STATIC
-	src/index_command_resolver.cpp
-	src/index_updater.cpp
+	lib/index-update/index_command_resolver.cpp
+	lib/index-update/index_updater.cpp
 )
 target_include_directories(semindex_index_update PUBLIC
-	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/index-update>
 )
 target_link_libraries(semindex_index_update PUBLIC
 	semindex_pipeline
 )
 
 add_library(semindex_protocol STATIC
-	src/protocol_logger.cpp
+	lib/protocol/protocol_logger.cpp
 )
 target_include_directories(semindex_protocol PUBLIC
-	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/protocol>
 )
 
 add_executable(semindex_lsp
-	src/lsp_call_hierarchy.cpp
-	src/lsp_indexer.cpp
-	src/lsp_overlay.cpp
-	src/lsp_source.cpp
-	src/lsp_server.cpp
-	src/lsp_transport.cpp
-	utils/lsp/main.cpp
+	tools/lsp/lsp_call_hierarchy.cpp
+	tools/lsp/lsp_indexer.cpp
+	tools/lsp/lsp_overlay.cpp
+	tools/lsp/lsp_source.cpp
+	tools/lsp/lsp_server.cpp
+	tools/lsp/lsp_transport.cpp
+	tools/lsp/main.cpp
 )
 set_target_properties(semindex_lsp PROPERTIES OUTPUT_NAME semindex-lsp)
 
 target_include_directories(semindex_lsp PRIVATE
-	${CMAKE_CURRENT_SOURCE_DIR}/src
+	${CMAKE_CURRENT_SOURCE_DIR}/tools/lsp
 	${LLVM_INCLUDE_DIRS}
 	${CLANG_INCLUDE_DIRS}
 )
@@ -391,17 +392,17 @@ set_target_properties(semindex_lsp PROPERTIES
 )
 
 add_executable(semindex_mcp
-	src/mcp_callgraph_tools.cpp
-	src/mcp_server.cpp
-	src/mcp_source_tools.cpp
-	src/mcp_symbol_tools.cpp
-	src/mcp_tools.cpp
-	src/mcp_transport.cpp
-	utils/mcp/main.cpp
+	tools/mcp/mcp_callgraph_tools.cpp
+	tools/mcp/mcp_server.cpp
+	tools/mcp/mcp_source_tools.cpp
+	tools/mcp/mcp_symbol_tools.cpp
+	tools/mcp/mcp_tools.cpp
+	tools/mcp/mcp_transport.cpp
+	tools/mcp/main.cpp
 )
 set_target_properties(semindex_mcp PROPERTIES OUTPUT_NAME semindex-mcp)
 target_include_directories(semindex_mcp PRIVATE
-	${CMAKE_CURRENT_SOURCE_DIR}/src
+	${CMAKE_CURRENT_SOURCE_DIR}/tools/mcp
 	${LLVM_INCLUDE_DIRS}
 )
 target_compile_definitions(semindex_mcp PRIVATE ${LLVM_DEFINITIONS})
@@ -419,56 +420,64 @@ set_target_properties(semindex_mcp PROPERTIES
 )
 
 add_library(semindex_cli_common STATIC
-	utils/cli_common.c
-	utils/index_command.c
-	utils/output_dissect.c
-	utils/output_json.c
+	tools/common/cli_common.c
+	tools/common/index_command.c
+	tools/common/output_dissect.c
+	tools/common/output_json.c
 )
-target_include_directories(semindex_cli_common PRIVATE include)
+target_include_directories(semindex_cli_common
+	PUBLIC
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/common>
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/pipeline>
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/query>
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/tools/common>
+	PRIVATE
+		${CMAKE_CURRENT_SOURCE_DIR}/include
+)
 target_link_libraries(semindex_cli_common PUBLIC semindex_names semindex_parser)
 
 function(add_semindex_command target command source)
 	add_executable(${target}
 		${source}
-		utils/command_main.c
+		tools/common/command_main.c
 	)
 	target_compile_definitions(${target} PRIVATE SEMINDEX_COMMAND=cmd_${command})
 	set_target_properties(${target} PROPERTIES OUTPUT_NAME semindex-${command})
 endfunction()
 
-add_executable(semindex_dispatcher utils/dispatcher/main.c)
+add_executable(semindex_dispatcher tools/semindex/main.c)
 set_target_properties(semindex_dispatcher PROPERTIES OUTPUT_NAME semindex)
 
-add_semindex_command(semindex_compiler compiler utils/compiler/cmd.c)
-target_sources(semindex_compiler PRIVATE utils/compiler_command.c)
+add_semindex_command(semindex_compiler compiler tools/compiler/cmd.c)
+target_sources(semindex_compiler PRIVATE tools/common/compiler_command.c)
 target_link_libraries(semindex_compiler PRIVATE semindex_cli_common semindex_pipeline)
 set_target_properties(semindex_compiler PROPERTIES
 	BUILD_RPATH "$ORIGIN"
 	INSTALL_RPATH "${CMAKE_INSTALL_FULL_LIBDIR}"
 )
 
-add_semindex_command(semindex_cc cc utils/cc/cmd.c)
-target_sources(semindex_cc PRIVATE utils/compiler_command.c)
+add_semindex_command(semindex_cc cc tools/cc/cmd.c)
+target_sources(semindex_cc PRIVATE tools/common/compiler_command.c)
 target_link_libraries(semindex_cc PRIVATE semindex_cli_common semindex_pipeline)
 set_target_properties(semindex_cc PROPERTIES
 	BUILD_RPATH "$ORIGIN"
 	INSTALL_RPATH "${CMAKE_INSTALL_FULL_LIBDIR}"
 )
 
-add_semindex_command(semindex_index index utils/index/cmd.c)
+add_semindex_command(semindex_index index tools/index/cmd.c)
 target_link_libraries(semindex_index PRIVATE semindex_cli_common semindex_pipeline)
 set_target_properties(semindex_index PROPERTIES
 	BUILD_RPATH "$ORIGIN"
 	INSTALL_RPATH "${CMAKE_INSTALL_FULL_LIBDIR}"
 )
 
-add_semindex_command(semindex_search search utils/search/cmd.c)
+add_semindex_command(semindex_search search tools/search/cmd.c)
 target_link_libraries(semindex_search PRIVATE semindex_cli_common semindex_query)
 
-add_semindex_command(semindex_callgraph callgraph utils/callgraph/cmd.c)
+add_semindex_command(semindex_callgraph callgraph tools/callgraph/cmd.c)
 target_link_libraries(semindex_callgraph PRIVATE semindex_query)
 
-add_semindex_command(semindex_compile_commands compile_commands utils/compile_commands/cmd.c)
+add_semindex_command(semindex_compile_commands compile_commands tools/compile-commands/cmd.c)
 set_target_properties(semindex_compile_commands PROPERTIES OUTPUT_NAME semindex-compile-commands)
 target_link_libraries(semindex_compile_commands PRIVATE semindex_query)
 
