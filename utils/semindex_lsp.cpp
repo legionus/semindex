@@ -12,6 +12,10 @@
 #include <string>
 #include <utility>
 
+extern "C" {
+#include "index_db.h"
+}
+
 static void usage(std::ostream &stream)
 {
 	stream << "Usage: semindex-lsp [OPTION]...\n";
@@ -29,6 +33,7 @@ static void help()
 		     "      --commands-database=PATH\n"
 		     "                             path to the compiler command database\n"
 		     "                             (default: commands.db beside --database)\n"
+		     "      --compile-commands=PATH path to compile_commands.json\n"
 		     "      --variant=NAME         query only the named index variant\n"
 		     "      --no-include-local     omit local symbols when reindexing\n"
 		     "      --logfile=FILE         append JSON-RPC requests and responses to FILE\n"
@@ -40,6 +45,7 @@ int main(int argc, char **argv)
 {
 	std::string database_path = ".semindex/semindex.db";
 	std::string commands_database_path;
+	std::string compile_commands_path;
 	std::string variant;
 	std::string logfile_path;
 	bool include_local = true;
@@ -76,6 +82,18 @@ int main(int argc, char **argv)
 		}
 		if (argument.rfind("--commands-database=", 0) == 0) {
 			commands_database_path = argument.substr(sizeof("--commands-database=") - 1);
+			continue;
+		}
+		if (argument == "--compile-commands") {
+			if (++i == argc) {
+				std::cerr << "semindex-lsp: option requires an argument: " << argument << '\n';
+				return 1;
+			}
+			compile_commands_path = argv[i];
+			continue;
+		}
+		if (argument.rfind("--compile-commands=", 0) == 0) {
+			compile_commands_path = argument.substr(sizeof("--compile-commands=") - 1);
 			continue;
 		}
 		if (argument == "--variant") {
@@ -128,7 +146,11 @@ int main(int argc, char **argv)
 	}
 	database_path = std::filesystem::absolute(database_path).lexically_normal().string();
 	commands_database_path = std::filesystem::absolute(commands_database_path).lexically_normal().string();
+
+	if (!compile_commands_path.empty())
+		compile_commands_path = std::filesystem::absolute(compile_commands_path).lexically_normal().string();
 	std::ofstream logfile;
+	std::error_code database_error;
 
 	if (!logfile_path.empty()) {
 		logfile.open(logfile_path, std::ios::app);
@@ -138,11 +160,21 @@ int main(int argc, char **argv)
 			return 1;
 		}
 	}
+	if (!std::filesystem::exists(database_path, database_error)) {
+		if (database_error) {
+			std::cerr << "semindex-lsp: failed to inspect database: " << database_error.message() << '\n';
+			return 1;
+		}
+
+		if (index_db_create(database_path.c_str()) < 0)
+			return 1;
+	}
 	if (semindex_db_open(database_path.c_str(), &database) < 0)
 		return 1;
 
 	LspTransport transport(std::cin, std::cout, std::cerr, logfile.is_open() ? &logfile : nullptr);
-	LspIndexer indexer(database_path, commands_database_path, variant.empty() ? "general" : variant, include_local);
+	LspIndexer indexer(database_path, commands_database_path, compile_commands_path,
+		variant.empty() ? "general" : variant, include_local);
 	LspServer server(transport, database, indexer, std::move(variant));
 	int ret = server.run();
 

@@ -83,6 +83,7 @@ set(SEMINDEX_FORMAT_SOURCES
 	tests/test17.c
 	tests/test18.c
 	tests/test19.c
+	tests/test20.c
 	utils/array_size.h
 	utils/cmd_cc.c
 	utils/cmd_compiler.c
@@ -503,6 +504,7 @@ if(BUILD_TESTING)
 		tests/test17.c
 		tests/test18.c
 		tests/test19.c
+		tests/test20.c
 	)
 		get_filename_component(test_name ${test_source} NAME)
 		add_test(

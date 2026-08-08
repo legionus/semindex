@@ -1319,7 +1319,7 @@ public:
 	{
 		SemindexContext index(out, CI.getSourceManager());
 
-		CI.getPreprocessor().addPPCallbacks(createSemindexPPCallbacks(index));
+		CI.getPreprocessor().addPPCallbacks(createSemindexPPCallbacks(index, CI.getDiagnostics()));
 
 		return std::make_unique<SemindexASTConsumer>(out, CI.getASTContext(), index);
 	}

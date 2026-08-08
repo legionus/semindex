@@ -224,6 +224,110 @@ def main():
             reference_line[:reference_line.index("field")].encode("utf-16-le")
         ) // 2
 
+        fresh_database = directory / "fresh" / ".semindex" / "semindex.db"
+        fresh_options = [
+            f"--database={fresh_database}",
+            f"--commands-database={commands_database}",
+            "--variant=general",
+        ]
+        process, responses = run_server(sys.argv[1], fresh_options, [
+            {
+                "jsonrpc": "2.0", "id": 70, "method": "initialize",
+                "params": {"rootUri": root_uri},
+            },
+            {"jsonrpc": "2.0", "method": "initialized", "params": {}},
+            {
+                "jsonrpc": "2.0", "method": "textDocument/didSave",
+                "params": {"textDocument": {"uri": uri}},
+            },
+            {"jsonrpc": "2.0", "id": 71, "method": "shutdown"},
+            {"jsonrpc": "2.0", "method": "exit"},
+        ])
+        if process.returncode != 0 or len(responses) != 3:
+            fail("LSP failed to initialize a missing database", process)
+        with sqlite3.connect(fresh_database) as connection:
+            records = connection.execute(
+                "SELECT count(*) FROM records"
+            ).fetchone()[0]
+        if not records:
+            fail("LSP did not populate the newly created database")
+
+        fallback_database = directory / "fallback" / ".semindex" / "semindex.db"
+        fallback_commands = directory / "fallback" / ".semindex" / "commands.db"
+        include_directory = directory / "include"
+        include_directory.mkdir()
+        (include_directory / "fallback.h").write_text(
+            "#define FALLBACK_VALUE 1\n", encoding="utf-8"
+        )
+        fallback_source = directory / "fallback.c"
+        fallback_source.write_text(
+            "#include <fallback.h>\n"
+            "int fallback(void)\n"
+            "{\n"
+            "\tint local = FALLBACK_VALUE;\n"
+            "\treturn local;\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        fallback_uri = fallback_source.resolve().as_uri()
+        fallback_options = [
+            f"--database={fallback_database}",
+            f"--commands-database={fallback_commands}",
+            "--variant=general",
+        ]
+        process, responses = run_server(sys.argv[1], fallback_options, [
+            {
+                "jsonrpc": "2.0", "id": 72, "method": "initialize",
+                "params": {"rootUri": root_uri},
+            },
+            {"jsonrpc": "2.0", "method": "initialized", "params": {}},
+            {
+                "jsonrpc": "2.0", "method": "textDocument/didOpen",
+                "params": {
+                    "textDocument": {
+                        "uri": fallback_uri, "languageId": "c", "version": 1,
+                        "text": fallback_source.read_text(encoding="utf-8"),
+                    },
+                },
+            },
+            {
+                "jsonrpc": "2.0", "id": 73,
+                "method": "textDocument/documentHighlight",
+                "params": {
+                    "textDocument": {"uri": fallback_uri},
+                    "position": {"line": 4, "character": 8},
+                },
+            },
+            {
+                "jsonrpc": "2.0", "id": 75,
+                "method": "textDocument/definition",
+                "params": {
+                    "textDocument": {"uri": fallback_uri},
+                    "position": {"line": 4, "character": 8},
+                },
+            },
+            {"jsonrpc": "2.0", "id": 74, "method": "shutdown"},
+            {"jsonrpc": "2.0", "method": "exit"},
+        ])
+        if process.returncode != 0 or len(responses) != 5:
+            fail("LSP fallback indexing lifecycle failed", process)
+        if not responses[2].get("result"):
+            fail("LSP fallback indexing returned no document highlights")
+        expected_local_definition = {
+            "uri": fallback_uri,
+            "range": source_range(3, 5, len("local")),
+        }
+        if responses[3].get("result") != [expected_local_definition]:
+            fail("LSP fallback indexing did not resolve a local definition")
+        with sqlite3.connect(fallback_database) as connection:
+            records = connection.execute(
+                "SELECT count(*) FROM records"
+            ).fetchone()[0]
+        if not records:
+            fail("LSP fallback indexing did not populate the symbol database")
+        if fallback_commands.exists():
+            fail("LSP stored an approximate fallback compiler command")
+
         process, responses = run_server(
             sys.argv[1], options, [
                 b"{",
@@ -317,7 +421,7 @@ def main():
         ) or capabilities.get("documentHighlightProvider") is not True or (
             capabilities.get("callHierarchyProvider") is not True
         ) or capabilities.get("textDocumentSync") != {
-            "change": 0, "save": True,
+            "change": 0, "openClose": True, "save": True,
         }:
             fail("initialize response has unexpected capabilities")
         if responses[2].get("id") != 3 or responses[2].get("error", {}).get(

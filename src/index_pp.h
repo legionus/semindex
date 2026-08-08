@@ -7,7 +7,9 @@
 
 namespace clang
 {
+class DiagnosticsEngine;
 class PPCallbacks;
-}
+} // namespace clang
 
-std::unique_ptr<clang::PPCallbacks> createSemindexPPCallbacks(SemindexContext index);
+std::unique_ptr<clang::PPCallbacks> createSemindexPPCallbacks(SemindexContext index,
+	clang::DiagnosticsEngine &diagnostics);

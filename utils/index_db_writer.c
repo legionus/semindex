@@ -366,6 +366,25 @@ static int open_writer(const char *path, sqlite3 **db, semindex_trace_t *trace)
 	return 0;
 }
 
+int index_db_create(const char *path)
+{
+	sqlite3 *db = NULL;
+	int ret = -1;
+
+	if (!path)
+		return -1;
+
+	if (open_writer(path, &db, NULL) < 0)
+		goto out;
+
+	ret = 0;
+out:
+	if (db && sqlite3_close(db) != SQLITE_OK)
+		ret = -1;
+
+	return ret;
+}
+
 static int create_staging(sqlite3 *db)
 {
 	if (exec_sql(db,

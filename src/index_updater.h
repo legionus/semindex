@@ -41,8 +41,10 @@ struct SemindexIndexUpdateResult {
 struct SemindexIndexUpdaterOptions {
 	std::string database;
 	std::string commands_database;
+	std::string compile_commands;
 	std::string repository_root;
 	bool include_local = true;
+	bool allow_fallback_command = false;
 };
 
 struct SemindexIndexUpdateRequest {
@@ -58,6 +60,8 @@ class SemindexIndexUpdater
 public:
 	explicit SemindexIndexUpdater(SemindexIndexUpdaterOptions options);
 
+	void setCompileCommands(std::string path);
+	void setRepositoryRoot(std::string path);
 	int commandAvailable(const std::string &file, const std::string &variant) const;
 	SemindexIndexUpdateResult update(const SemindexIndexUpdateRequest &request) const;
 

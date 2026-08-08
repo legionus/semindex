@@ -56,6 +56,7 @@ typedef struct {
 	int include_local;
 } index_db_store_request_t;
 
+int index_db_create(const char *path);
 int index_db_store(const index_db_store_request_t *request);
 int index_db_search(const char *path, const index_db_search_options_t *opts, FILE *out);
 int index_db_callgraph(const char *path, const index_db_callgraph_options_t *opts, FILE *out);

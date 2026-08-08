@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "symbols": [
+    {"kind":"struct","name":"Request","owner":null,"type":null,"usr":"c:@S@Request","usr_id":"7d7f5757ae4e6fad","context":null,"file":"tests/test20.c","line":4,"column":8,"local":false,"definition":true},
+    {"kind":"field","name":"value","owner":"Request","type":"int","usr":"c:@S@Request@FI@value","usr_id":"a5487fff9151214c","context":null,"file":"tests/test20.c","line":5,"column":6,"local":false,"definition":true},
+    {"kind":"function","name":"update_request","owner":null,"type":"int (void)","usr":"c:@F@update_request","usr_id":"3336dea06f77d4d9","context":null,"file":"tests/test20.c","line":8,"column":5,"local":false,"definition":true},
+    {"kind":"variable","name":"request","owner":null,"type":"struct Request","usr":"c:test20.c@135@F@update_request@request","usr_id":"4dd1cc574c4f360c","context":"update_request","file":"tests/test20.c","line":10,"column":17,"local":true,"definition":true}
+  ],
+  "uses": [
+    {"kind":"read","symbol_kind":"file","mode":"-r-","mode_bits":4,"name":"missing-test20.h","owner":null,"type":null,"usr":"file:missing-test20.h","usr_id":"785e081e579f5ddb","context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test20.c","line":2,"column":10,"local":false},
+    {"kind":"read","symbol_kind":"struct","mode":"-r-","mode_bits":4,"name":"Request","owner":null,"type":null,"usr":"c:@S@Request","usr_id":"7d7f5757ae4e6fad","context":"update_request","context_usr":null,"context_usr_id":null,"file":"tests/test20.c","line":10,"column":9,"local":true},
+    {"kind":"write","symbol_kind":"variable","mode":"-w-","mode_bits":8,"name":"request","owner":null,"type":"struct Request","usr":"c:test20.c@135@F@update_request@request","usr_id":"4dd1cc574c4f360c","context":"update_request","context_usr":null,"context_usr_id":null,"file":"tests/test20.c","line":12,"column":2,"local":true},
+    {"kind":"read","symbol_kind":"struct","mode":"-r-","mode_bits":4,"name":"Request","owner":null,"type":null,"usr":"c:@S@Request","usr_id":"7d7f5757ae4e6fad","context":"update_request","context_usr":null,"context_usr_id":null,"file":"tests/test20.c","line":12,"column":20,"local":true},
+    {"kind":"write","symbol_kind":"field","mode":"-w-","mode_bits":8,"name":"value","owner":"Request","type":"int","usr":"c:@S@Request@FI@value","usr_id":"a5487fff9151214c","context":"update_request","context_usr":null,"context_usr_id":null,"file":"tests/test20.c","line":12,"column":31,"local":false},
+    {"kind":"read","symbol_kind":"field","mode":"-r-","mode_bits":4,"name":"value","owner":"Request","type":"int","usr":"c:@S@Request@FI@value","usr_id":"a5487fff9151214c","context":"update_request","context_usr":null,"context_usr_id":null,"file":"tests/test20.c","line":14,"column":17,"local":false},
+    {"kind":"read","symbol_kind":"variable","mode":"-r-","mode_bits":4,"name":"request","owner":null,"type":"struct Request","usr":"c:test20.c@135@F@update_request@request","usr_id":"4dd1cc574c4f360c","context":"update_request","context_usr":null,"context_usr_id":null,"file":"tests/test20.c","line":14,"column":9,"local":true}
+  ]
+}

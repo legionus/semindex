@@ -121,13 +121,26 @@ static bool parsePosition(const llvm::json::Object *params, llvm::StringRef &uri
 	return true;
 }
 
-static void setWorkspaceRoot(LspSourceMapper &sources, const llvm::json::Object *params)
+static bool setRootUri(LspSourceMapper &sources, LspIndexer &indexer, llvm::StringRef uri)
+{
+	if (!sources.setRootUri(uri))
+		return false;
+
+	auto path = sources.filePath(uri);
+
+	if (path)
+		indexer.setWorkspaceRoot(*path);
+
+	return true;
+}
+
+static void setWorkspaceRoot(LspSourceMapper &sources, LspIndexer &indexer, const llvm::json::Object *params)
 {
 	if (!params)
 		return;
 
 	if (auto root_uri = params->getString("rootUri")) {
-		if (sources.setRootUri(*root_uri))
+		if (setRootUri(sources, indexer, *root_uri))
 			return;
 	}
 
@@ -143,7 +156,7 @@ static void setWorkspaceRoot(LspSourceMapper &sources, const llvm::json::Object 
 			continue;
 
 		if (auto uri = object->getString("uri")) {
-			if (sources.setRootUri(*uri))
+			if (setRootUri(sources, indexer, *uri))
 				return;
 		}
 	}
@@ -462,7 +475,7 @@ bool LspServer::dispatch(const llvm::json::Object &message)
 		if (!id || state != State::Uninitialized)
 			return error(id, INVALID_REQUEST, "Invalid Request");
 
-		setWorkspaceRoot(sources, message.getObject("params"));
+		setWorkspaceRoot(sources, indexer, message.getObject("params"));
 		state = State::Running;
 		return reply(*id,
 			llvm::json::Object{
@@ -476,6 +489,7 @@ bool LspServer::dispatch(const llvm::json::Object &message)
 						{ "textDocumentSync",
 							llvm::json::Object{
 								{ "change", 0 },
+								{ "openClose", true },
 								{ "save", true },
 							} },
 					} },
@@ -494,6 +508,9 @@ bool LspServer::dispatch(const llvm::json::Object &message)
 
 	if (*method == "initialized")
 		return id ? error(id, INVALID_REQUEST, "Invalid Request") : true;
+
+	if (*method == "textDocument/didOpen")
+		return id ? error(id, INVALID_REQUEST, "Invalid Request") : didSave(message.getObject("params"));
 
 	if (*method == "textDocument/definition")
 		return id ? definition(*id, message.getObject("params")) : true;

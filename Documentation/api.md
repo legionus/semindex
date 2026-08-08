@@ -34,6 +34,11 @@ After either operation, inspect `semindex_get_index_result()`:
   errors;
 * `SEMINDEX_INDEX_FAILED` means no usable records were produced.
 
+Missing include files are reported as errors but do not stop preprocessing.
+Clang continues parsing the main file and produces a partial index for
+constructs whose declarations and types remain available. Semindex does not
+invent declarations for content that would have come from the missing header.
+
 The integer return value reports the frontend invocation result and does not
 replace the status check. In particular, partial results can contain symbols
 and uses even when the operation returns a failure.

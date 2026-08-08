@@ -1,0 +1,14 @@
+
+FILE: tests/test20.c
+
+   2:10                   -r-   i missing-test20.h
+   4:8                    def   s Request
+   5:6                    def   m Request.value                    int
+   8:5                    def   f update_request                   int (void)
+  10:17  update_request   def . v request                          struct Request
+  10:9   update_request   -r- . s Request
+  12:2   update_request   -w- . v request                          struct Request
+  12:20  update_request   -r- . s Request
+  12:31  update_request   -w-   m Request.value                    int
+  14:17  update_request   -r-   m Request.value                    int
+  14:9   update_request   -r- . v request                          struct Request

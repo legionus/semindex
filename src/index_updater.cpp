@@ -61,6 +61,16 @@ SemindexIndexUpdater::SemindexIndexUpdater(SemindexIndexUpdaterOptions options) 
 {
 }
 
+void SemindexIndexUpdater::setCompileCommands(std::string path)
+{
+	options.compile_commands = std::move(path);
+}
+
+void SemindexIndexUpdater::setRepositoryRoot(std::string path)
+{
+	options.repository_root = std::move(path);
+}
+
 int SemindexIndexUpdater::commandAvailable(const std::string &file, const std::string &variant) const
 {
 	command_db_command_t *command = nullptr;
@@ -86,7 +96,12 @@ SemindexIndexUpdateResult SemindexIndexUpdater::update(const SemindexIndexUpdate
 	SemindexIndexUpdateResult result;
 	std::error_code fs_error;
 	std::filesystem::path old_directory;
+	std::string fallback_directory;
+	std::string fallback_include;
+	const char *fallback_argv[7];
+	semindex_compile_command_t fallback_command = {};
 	bool changed_directory = false;
+	int loaded;
 
 	if (request.stopped && request.stopped()) {
 		result.error = "index update cancelled";
@@ -94,15 +109,11 @@ SemindexIndexUpdateResult SemindexIndexUpdater::update(const SemindexIndexUpdate
 		return result;
 	}
 
-	int loaded = command_db_load(options.commands_database.c_str(), request.variant.c_str(), request.file.c_str(),
-		&saved);
-
-	if (loaded > 0) {
-		result.error =
-			"no saved compiler command for '" + request.file + "' in variant '" + request.variant + "'";
-
-		goto out;
-	}
+	if (std::filesystem::exists(options.commands_database, fs_error))
+		loaded = command_db_load(options.commands_database.c_str(), request.variant.c_str(),
+			request.file.c_str(), &saved);
+	else
+		loaded = fs_error ? -1 : 1;
 
 	if (loaded < 0) {
 		result.error = "failed to load compiler command for '" + request.file + "'";
@@ -110,32 +121,74 @@ SemindexIndexUpdateResult SemindexIndexUpdater::update(const SemindexIndexUpdate
 		goto out;
 	}
 
-	result.command_available = true;
-	command = command_db_command_get(saved);
-	result.directory = command->directory;
-	old_directory = std::filesystem::current_path(fs_error);
-
-	if (fs_error) {
-		result.error = "failed to read the current directory: " + fs_error.message();
+	if (loaded > 0 && options.compile_commands.empty() && !options.allow_fallback_command) {
+		result.error =
+			"no saved compiler command for '" + request.file + "' in variant '" + request.variant + "'";
 
 		goto out;
 	}
 
-	std::filesystem::current_path(command->directory, fs_error);
+	if (!loaded) {
+		result.command_available = true;
+		command = command_db_command_get(saved);
+		result.directory = command->directory;
+		old_directory = std::filesystem::current_path(fs_error);
 
-	if (fs_error) {
-		result.error = "failed to enter compiler directory '" + std::string(command->directory) +
-			"': " + fs_error.message();
+		if (fs_error) {
+			result.error = "failed to read the current directory: " + fs_error.message();
 
-		goto out;
+			goto out;
+		}
+
+		std::filesystem::current_path(command->directory, fs_error);
+
+		if (fs_error) {
+			result.error = "failed to enter compiler directory '" + std::string(command->directory) +
+				"': " + fs_error.message();
+
+			goto out;
+		}
+
+		changed_directory = true;
+		pipeline_request.input = INDEX_PIPELINE_COMMAND;
+		pipeline_request.storage = INDEX_PIPELINE_STORE_SYMBOLS;
+		pipeline_request.command = command;
+		pipeline_request.source_file = command->file;
+	} else if (!options.compile_commands.empty()) {
+		result.directory = options.repository_root;
+		pipeline_request.input = INDEX_PIPELINE_COMPILE_COMMANDS;
+		pipeline_request.storage = INDEX_PIPELINE_STORE_SYMBOLS_AND_COMMAND;
+		pipeline_request.compile_commands = options.compile_commands.c_str();
+		pipeline_request.source_file = request.file.c_str();
+		pipeline_request.commands_database = options.commands_database.c_str();
+	} else {
+		fallback_directory = options.repository_root.empty()
+			? std::filesystem::path(request.file).parent_path().string()
+			: options.repository_root;
+		fallback_argv[0] = "cc";
+		fallback_argv[1] = "--no-default-config";
+		fallback_argv[2] = "-I";
+		fallback_argv[3] = fallback_directory.c_str();
+		fallback_command.argc = 4;
+		fallback_include = (std::filesystem::path(fallback_directory) / "include").string();
+
+		if (std::filesystem::is_directory(fallback_include)) {
+			fallback_argv[fallback_command.argc++] = "-I";
+			fallback_argv[fallback_command.argc++] = fallback_include.c_str();
+		}
+
+		fallback_argv[fallback_command.argc++] = request.file.c_str();
+		fallback_command.directory = fallback_directory.c_str();
+		fallback_command.file = request.file.c_str();
+		fallback_command.argv = fallback_argv;
+		result.directory = fallback_directory;
+		pipeline_request.input = INDEX_PIPELINE_COMMAND;
+		pipeline_request.storage = INDEX_PIPELINE_STORE_SYMBOLS;
+		pipeline_request.command = &fallback_command;
+		pipeline_request.source_file = request.file.c_str();
 	}
 
-	changed_directory = true;
-	pipeline_request.input = INDEX_PIPELINE_COMMAND;
-	pipeline_request.storage = INDEX_PIPELINE_STORE_SYMBOLS;
 	pipeline_request.partial = request.store_partial ? INDEX_PIPELINE_STORE_PARTIAL : INDEX_PIPELINE_RETURN_PARTIAL;
-	pipeline_request.command = command;
-	pipeline_request.source_file = command->file;
 	pipeline_request.symbol_database = options.database.c_str();
 	pipeline_request.variant = request.variant.c_str();
 	pipeline_request.repository_root = options.repository_root.empty() ? nullptr : options.repository_root.c_str();
@@ -158,7 +211,12 @@ SemindexIndexUpdateResult SemindexIndexUpdater::update(const SemindexIndexUpdate
 		goto out;
 	}
 
-	copyDiagnostics(pipeline.index, command->directory, request.diagnostic_limit, result);
+	if (pipeline.command) {
+		result.command_available = true;
+		result.directory = pipeline.command->directory;
+	}
+
+	copyDiagnostics(pipeline.index, result.directory.c_str(), request.diagnostic_limit, result);
 
 	if (pipeline.frontend_ret != 0 || pipeline.frontend->status == SEMINDEX_INDEX_PARTIAL) {
 		result.status = SemindexIndexUpdateResult::Status::Partial;
@@ -171,7 +229,7 @@ SemindexIndexUpdateResult SemindexIndexUpdater::update(const SemindexIndexUpdate
 		goto out;
 	}
 
-	if (pipeline.persisted != INDEX_PIPELINE_STORE_SYMBOLS) {
+	if (pipeline.persisted != pipeline_request.storage) {
 		result.error = "index for '" + request.file + "' was not stored";
 
 		goto out;

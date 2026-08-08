@@ -16,8 +16,14 @@ namespace
 class SemindexPPCallbacks : public PPCallbacks
 {
 public:
-	explicit SemindexPPCallbacks(SemindexContext index) : index(index)
+	SemindexPPCallbacks(SemindexContext index, DiagnosticsEngine &diagnostics)
+	    : index(index), diagnostics(diagnostics)
 	{
+	}
+
+	bool FileNotFound(StringRef) override
+	{
+		return true;
 	}
 
 	void MacroDefined(const Token &macroNameTok, const MacroDirective *) override
@@ -81,6 +87,12 @@ public:
 		CharSourceRange filenameRange, OptionalFileEntryRef file, StringRef, StringRef, const Module *, bool,
 		SrcMgr::CharacteristicKind) override
 	{
+		if (!file) {
+			unsigned id = diagnostics.getCustomDiagID(DiagnosticsEngine::Error, "'%0' file not found");
+
+			diagnostics.Report(filenameRange.getBegin(), id) << fileName;
+		}
+
 		addIncludeUse(fileName, isAngled, file, filenameRange.getBegin());
 	}
 
@@ -148,6 +160,7 @@ private:
 	}
 
 	SemindexContext index;
+	DiagnosticsEngine &diagnostics;
 };
 
 class SemindexPreprocessorAction : public PreprocessOnlyAction
@@ -163,7 +176,7 @@ protected:
 		CompilerInstance &CI = getCompilerInstance();
 		SemindexContext index(out, CI.getSourceManager());
 
-		CI.getPreprocessor().addPPCallbacks(createSemindexPPCallbacks(index));
+		CI.getPreprocessor().addPPCallbacks(createSemindexPPCallbacks(index, CI.getDiagnostics()));
 		PreprocessOnlyAction::ExecuteAction();
 		out->has_index_data = true;
 	}
@@ -190,9 +203,9 @@ private:
 
 } // namespace
 
-std::unique_ptr<PPCallbacks> createSemindexPPCallbacks(SemindexContext index)
+std::unique_ptr<PPCallbacks> createSemindexPPCallbacks(SemindexContext index, DiagnosticsEngine &diagnostics)
 {
-	return std::make_unique<SemindexPPCallbacks>(index);
+	return std::make_unique<SemindexPPCallbacks>(index, diagnostics);
 }
 
 std::unique_ptr<tooling::FrontendActionFactory> createSemindexPreprocessorActionFactory(semindex *out)

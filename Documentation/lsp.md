@@ -27,6 +27,15 @@ Relative paths stored in the index are resolved against the workspace
 valid URI in `workspaceFolders` is used instead. The workspace root must match
 the Git repository root used when the index was created.
 
+If the symbol database does not exist, the server creates it with an empty
+index instead of refusing to start. Opening and saving files begins populating
+that database. The server prefers a command already stored in the command
+database, then `compile_commands.json` in the workspace root. If neither is
+available, it indexes the file with a minimal command and retains partial
+results produced by Clang. The fallback command searches the workspace root
+and its `include` directory when present. The approximate command is not stored
+in the command database.
+
 The server reads `Content-Length` framed JSON-RPC messages from standard input
 and writes responses and notifications to standard output.
 
