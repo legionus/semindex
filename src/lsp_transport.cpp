@@ -4,10 +4,7 @@
 #include <llvm/Support/raw_ostream.h>
 
 #include <charconv>
-#include <chrono>
 #include <cstddef>
-#include <ctime>
-#include <iomanip>
 #include <istream>
 #include <ostream>
 #include <string>
@@ -16,32 +13,8 @@
 static constexpr size_t MAX_MESSAGE_SIZE = 64 * 1024 * 1024;
 
 LspTransport::LspTransport(std::istream &input, std::ostream &output, std::ostream &errors, std::ostream *log)
-    : input(input), output(output), errors(errors), log(log)
+    : input(input), output(output), errors(errors), logger(errors, log, "semindex-lsp")
 {
-}
-
-bool LspTransport::logMessage(const char *direction, const std::string &payload)
-{
-	if (!log)
-		return true;
-
-	auto now = std::chrono::system_clock::now();
-	auto seconds = std::chrono::time_point_cast<std::chrono::seconds>(now);
-	auto micros = std::chrono::duration_cast<std::chrono::microseconds>(now - seconds).count();
-	std::time_t time = std::chrono::system_clock::to_time_t(now);
-	std::tm utc = {};
-
-	gmtime_r(&time, &utc);
-	*log << std::put_time(&utc, "%FT%T") << '.' << std::setfill('0') << std::setw(6) << micros << "Z " << direction
-	     << '\n'
-	     << payload << "\n\n";
-	log->flush();
-
-	if (!*log) {
-		errors << "semindex-lsp: failed to write protocol log\n";
-		return false;
-	}
-	return true;
 }
 
 LspTransport::ReadResult LspTransport::read(std::string &payload)
@@ -99,7 +72,7 @@ LspTransport::ReadResult LspTransport::read(std::string &payload)
 		errors << "semindex-lsp: truncated message body\n";
 		return ReadResult::Error;
 	}
-	if (!logMessage("CLIENT --> SERVER", payload))
+	if (!logger.write("CLIENT --> SERVER", payload))
 		return ReadResult::Error;
 
 	return ReadResult::Message;
@@ -119,5 +92,5 @@ bool LspTransport::write(const llvm::json::Value &message)
 		errors << "semindex-lsp: failed to write response\n";
 		return false;
 	}
-	return logMessage("SERVER --> CLIENT", payload);
+	return logger.write("SERVER --> CLIENT", payload);
 }

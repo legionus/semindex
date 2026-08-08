@@ -3,43 +3,14 @@
 
 #include <llvm/Support/raw_ostream.h>
 
-#include <chrono>
-#include <ctime>
-#include <iomanip>
 #include <istream>
 #include <ostream>
 
 static constexpr size_t MAX_MESSAGE_SIZE = 4 * 1024 * 1024;
 
 McpTransport::McpTransport(std::istream &input, std::ostream &output, std::ostream &errors, std::ostream *log)
-    : input(input), output(output), errors(errors), log(log)
+    : input(input), output(output), errors(errors), logger(errors, log, "semindex-mcp")
 {
-}
-
-bool McpTransport::logMessage(const char *direction, const std::string &payload)
-{
-	if (!log)
-		return true;
-
-	auto now = std::chrono::system_clock::now();
-	auto seconds = std::chrono::time_point_cast<std::chrono::seconds>(now);
-	auto micros = std::chrono::duration_cast<std::chrono::microseconds>(now - seconds).count();
-	std::time_t time = std::chrono::system_clock::to_time_t(now);
-	std::tm utc = {};
-
-	gmtime_r(&time, &utc);
-	*log << std::put_time(&utc, "%FT%T") << '.' << std::setfill('0') << std::setw(6) << micros << "Z " << direction
-	     << '\n'
-	     << payload << "\n\n";
-	log->flush();
-
-	if (!*log) {
-		errors << "semindex-mcp: failed to write protocol log\n";
-
-		return false;
-	}
-
-	return true;
 }
 
 McpTransport::ReadResult McpTransport::read(std::string &payload)
@@ -61,7 +32,7 @@ McpTransport::ReadResult McpTransport::read(std::string &payload)
 	{
 		std::lock_guard<std::mutex> guard(write_mutex);
 
-		if (!logMessage("CLIENT --> SERVER", payload))
+		if (!logger.write("CLIENT --> SERVER", payload))
 			return ReadResult::Error;
 	}
 
@@ -87,5 +58,5 @@ bool McpTransport::write(const llvm::json::Value &message)
 		return false;
 	}
 
-	return logMessage("SERVER --> CLIENT", payload);
+	return logger.write("SERVER --> CLIENT", payload);
 }

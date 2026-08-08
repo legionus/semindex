@@ -77,6 +77,12 @@ int main(int argc, char **argv)
 	if (!resolver.setWorkspaceRoot(root))
 		return 1;
 
+	if (SemindexSourceResolver::normalize(root / "a/../b") != root / "b")
+		return 1;
+
+	if (SemindexSourceResolver::resolveAgainst(root, "a/../b") != root / "b")
+		return 1;
+
 	if (resolver.resolve(relative) != source)
 		return 1;
 

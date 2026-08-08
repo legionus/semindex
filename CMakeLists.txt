@@ -36,12 +36,18 @@ set(SEMINDEX_FORMAT_SOURCES
 	src/lsp_server.h
 	src/lsp_transport.cpp
 	src/lsp_transport.h
+	src/mcp_callgraph_tools.cpp
 	src/mcp_server.cpp
 	src/mcp_server.h
+	src/mcp_source_tools.cpp
+	src/mcp_symbol_tools.cpp
 	src/mcp_tools.cpp
 	src/mcp_tools.h
+	src/mcp_tools_internal.h
 	src/mcp_transport.cpp
 	src/mcp_transport.h
+	src/protocol_logger.cpp
+	src/protocol_logger.h
 	src/semantic_query.cpp
 	src/semantic_query.h
 	src/index_pp.cpp
@@ -349,6 +355,13 @@ target_link_libraries(semindex_index_update PUBLIC
 	semindex_pipeline
 )
 
+add_library(semindex_protocol STATIC
+	src/protocol_logger.cpp
+)
+target_include_directories(semindex_protocol PUBLIC
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+)
+
 add_executable(semindex_lsp
 	src/lsp_call_hierarchy.cpp
 	src/lsp_indexer.cpp
@@ -368,6 +381,7 @@ target_include_directories(semindex_lsp PRIVATE
 target_compile_definitions(semindex_lsp PRIVATE ${LLVM_DEFINITIONS})
 target_link_libraries(semindex_lsp PRIVATE
 	semindex_index_update
+	semindex_protocol
 	semindex_semantic
 	LLVM
 )
@@ -377,7 +391,10 @@ set_target_properties(semindex_lsp PROPERTIES
 )
 
 add_executable(semindex_mcp
+	src/mcp_callgraph_tools.cpp
 	src/mcp_server.cpp
+	src/mcp_source_tools.cpp
+	src/mcp_symbol_tools.cpp
 	src/mcp_tools.cpp
 	src/mcp_transport.cpp
 	utils/mcp/main.cpp
@@ -391,6 +408,7 @@ target_compile_definitions(semindex_mcp PRIVATE ${LLVM_DEFINITIONS})
 target_link_libraries(semindex_mcp PRIVATE
 	semindex_index_update
 	semindex_names
+	semindex_protocol
 	semindex_semantic
 	Threads::Threads
 	LLVM

@@ -45,6 +45,9 @@ class SemindexSourceResolver
 public:
 	SemindexSourceResolver();
 
+	static std::filesystem::path normalize(const std::filesystem::path &path);
+	static std::filesystem::path resolveAgainst(const std::filesystem::path &directory,
+		const std::filesystem::path &path);
 	bool setWorkspaceRoot(const std::filesystem::path &path);
 	std::filesystem::path resolve(const std::filesystem::path &path) const;
 	std::vector<std::string> databasePaths(const std::filesystem::path &path) const;

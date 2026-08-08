@@ -198,28 +198,39 @@ SemindexSourceResolver::SemindexSourceResolver() : root(std::filesystem::current
 {
 }
 
+std::filesystem::path SemindexSourceResolver::normalize(const std::filesystem::path &path)
+{
+	return path.lexically_normal();
+}
+
+std::filesystem::path SemindexSourceResolver::resolveAgainst(const std::filesystem::path &directory,
+	const std::filesystem::path &path)
+{
+	if (path.is_absolute())
+		return normalize(path);
+
+	return normalize(directory / path);
+}
+
 bool SemindexSourceResolver::setWorkspaceRoot(const std::filesystem::path &path)
 {
 	if (!path.is_absolute())
 		return false;
 
-	root = path.lexically_normal();
+	root = normalize(path);
 
 	return true;
 }
 
 std::filesystem::path SemindexSourceResolver::resolve(const std::filesystem::path &path) const
 {
-	if (path.is_absolute())
-		return path.lexically_normal();
-
-	return (root / path).lexically_normal();
+	return resolveAgainst(root, path);
 }
 
 std::vector<std::string> SemindexSourceResolver::databasePaths(const std::filesystem::path &path) const
 {
 	std::vector<std::string> result;
-	std::filesystem::path normalized = path.lexically_normal();
+	std::filesystem::path normalized = normalize(path);
 
 	if (!normalized.is_absolute())
 		return result;

@@ -1,22 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "lsp_overlay.h"
+#include "source_resolver.h"
 
 #include <filesystem>
 #include <string>
-
-static std::string normalizedPath(const std::string &path)
-{
-	return std::filesystem::path(path).lexically_normal().string();
-}
-
-static std::string resolvedPath(const std::string &directory, const char *path)
-{
-	std::filesystem::path result(path ? path : "");
-
-	if (result.is_relative())
-		result = std::filesystem::path(directory) / result;
-	return result.lexically_normal().string();
-}
 
 static std::string qualifiedName(const char *owner, const char *name)
 {
@@ -52,7 +39,8 @@ static bool matchesOptions(const semindex_db_record_t &record, const semindex_db
 	if (options.symbol && record.symbol != std::string(options.symbol))
 		return false;
 
-	if (options.path && normalizedPath(record.path) != normalizedPath(options.path))
+	if (options.path &&
+		SemindexSourceResolver::normalize(record.path) != SemindexSourceResolver::normalize(options.path))
 		return false;
 
 	if (options.context && record.context != std::string(options.context))
@@ -82,13 +70,15 @@ static const char *leafName(const std::string &symbol)
 
 void LspOverlay::replace(const std::string &path, const std::string &directory, const semindex_t *index)
 {
-	std::string main_path = normalizedPath(path);
+	std::string main_path = SemindexSourceResolver::normalize(path).string();
 	Entry entry;
 
 	for (size_t i = 0; i < semindex_symbol_count(index); i++) {
 		const semindex_symbol_t *symbol = semindex_get_symbol(index, i);
 
-		if (!symbol || resolvedPath(directory, symbol->file) != main_path)
+		if (!symbol ||
+			SemindexSourceResolver::resolveAgainst(directory, symbol->file ? symbol->file : "") !=
+				main_path)
 			continue;
 		entry.records.push_back({
 			.symbol = qualifiedName(symbol->owner, symbol->name),
@@ -107,7 +97,7 @@ void LspOverlay::replace(const std::string &path, const std::string &directory, 
 	for (size_t i = 0; i < semindex_use_count(index); i++) {
 		const semindex_use_t *use = semindex_get_use(index, i);
 
-		if (!use || resolvedPath(directory, use->file) != main_path)
+		if (!use || SemindexSourceResolver::resolveAgainst(directory, use->file ? use->file : "") != main_path)
 			continue;
 		entry.records.push_back({
 			.symbol = qualifiedName(use->owner, use->name),
@@ -128,12 +118,12 @@ void LspOverlay::replace(const std::string &path, const std::string &directory, 
 
 void LspOverlay::erase(const std::string &path)
 {
-	indices.erase(normalizedPath(path));
+	indices.erase(SemindexSourceResolver::normalize(path).string());
 }
 
 bool LspOverlay::contains(const std::string &path) const
 {
-	return indices.find(normalizedPath(path)) != indices.end();
+	return indices.find(SemindexSourceResolver::normalize(path).string()) != indices.end();
 }
 
 int LspOverlay::emitRecord(const Record &stored, const char *path, const char *variant,
@@ -171,7 +161,7 @@ int LspOverlay::emitRecord(const Record &stored, const char *path, const char *v
 int LspOverlay::findAt(const std::string &path, const char *variant, unsigned line, unsigned column,
 	semindex_db_record_callback_t callback, void *data) const
 {
-	auto entry = indices.find(normalizedPath(path));
+	auto entry = indices.find(SemindexSourceResolver::normalize(path).string());
 
 	if (entry == indices.end())
 		return 0;
@@ -192,7 +182,7 @@ int LspOverlay::findAt(const std::string &path, const char *variant, unsigned li
 int LspOverlay::query(const std::string &path, const char *variant, const semindex_db_query_options_t &options,
 	semindex_db_record_callback_t callback, void *data) const
 {
-	auto entry = indices.find(normalizedPath(path));
+	auto entry = indices.find(SemindexSourceResolver::normalize(path).string());
 
 	if (entry == indices.end())
 		return 0;

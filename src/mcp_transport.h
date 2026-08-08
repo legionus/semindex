@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 
+#include "protocol_logger.h"
+
 #include <llvm/Support/JSON.h>
 
 #include <iosfwd>
@@ -25,8 +27,6 @@ private:
 	std::istream &input;
 	std::ostream &output;
 	std::ostream &errors;
-	std::ostream *log;
+	ProtocolLogger logger;
 	std::mutex write_mutex;
-
-	bool logMessage(const char *direction, const std::string &payload);
 };
