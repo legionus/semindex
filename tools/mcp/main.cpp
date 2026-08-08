@@ -11,6 +11,7 @@ extern "C" {
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <getopt.h>
 #include <iostream>
 #include <string>
 
@@ -43,30 +44,27 @@ static void help()
 		     "\n";
 }
 
-static bool optionValue(int &index, int argc, char **argv, const std::string &argument, const char *name,
-	std::string &value)
-{
-	std::string prefix = std::string(name) + '=';
-
-	if (argument == name) {
-		if (++index == argc)
-			return false;
-
-		value = argv[index];
-
-		return true;
-	}
-
-	if (argument.rfind(prefix, 0) != 0)
-		return false;
-
-	value = argument.substr(prefix.size());
-
-	return true;
-}
-
 int main(int argc, char **argv)
 {
+	enum {
+		OPT_COMMANDS_DATABASE = 1,
+		OPT_VARIANT,
+		OPT_WORKSPACE,
+		OPT_ALLOW_REINDEX,
+		OPT_NO_INCLUDE_LOCAL,
+		OPT_LOGFILE,
+	};
+	static const struct option long_options[] = {
+		{ "database", required_argument, nullptr, 'd' },
+		{ "commands-database", required_argument, nullptr, OPT_COMMANDS_DATABASE },
+		{ "variant", required_argument, nullptr, OPT_VARIANT },
+		{ "workspace", required_argument, nullptr, OPT_WORKSPACE },
+		{ "allow-reindex", no_argument, nullptr, OPT_ALLOW_REINDEX },
+		{ "no-include-local", no_argument, nullptr, OPT_NO_INCLUDE_LOCAL },
+		{ "logfile", required_argument, nullptr, OPT_LOGFILE },
+		{ "help", no_argument, nullptr, 'h' },
+		{ nullptr, 0, nullptr, 0 },
+	};
 	std::string database = ".semindex/semindex.db";
 	std::string commands_database;
 	std::string workspace = std::filesystem::current_path().string();
@@ -74,47 +72,45 @@ int main(int argc, char **argv)
 	std::string logfile_path;
 	bool allow_reindex = false;
 	bool include_local = true;
+	int opt;
 
-	for (int i = 1; i < argc; i++) {
-		std::string argument(argv[i]);
+	optind = 1;
 
-		if (argument == "-h" || argument == "--help") {
+	while ((opt = getopt_long(argc, argv, "+d:h", long_options, nullptr)) != -1) {
+		switch (opt) {
+		case 'd':
+			database = optarg;
+			break;
+		case 'h':
 			help();
 
 			return 0;
-		}
-
-		if (argument == "-d") {
-			if (++i == argc) {
-				std::cerr << "semindex-mcp: option requires an argument: " << argument << '\n';
-
-				return 1;
-			}
-
-			database = argv[i];
-			continue;
-		}
-
-		if (argument == "--allow-reindex") {
+		case OPT_COMMANDS_DATABASE:
+			commands_database = optarg;
+			break;
+		case OPT_VARIANT:
+			variant = optarg;
+			break;
+		case OPT_WORKSPACE:
+			workspace = optarg;
+			break;
+		case OPT_ALLOW_REINDEX:
 			allow_reindex = true;
-
-			continue;
-		}
-
-		if (argument == "--no-include-local") {
+			break;
+		case OPT_NO_INCLUDE_LOCAL:
 			include_local = false;
+			break;
+		case OPT_LOGFILE:
+			logfile_path = optarg;
+			break;
+		default:
+			usage(std::cerr);
 
-			continue;
+			return 1;
 		}
+	}
 
-		if (optionValue(i, argc, argv, argument, "--database", database) ||
-			optionValue(i, argc, argv, argument, "--commands-database", commands_database) ||
-			optionValue(i, argc, argv, argument, "--variant", variant) ||
-			optionValue(i, argc, argv, argument, "--workspace", workspace) ||
-			optionValue(i, argc, argv, argument, "--logfile", logfile_path))
-			continue;
-
-		std::cerr << "semindex-mcp: unknown option: " << argument << '\n';
+	if (optind != argc) {
 		usage(std::cerr);
 
 		return 1;

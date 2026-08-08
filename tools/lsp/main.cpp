@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <getopt.h>
 #include <iostream>
 #include <string>
 #include <utility>
@@ -43,6 +44,23 @@ static void help()
 
 int main(int argc, char **argv)
 {
+	enum {
+		OPT_COMMANDS_DATABASE = 1,
+		OPT_COMPILE_COMMANDS,
+		OPT_VARIANT,
+		OPT_NO_INCLUDE_LOCAL,
+		OPT_LOGFILE,
+	};
+	static const struct option long_options[] = {
+		{ "database", required_argument, nullptr, 'd' },
+		{ "commands-database", required_argument, nullptr, OPT_COMMANDS_DATABASE },
+		{ "compile-commands", required_argument, nullptr, OPT_COMPILE_COMMANDS },
+		{ "variant", required_argument, nullptr, OPT_VARIANT },
+		{ "no-include-local", no_argument, nullptr, OPT_NO_INCLUDE_LOCAL },
+		{ "logfile", required_argument, nullptr, OPT_LOGFILE },
+		{ "help", no_argument, nullptr, 'h' },
+		{ nullptr, 0, nullptr, 0 },
+	};
 	std::string database_path = ".semindex/semindex.db";
 	std::string commands_database_path;
 	std::string compile_commands_path;
@@ -52,84 +70,48 @@ int main(int argc, char **argv)
 	bool logfile_requested = false;
 
 	semindex_db_t *database = nullptr;
+	int opt;
 
-	for (int i = 1; i < argc; i++) {
-		std::string argument(argv[i]);
+	optind = 1;
 
-		if (argument == "-h" || argument == "--help") {
+	while ((opt = getopt_long(argc, argv, "+d:h", long_options, nullptr)) != -1) {
+		switch (opt) {
+		case 'd':
+			database_path = optarg;
+			break;
+		case 'h':
 			help();
+
 			return 0;
-		}
-		if (argument == "-d" || argument == "--database") {
-			if (++i == argc) {
-				std::cerr << "semindex-lsp: option requires an argument: " << argument << '\n';
-				return 1;
-			}
-			database_path = argv[i];
-			continue;
-		}
-		if (argument.rfind("--database=", 0) == 0) {
-			database_path = argument.substr(sizeof("--database=") - 1);
-			continue;
-		}
-		if (argument == "--commands-database") {
-			if (++i == argc) {
-				std::cerr << "semindex-lsp: option requires an argument: " << argument << '\n';
-				return 1;
-			}
-			commands_database_path = argv[i];
-			continue;
-		}
-		if (argument.rfind("--commands-database=", 0) == 0) {
-			commands_database_path = argument.substr(sizeof("--commands-database=") - 1);
-			continue;
-		}
-		if (argument == "--compile-commands") {
-			if (++i == argc) {
-				std::cerr << "semindex-lsp: option requires an argument: " << argument << '\n';
-				return 1;
-			}
-			compile_commands_path = argv[i];
-			continue;
-		}
-		if (argument.rfind("--compile-commands=", 0) == 0) {
-			compile_commands_path = argument.substr(sizeof("--compile-commands=") - 1);
-			continue;
-		}
-		if (argument == "--variant") {
-			if (++i == argc) {
-				std::cerr << "semindex-lsp: option requires an argument: " << argument << '\n';
-				return 1;
-			}
-			variant = argv[i];
-			continue;
-		}
-		if (argument.rfind("--variant=", 0) == 0) {
-			variant = argument.substr(sizeof("--variant=") - 1);
-			continue;
-		}
-		if (argument == "--logfile") {
-			if (++i == argc) {
-				std::cerr << "semindex-lsp: option requires an argument: " << argument << '\n';
-				return 1;
-			}
-			logfile_path = argv[i];
-			logfile_requested = true;
-			continue;
-		}
-		if (argument.rfind("--logfile=", 0) == 0) {
-			logfile_path = argument.substr(sizeof("--logfile=") - 1);
-			logfile_requested = true;
-			continue;
-		}
-		if (argument == "--no-include-local") {
+		case OPT_COMMANDS_DATABASE:
+			commands_database_path = optarg;
+			break;
+		case OPT_COMPILE_COMMANDS:
+			compile_commands_path = optarg;
+			break;
+		case OPT_VARIANT:
+			variant = optarg;
+			break;
+		case OPT_NO_INCLUDE_LOCAL:
 			include_local = false;
-			continue;
+			break;
+		case OPT_LOGFILE:
+			logfile_path = optarg;
+			logfile_requested = true;
+			break;
+		default:
+			usage(std::cerr);
+
+			return 1;
 		}
-		std::cerr << "semindex-lsp: unknown option: " << argument << '\n';
+	}
+
+	if (optind != argc) {
 		usage(std::cerr);
+
 		return 1;
 	}
+
 	if (logfile_requested && logfile_path.empty()) {
 		std::cerr << "semindex-lsp: empty log file path\n";
 		return 1;
