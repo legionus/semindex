@@ -1,7 +1,7 @@
 # Building semindex
 
 semindex requires a C and C++ compiler, CMake, SQLite 3.35 or newer, and the
-LLVM and Clang development files from LLVM 21 or newer. Python 3 runs the
+LLVM and Clang development files from LLVM 22 or newer. Python 3 runs the
 performance and trace analysis tools. `clang-format` and the `sqlite3`
 command-line program are needed by the development checks and tests. The
 performance benchmark additionally uses `/usr/bin/time`. Git provenance is
@@ -17,12 +17,12 @@ clang-format --version
 python3 --version
 ```
 
-`llvm-config --version` must report 21 or newer.  CMake uses this program to
+`llvm-config --version` must report 22 or newer. CMake uses this program to
 find the matching LLVM headers and libraries.
 
 ## Fedora
 
-On a Fedora release whose default LLVM is version 21 or newer, install:
+On a Fedora release whose default LLVM is version 22 or newer, install:
 
 ```sh
 sudo dnf install \
@@ -33,7 +33,7 @@ sudo dnf install \
 
 `clang-tools-extra` provides `clang-format` on Fedora.  If the default LLVM is
 older, supported Fedora releases also provide versioned compatibility packages
-such as `llvm21-devel`, `clang21-devel`, and `clang21-tools-extra`.  Install the
+such as `llvm22-devel`, `clang22-devel`, and `clang22-tools-extra`. Install the
 three packages from the same LLVM version and verify that the corresponding
 `llvm-config` is selected before running CMake.
 
@@ -42,7 +42,7 @@ Package names and available versions can be checked in
 
 ## Ubuntu
 
-On an Ubuntu release whose default `llvm-dev` package is version 21 or newer,
+On an Ubuntu release whose default `llvm-dev` package is version 22 or newer,
 install:
 
 ```sh
@@ -55,22 +55,22 @@ sudo apt install \
 
 After installation, check `llvm-config --version`.  On Ubuntu releases whose
 archive contains an older LLVM, use the LLVM project's apt repository.  The
-following example installs LLVM 21:
+following example installs LLVM 22:
 
 ```sh
 sudo apt update
 sudo apt install wget ca-certificates gnupg
 wget https://apt.llvm.org/llvm.sh
 chmod +x llvm.sh
-sudo ./llvm.sh 21
+sudo ./llvm.sh 22
 sudo apt install \
-    llvm-21-dev libclang-21-dev libclang-cpp21-dev clang-format-21 \
+    llvm-22-dev libclang-22-dev libclang-cpp22-dev clang-format-22 \
     build-essential cmake python3 sqlite3 libsqlite3-dev libgit2-dev time
-export PATH=/usr/lib/llvm-21/bin:$PATH
+export PATH=/usr/lib/llvm-22/bin:$PATH
 ```
 
 Set `PATH` in every shell used to configure or build semindex.  This ensures
-that CMake runs `llvm-config` and `clang-format` from LLVM 21 instead of an
+that CMake runs `llvm-config` from LLVM 22 instead of an
 older distribution version.
 
 See [apt.llvm.org](https://apt.llvm.org/) for the repository setup script and
@@ -136,5 +136,5 @@ LLVM installations are not mixed.
 
 If linking fails with a missing `clang-cpp` library, make sure the LLVM and
 Clang development packages come from the same version.  On Ubuntu this means
-matching packages such as `llvm-21-dev`, `libclang-21-dev`, and
-`libclang-cpp21-dev`.
+matching packages such as `llvm-22-dev`, `libclang-22-dev`, and
+`libclang-cpp22-dev`.

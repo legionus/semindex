@@ -79,7 +79,7 @@ implemented symbol index, direct call graph, and SQLite queries. This includes:
 
 The project requires:
 
-* LLVM/Clang 21 or newer;
+* LLVM/Clang 22 or newer;
 * CMake;
 * SQLite 3.35 or newer.
 

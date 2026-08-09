@@ -145,20 +145,6 @@ set(SEMINDEX_FORMAT_SOURCES
 	tools/mcp/main.cpp
 )
 
-find_program(CLANG_FORMAT clang-format)
-if(CLANG_FORMAT)
-	add_custom_target(format
-		COMMAND ${CLANG_FORMAT} -i ${SEMINDEX_FORMAT_SOURCES}
-		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-		COMMENT "Formatting source files"
-	)
-	add_custom_target(format-check
-		COMMAND ${CLANG_FORMAT} --dry-run --Werror ${SEMINDEX_FORMAT_SOURCES}
-		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-		COMMENT "Checking source formatting"
-	)
-endif()
-
 find_package(SQLite3 3.35 REQUIRED)
 if(NOT TARGET SQLite3::SQLite3 AND TARGET SQLite::SQLite3)
 	add_library(SQLite3::SQLite3 ALIAS SQLite::SQLite3)
@@ -180,6 +166,25 @@ endif()
 
 find_package(LLVM REQUIRED CONFIG)
 find_package(Clang REQUIRED CONFIG)
+
+if(LLVM_PACKAGE_VERSION VERSION_LESS 22)
+	message(FATAL_ERROR "semindex requires LLVM and Clang 22 or newer")
+endif()
+
+find_program(CLANG_FORMAT NAMES clang-format-${LLVM_VERSION_MAJOR} clang-format)
+if(CLANG_FORMAT)
+	add_custom_target(format
+		COMMAND ${CLANG_FORMAT} -i ${SEMINDEX_FORMAT_SOURCES}
+		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+		COMMENT "Formatting source files"
+	)
+	add_custom_target(format-check
+		COMMAND ${CLANG_FORMAT} --dry-run --Werror ${SEMINDEX_FORMAT_SOURCES}
+		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+		COMMENT "Checking source formatting"
+	)
+endif()
+
 find_package(Threads REQUIRED)
 
 # Internal SQLite helpers
