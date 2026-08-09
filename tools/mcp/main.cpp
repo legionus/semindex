@@ -4,7 +4,7 @@
 #include "mcp_transport.h"
 
 extern "C" {
-#include "command_db.h"
+#include "command_db_common.h"
 #include "repository.h"
 #include "semindex_paths.h"
 }

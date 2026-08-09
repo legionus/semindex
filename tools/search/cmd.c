@@ -4,9 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "index_db.h"
+#include "index_db_query.h"
 #include "repository.h"
-#include "semindex_cli.h"
+#include "cmdline.h"
 #include "semindex_paths.h"
 
 static void search_usage(FILE *f)

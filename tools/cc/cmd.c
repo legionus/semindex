@@ -10,7 +10,7 @@
 #include "compiler_command.h"
 #include "index_command.h"
 #include "index_pipeline.h"
-#include "semindex_cli.h"
+#include "cmdline.h"
 #include "semindex_paths.h"
 
 enum index_error_policy {

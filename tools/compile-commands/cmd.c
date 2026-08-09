@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "command_db.h"
+#include "command_db_reader.h"
 #include "repository.h"
 #include "semindex_paths.h"
 

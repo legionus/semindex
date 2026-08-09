@@ -5,7 +5,7 @@
 
 #include "index_command.h"
 #include "index_pipeline.h"
-#include "semindex_cli.h"
+#include "cmdline.h"
 #include "semindex_paths.h"
 
 static void index_usage(FILE *f)

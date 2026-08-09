@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-#include "command_db.h"
+#include "command_db_common.h"
 #include "lsp_indexer.h"
 #include "lsp_server.h"
 #include "lsp_transport.h"
@@ -16,7 +16,7 @@
 #include <utility>
 
 extern "C" {
-#include "index_db.h"
+#include "index_db_writer.h"
 }
 
 static void usage(std::ostream &stream)
