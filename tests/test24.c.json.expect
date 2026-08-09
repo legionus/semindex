@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "symbols": [
+    {"kind":"macro","name":"_weakref_","owner":null,"type":null,"usr":"macro:_weakref_","usr_id":"21a71233635b891b","context":null,"file":"tests/test24.c","line":11,"column":9,"local":false,"definition":true},
+    {"kind":"function","name":"weak_target","owner":null,"type":"void (void)","usr":"c:@F@weak_target","usr_id":"25fe2cb8cc031394","context":null,"file":"tests/test24.c","line":2,"column":6,"local":false,"definition":true},
+    {"kind":"function","name":"function_ref","owner":null,"type":"void (void)","usr":"c:test24.c@F@function_ref","usr_id":"31834eb2fd95f915","context":null,"file":"tests/test24.c","line":6,"column":13,"local":false,"definition":true},
+    {"kind":"variable","name":"weak_value","owner":null,"type":"int","usr":"c:@weak_value","usr_id":"567a0d41acfed3a0","context":null,"file":"tests/test24.c","line":8,"column":5,"local":false,"definition":true},
+    {"kind":"variable","name":"variable_ref","owner":null,"type":"int","usr":"c:test24.c@variable_ref","usr_id":"a26558f9b8ed8c40","context":null,"file":"tests/test24.c","line":9,"column":12,"local":false,"definition":true},
+    {"kind":"function","name":"macro_ref","owner":null,"type":"void (void)","usr":"c:test24.c@F@macro_ref","usr_id":"91abad70c5b11a30","context":null,"file":"tests/test24.c","line":12,"column":13,"local":false,"definition":true},
+    {"kind":"function","name":"split_ref","owner":null,"type":"void (void)","usr":"c:test24.c@F@split_ref","usr_id":"c5f0f426802dafd7","context":null,"file":"tests/test24.c","line":14,"column":13,"local":false,"definition":true}
+  ],
+  "uses": [
+    {"kind":"read","symbol_kind":"macro","mode":"-r-","mode_bits":4,"name":"_weakref_","owner":null,"type":null,"usr":"macro:_weakref_","usr_id":"21a71233635b891b","context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test24.c","line":12,"column":29,"local":false},
+    {"kind":"address","symbol_kind":"function","mode":"m--","mode_bits":3,"name":"weak_target","owner":null,"type":"void (void)","usr":"c:@F@weak_target","usr_id":"25fe2cb8cc031394","context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test24.c","line":6,"column":56,"local":false},
+    {"kind":"address","symbol_kind":"variable","mode":"m--","mode_bits":3,"name":"weak_value","owner":null,"type":"int","usr":"c:@weak_value","usr_id":"567a0d41acfed3a0","context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test24.c","line":9,"column":49,"local":false},
+    {"kind":"address","symbol_kind":"function","mode":"m--","mode_bits":3,"name":"weak_target","owner":null,"type":"void (void)","usr":"c:@F@weak_target","usr_id":"25fe2cb8cc031394","context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test24.c","line":12,"column":29,"local":false},
+    {"kind":"address","symbol_kind":"function","mode":"m--","mode_bits":3,"name":"weak_target","owner":null,"type":"void (void)","usr":"c:@F@weak_target","usr_id":"25fe2cb8cc031394","context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test24.c","line":14,"column":60,"local":false}
+  ]
+}

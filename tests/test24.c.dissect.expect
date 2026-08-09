@@ -1,0 +1,15 @@
+
+FILE: tests/test24.c
+
+  11:9                    def   d _weakref_
+  12:29                   -r-   d _weakref_
+   2:6                    def   f weak_target                      void (void)
+   6:56                   m--   f weak_target                      void (void)
+   6:13                   def   f function_ref                     void (void)
+   8:5                    def   v weak_value                       int
+   9:49                   m--   v weak_value                       int
+   9:12                   def   v variable_ref                     int
+  12:29                   m--   f weak_target                      void (void)
+  12:13                   def   f macro_ref                        void (void)
+  14:60                   m--   f weak_target                      void (void)
+  14:13                   def   f split_ref                        void (void)
