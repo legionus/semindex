@@ -4,12 +4,69 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "array_size.h"
 #include "output.h"
 #include "repository.h"
+#include "semantic_names.h"
+
+enum search_field {
+	SEARCH_FIELD_FILE,
+	SEARCH_FIELD_VARIANT,
+	SEARCH_FIELD_VARIANT_FILE,
+	SEARCH_FIELD_LINE,
+	SEARCH_FIELD_COLUMN,
+	SEARCH_FIELD_CONTEXT,
+	SEARCH_FIELD_SYMBOL,
+	SEARCH_FIELD_RECORD,
+	SEARCH_FIELD_MODE,
+	SEARCH_FIELD_KIND,
+	SEARCH_FIELD_KIND_CHAR,
+	SEARCH_FIELD_SOURCE,
+};
+
+struct search_field_name {
+	const char *name;
+	size_t length;
+	enum search_field field;
+};
+
+enum search_token_kind {
+	SEARCH_TOKEN_TEXT,
+	SEARCH_TOKEN_CHARACTER,
+	SEARCH_TOKEN_FIELD,
+};
+
+struct search_token {
+	enum search_token_kind kind;
+	const char *text;
+	size_t length;
+	union {
+		char character;
+		enum search_field field;
+	};
+};
+
+#define SEARCH_FIELD(name, field) { name, sizeof(name) - 1, field }
+
+static const struct search_field_name search_fields[] = {
+	SEARCH_FIELD("file", SEARCH_FIELD_FILE),
+	SEARCH_FIELD("variant", SEARCH_FIELD_VARIANT),
+	SEARCH_FIELD("variant_file", SEARCH_FIELD_VARIANT_FILE),
+	SEARCH_FIELD("line", SEARCH_FIELD_LINE),
+	SEARCH_FIELD("column", SEARCH_FIELD_COLUMN),
+	SEARCH_FIELD("context", SEARCH_FIELD_CONTEXT),
+	SEARCH_FIELD("symbol", SEARCH_FIELD_SYMBOL),
+	SEARCH_FIELD("record", SEARCH_FIELD_RECORD),
+	SEARCH_FIELD("mode", SEARCH_FIELD_MODE),
+	SEARCH_FIELD("kind", SEARCH_FIELD_KIND),
+	SEARCH_FIELD("kind_char", SEARCH_FIELD_KIND_CHAR),
+	SEARCH_FIELD("source", SEARCH_FIELD_SOURCE),
+};
 
 struct output_search {
 	FILE *out;
-	const char *format;
+	struct search_token *tokens;
+	size_t token_count;
 
 	char *path;
 	char *root;
@@ -30,6 +87,156 @@ static void print_mode(FILE *out, const output_search_record_t *record)
 	}
 	output_mode_string(record->mode, str);
 	fputs(str, out);
+}
+
+static const char *record_name(const output_search_record_t *record)
+{
+	if (!record->symbol_record)
+		return "reference";
+
+	return record->definition ? "definition" : "declaration";
+}
+
+static int find_field(const char *name, size_t length, enum search_field *field)
+{
+	size_t i;
+
+	for (i = 0; i < ARRAY_SIZE(search_fields); i++) {
+		if (length == search_fields[i].length && !strncmp(name, search_fields[i].name, length)) {
+			*field = search_fields[i].field;
+
+			return 0;
+		}
+	}
+
+	return -1;
+}
+
+static const char *parse_field(const char *format, enum search_field *field)
+{
+	const char *end;
+
+	if (format[0] != '%' || format[1] != '{') {
+		fprintf(stderr, "semindex: expected named format specification after '%%'\n");
+
+		return NULL;
+	}
+
+	end = strchr(format + 2, '}');
+
+	if (!end) {
+		fprintf(stderr, "semindex: unterminated format specification\n");
+
+		return NULL;
+	}
+
+	if (find_field(format + 2, end - format - 2, field) < 0) {
+		fprintf(stderr, "semindex: unknown format field: %.*s\n", (int)(end - format - 2), format + 2);
+
+		return NULL;
+	}
+
+	return end;
+}
+
+static void add_text_token(output_search_t *search, const char *text, size_t length)
+{
+	struct search_token *token;
+
+	if (!length)
+		return;
+
+	token = &search->tokens[search->token_count++];
+	token->kind = SEARCH_TOKEN_TEXT;
+	token->text = text;
+	token->length = length;
+}
+
+static void add_character_token(output_search_t *search, char character)
+{
+	struct search_token *token;
+
+	token = &search->tokens[search->token_count++];
+
+	token->kind = SEARCH_TOKEN_CHARACTER;
+	token->character = character;
+}
+
+static void add_field_token(output_search_t *search, enum search_field field)
+{
+	struct search_token *token;
+
+	token = &search->tokens[search->token_count++];
+
+	token->kind = SEARCH_TOKEN_FIELD;
+	token->field = field;
+}
+
+static int compile_format(output_search_t *search, const char *format)
+{
+	const char *text;
+	const char *p;
+
+	text = format;
+
+	search->tokens = calloc(strlen(format) + 1, sizeof(*search->tokens));
+
+	if (!search->tokens)
+		return -1;
+
+	for (p = format; *p; p++) {
+		enum search_field field;
+		char character;
+
+		if (*p != '\\' && *p != '%')
+			continue;
+
+		add_text_token(search, text, p - text);
+
+		if (*p == '\\') {
+			character = *++p;
+
+			if (!character) {
+				text = p;
+				break;
+			}
+
+			switch (character) {
+			case 't':
+				character = '\t';
+				break;
+			case 'r':
+				character = '\r';
+				break;
+			case 'n':
+				character = '\n';
+				break;
+			}
+
+			add_character_token(search, character);
+			text = p + 1;
+			continue;
+		}
+
+		if (p[1] == '%') {
+			add_character_token(search, '%');
+			p++;
+			text = p + 1;
+			continue;
+		}
+
+		p = parse_field(p, &field);
+
+		if (!p)
+			return -1;
+
+		add_field_token(search, field);
+		text = p + 1;
+	}
+
+	add_text_token(search, text, p - text);
+
+	return 0;
 }
 
 static int open_source(output_search_t *search, const char *root, const char *path)
@@ -114,13 +321,22 @@ output_search_t *output_search_create(FILE *out, const char *format, const char 
 	if (!out)
 		return NULL;
 
+	if (!format)
+		format = OUTPUT_SEARCH_DEFAULT_FORMAT;
+
 	search = calloc(1, sizeof(*search));
 
 	if (!search)
 		return NULL;
 
 	search->out = out;
-	search->format = format ? format : OUTPUT_SEARCH_DEFAULT_FORMAT;
+
+	if (compile_format(search, format) < 0) {
+		output_search_destroy(search);
+
+		return NULL;
+	}
+
 	search->root = semindex_repository_root(root_hint);
 
 	if (!search->root)
@@ -139,86 +355,74 @@ void output_search_destroy(output_search_t *search)
 	free(search->path);
 	free(search->root);
 	free(search->text);
+	free(search->tokens);
 	free(search);
 }
 
 int output_search_write(output_search_t *search, const output_search_record_t *record)
 {
-	const char *p;
+	size_t i;
 
 	if (!search || !record)
 		return -1;
 
-	for (p = search->format; *p; p++) {
-		char c = *p;
+	for (i = 0; i < search->token_count; i++) {
+		const struct search_token *token;
 
-		if (c == '\\') {
-			c = *++p;
+		token = &search->tokens[i];
 
-			if (!c)
-				break;
+		if (token->kind == SEARCH_TOKEN_TEXT) {
+			if (fwrite(token->text, 1, token->length, search->out) != token->length)
+				return -1;
 
-			switch (c) {
-			case 't':
-				c = '\t';
-				break;
-			case 'r':
-				c = '\r';
-				break;
-			case 'n':
-				c = '\n';
-				break;
-			}
-			fputc(c, search->out);
-			continue;
-		}
-		if (c != '%') {
-			fputc(c, search->out);
 			continue;
 		}
 
-		c = *++p;
+		if (token->kind == SEARCH_TOKEN_CHARACTER) {
+			fputc(token->character, search->out);
 
-		if (!c) {
-			fprintf(stderr, "semindex: unexpected end of format string\n");
-			return -1;
+			continue;
 		}
-		switch (c) {
-		case 'f':
+
+		switch (token->field) {
+		case SEARCH_FIELD_FILE:
 			fputs(record->file, search->out);
 			break;
-		case 'F':
+		case SEARCH_FIELD_VARIANT_FILE:
 			fprintf(search->out, "%s:%s", record->variant, record->file);
 			break;
-		case 'v':
+		case SEARCH_FIELD_VARIANT:
 			fputs(record->variant, search->out);
 			break;
-		case 'l':
+		case SEARCH_FIELD_LINE:
 			fprintf(search->out, "%d", record->line);
 			break;
-		case 'c':
+		case SEARCH_FIELD_COLUMN:
 			fprintf(search->out, "%d", record->column);
 			break;
-		case 'C':
+		case SEARCH_FIELD_CONTEXT:
 			fputs(record->context ? record->context : "", search->out);
 			break;
-		case 'n':
+		case SEARCH_FIELD_SYMBOL:
 			fputs(record->symbol, search->out);
 			break;
-		case 'm':
+		case SEARCH_FIELD_RECORD:
+			fputs(record_name(record), search->out);
+			break;
+		case SEARCH_FIELD_MODE:
 			print_mode(search->out, record);
 			break;
-		case 'k':
+		case SEARCH_FIELD_KIND:
+			fputs(semindex_symbol_kind_name(record->kind), search->out);
+			break;
+		case SEARCH_FIELD_KIND_CHAR:
 			fputc(output_symbol_kind_char(record->kind), search->out);
 			break;
-		case 's':
+		case SEARCH_FIELD_SOURCE:
 			if (print_source_line(search, record->root, record->file, record->line) < 0)
 				return -1;
 
 			break;
-		default:
-			fprintf(stderr, "semindex: invalid format specification: %%%c\n", c);
-			return -1;
 		}
 	}
 	fputc('\n', search->out);

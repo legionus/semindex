@@ -283,7 +283,7 @@ target_include_directories(semindex_query PUBLIC
 )
 target_link_libraries(semindex_query
 	PUBLIC semindex_database
-	PRIVATE semindex_sqlite
+	PRIVATE semindex_names semindex_sqlite
 )
 
 # SQLite storage adapters

@@ -157,39 +157,44 @@ semantic changes require a new version.
 Its default format is:
 
 ```text
-(%m) %F\t%l\t%c\t%C\t%s
+(%{mode}) %{variant_file}\t%{line}\t%{column}\t%{context}\t%{source}
 ```
 
 Select another format with `-f STRING` or `--format=STRING`.  Each result gets
 one output line.  The following substitutions are available:
 
-* `%f`: source file path;
-* `%F`: variant-qualified source file path in `variant:path` form;
-* `%v`: index variant;
-* `%l`: line number;
-* `%c`: column number;
-* `%C`: containing function context;
-* `%n`: qualified symbol name;
-* `%m`: access mode;
-* `%k`: one-character symbol kind;
-* `%s`: source line text.
+* `%{file}`: source file path;
+* `%{variant}`: index variant;
+* `%{variant_file}`: variant-qualified source file path in `variant:path` form;
+* `%{line}`: line number;
+* `%{column}`: column number;
+* `%{context}`: containing function context;
+* `%{symbol}`: qualified symbol name;
+* `%{record}`: `definition`, `declaration`, or `reference`;
+* `%{mode}`: access mode;
+* `%{kind}`: full symbol kind name;
+* `%{kind_char}`: one-character symbol kind;
+* `%{source}`: source line text.
 
-The escapes `\t`, `\r`, and `\n` insert a tab, carriage return, and newline.
-Other escaped characters are inserted literally.
+Use `%%` to insert a literal percent sign. The escapes `\t`, `\r`, and `\n`
+insert a tab, carriage return, and newline. Other escaped characters are
+inserted literally. Unknown or unterminated fields are errors, including when
+the search returns no records.
 
 Definitions use the mode `def`, declarations use `decl`, and uses have the
-same three-character access mode described for the `dissect` format.  The `%k`
-substitution uses the same one-character tags as `dissect`.
+same three-character access mode described for the `dissect` format. The
+`%{kind_char}` field uses the same one-character tags as `dissect`.
 
 For example:
 
 ```sh
-semindex search --format='%m %k %n at %f:%l:%c' 'task_struct.pid'
+semindex search --format='%{mode} %{kind} %{symbol} at %{file}:%{line}:%{column}' \
+  'task_struct.pid'
 ```
 
-The default format uses `%F` so results from different variants remain
-distinguishable.  Use `%f` in a custom format when only the physical source
-path is wanted.
+The default format uses `%{variant_file}` so results from different variants
+remain distinguishable. Use `%{file}` in a custom format when only the
+physical source path is wanted.
 
 Indexing commands store records in the `general` variant unless
 `--variant=NAME` is specified.  Search covers every variant by default and can

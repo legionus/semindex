@@ -50,7 +50,7 @@ if ! cmp -s "$tmpdir/search.expect" "$tmpdir/search.out"; then
 fi
 
 if ! "$SEMINDEX" search --database "$db" \
-	--format='%m|%f|%l|%c|%C|%n|%k|%s\tEND' Outer.y \
+	--format='%{record}|%{mode}|%{file}|%{line}|%{column}|%{context}|%{symbol}|%{kind}|%{kind_char}|%{source}\t%%END' Outer.y \
 	>"$tmpdir/custom.out"; then
 	fail "custom field search failed"
 fi
@@ -65,7 +65,7 @@ fi
 	--compile-commands "$COMPILE_COMMANDS" "$SOURCE_DIR/tests/test11.c" \
 	>/dev/null
 if ! "$SEMINDEX" search --database "$db" \
-	--format='%v|%F|%f|%n' Outer.y >"$tmpdir/variant.out"; then
+	--format='%{variant}|%{variant_file}|%{file}|%{symbol}' Outer.y >"$tmpdir/variant.out"; then
 	fail "multi-variant search failed"
 fi
 sed "s|@SOURCE_DIR@|$SOURCE_DIR|g" \
@@ -76,7 +76,7 @@ if ! cmp -s "$tmpdir/variant.expect" "$tmpdir/variant.out"; then
 fi
 
 if ! "$SEMINDEX" search --database "$db" --variant='arm64-*' \
-	--format='%v' Outer.y >"$tmpdir/variant-filter.out"; then
+	--format='%{variant}' Outer.y >"$tmpdir/variant-filter.out"; then
 	fail "variant-filtered search failed"
 fi
 if [ "$(wc -l <"$tmpdir/variant-filter.out")" != 2 ] || \
@@ -85,16 +85,34 @@ if [ "$(wc -l <"$tmpdir/variant-filter.out")" != 2 ] || \
 	fail "variant filter returned unexpected results"
 fi
 
-if "$SEMINDEX" search --database "$db" --format='%x' Outer.y \
+if "$SEMINDEX" search --database "$db" --format='%{unknown}' no_such_symbol \
 	>"$tmpdir/invalid.out" 2>"$tmpdir/invalid.err"; then
 	fail "invalid search format succeeded"
 fi
-if ! grep -q 'invalid format specification: %x' "$tmpdir/invalid.err"; then
+if ! grep -q 'unknown format field: unknown' "$tmpdir/invalid.err"; then
 	cat "$tmpdir/invalid.err" >&2
 	fail "invalid search format diagnostic differs"
 fi
 
-if ! "$SEMINDEX" search --database "$db" --variant=general --format='%m' --mode=def \
+if "$SEMINDEX" search --database "$db" --format='%{file' Outer.y \
+	>"$tmpdir/unterminated.out" 2>"$tmpdir/unterminated.err"; then
+	fail "unterminated search format succeeded"
+fi
+if ! grep -q 'unterminated format specification' "$tmpdir/unterminated.err"; then
+	cat "$tmpdir/unterminated.err" >&2
+	fail "unterminated search format diagnostic differs"
+fi
+
+if "$SEMINDEX" search --database "$db" --format='%f' Outer.y \
+	>"$tmpdir/legacy.out" 2>"$tmpdir/legacy.err"; then
+	fail "legacy search format succeeded"
+fi
+if ! grep -q "expected named format specification after '%'" "$tmpdir/legacy.err"; then
+	cat "$tmpdir/legacy.err" >&2
+	fail "legacy search format diagnostic differs"
+fi
+
+if ! "$SEMINDEX" search --database "$db" --variant=general --format='%{mode}' --mode=def \
 	Outer.y >"$tmpdir/mode-def.out"; then
 	fail "definition mode search failed"
 fi
@@ -103,7 +121,7 @@ if [ "$(cat "$tmpdir/mode-def.out")" != def ]; then
 	fail "definition mode search returned unexpected results"
 fi
 
-if ! "$SEMINDEX" search --database "$db" --variant=general --format='%m' --mode=w \
+if ! "$SEMINDEX" search --database "$db" --variant=general --format='%{mode}' --mode=w \
 	Outer.y >"$tmpdir/mode-write.out"; then
 	fail "write mode search failed"
 fi
@@ -112,7 +130,7 @@ if [ "$(cat "$tmpdir/mode-write.out")" != -w- ]; then
 	fail "write mode search returned unexpected results"
 fi
 
-if ! "$SEMINDEX" search --database "$db" --variant=general --format='%m' --mode=-w- \
+if ! "$SEMINDEX" search --database "$db" --variant=general --format='%{mode}' --mode=-w- \
 	Outer.y >"$tmpdir/mode-exact.out"; then
 	fail "three-character mode search failed"
 fi
@@ -149,7 +167,7 @@ if ! grep -q 'invalid mode: invalid' "$tmpdir/invalid-mode.err"; then
 fi
 
 if ! "$SEMINDEX" search --database "$db" --mode=w \
-	--format='%m|%l|%c|%C|%n' task_struct.pid \
+	--format='%{mode}|%{line}|%{column}|%{context}|%{symbol}' task_struct.pid \
 	>"$tmpdir/macro-write.out"; then
 	fail "macro argument write search failed"
 fi

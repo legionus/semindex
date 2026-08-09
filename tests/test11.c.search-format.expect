@@ -1,2 +1,2 @@
-def|tests/test11.c|8|6||Outer.y|m|	int y;	END
--w-|tests/test11.c|14|3||Outer.y|m|	.y = 2,	END
+definition|def|tests/test11.c|8|6||Outer.y|field|m|	int y;	%END
+reference|-w-|tests/test11.c|14|3||Outer.y|field|m|	.y = 2,	%END

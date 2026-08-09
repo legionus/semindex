@@ -11,7 +11,7 @@ enum output_format {
 	FORMAT_JSON,
 };
 
-#define OUTPUT_SEARCH_DEFAULT_FORMAT "(%m) %F\\t%l\\t%c\\t%C\\t%s"
+#define OUTPUT_SEARCH_DEFAULT_FORMAT "(%{mode}) %{variant_file}\\t%{line}\\t%{column}\\t%{context}\\t%{source}"
 
 typedef struct output_search output_search_t;
 
