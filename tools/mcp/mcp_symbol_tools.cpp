@@ -622,14 +622,10 @@ McpToolResult relatedRecords(semindex_db_t *database, const llvm::json::Object *
 		if (!id || !*id || !kind)
 			return { McpToolStatus::InvalidParams, {}, "Invalid stable identity" };
 
-		semindex_db_identity_t identity = {
-			.variant = selected->c_str(),
-			.symbol = symbol->data(),
-			.usr_id = *id,
-			.kind = *kind,
-		};
+		SemindexIdentity identity{ *selected, symbol->str(), *kind, *id };
+		semindex_db_identity_t identity_view = identity.view();
 		semindex_db_identity_query_t query = {
-			.identity = &identity,
+			.identity = &identity_view,
 			.after = after,
 			.limit = limit + 1,
 			.record = filter,
@@ -689,14 +685,10 @@ McpToolResult declaredTypes(semindex_db_t *database, const llvm::json::Object *a
 	if (!id || !*id || !kind)
 		return { McpToolStatus::InvalidParams, {}, "Invalid symbol identity" };
 
-	semindex_db_identity_t identity = {
-		.variant = selected->c_str(),
-		.symbol = symbol->data(),
-		.usr_id = *id,
-		.kind = *kind,
-	};
+	SemindexIdentity identity{ *selected, symbol->str(), *kind, *id };
+	semindex_db_identity_t identity_view = identity.view();
 	semindex_db_symbol_type_query_t query = {
-		.identity = &identity,
+		.identity = &identity_view,
 		.limit = limit + 1,
 	};
 	OwnedTypeCursor cursor;
@@ -744,14 +736,10 @@ McpToolResult functionSignature(semindex_db_t *database, const llvm::json::Objec
 	if (!id || !*id)
 		return { McpToolStatus::InvalidParams, {}, "Invalid function identity" };
 
-	semindex_db_identity_t identity = {
-		.variant = selected->c_str(),
-		.symbol = symbol->data(),
-		.usr_id = *id,
-		.kind = SEMINDEX_SYMBOL_FUNCTION,
-	};
+	SemindexIdentity identity{ *selected, symbol->str(), SEMINDEX_SYMBOL_FUNCTION, *id };
+	semindex_db_identity_t identity_view = identity.view();
 	semindex_db_function_type_query_t query = {
-		.identity = &identity,
+		.identity = &identity_view,
 		.limit = limit + 1,
 	};
 	OwnedFunctionTypeCursor cursor;

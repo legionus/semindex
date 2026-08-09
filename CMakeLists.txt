@@ -285,6 +285,7 @@ target_link_libraries(semindex_names PRIVATE semindex_support)
 
 # Protocol-neutral semantic queries
 add_library(semindex_semantic STATIC
+	lib/semindex_semantic/semantic_identity.cpp
 	lib/semindex_semantic/semantic_query.cpp
 )
 target_include_directories(semindex_semantic PUBLIC

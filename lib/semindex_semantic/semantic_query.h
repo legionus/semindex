@@ -1,24 +1,20 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 
-#include "semindex_database.h"
+#include "semantic_identity.h"
 #include "source_resolver.h"
 
 #include <string>
 #include <vector>
 
-struct SemindexQueryRecord {
-	std::string variant;
+struct SemindexQueryRecord : SemindexIdentity {
 	std::string path;
-	std::string symbol;
 	std::string context;
 	semindex_db_record_type_t record;
-	semindex_symbol_kind_t kind;
 	unsigned action;
 	unsigned mode;
 	unsigned line;
 	unsigned column;
-	unsigned long long usr_id;
 	unsigned long long context_usr_id;
 	int local;
 

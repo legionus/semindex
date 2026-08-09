@@ -28,19 +28,15 @@ namespace
 {
 
 struct RecordKey {
-	std::string variant;
+	SemindexIdentity identity;
 	std::string path;
-	std::string symbol;
 	std::string context;
-	semindex_symbol_kind_t kind;
-	unsigned long long usr_id;
 	int local;
 
 	bool operator<(const RecordKey &other) const
 	{
-		return std::tie(variant, symbol, kind, usr_id, path, context, local) <
-			std::tie(other.variant, other.symbol, other.kind, other.usr_id, other.path, other.context,
-				other.local);
+		return std::tie(identity, path, context, local) <
+			std::tie(other.identity, other.path, other.context, other.local);
 	}
 };
 
@@ -53,21 +49,23 @@ struct RecordCollector {
 
 SemindexQueryRecord semindexQueryRecord(const semindex_db_record_t &record)
 {
-	return SemindexQueryRecord{
-		.variant = record.variant,
-		.path = record.path,
-		.symbol = record.symbol,
-		.context = record.context,
-		.record = record.record,
-		.kind = record.kind,
-		.action = record.action,
-		.mode = record.mode,
-		.line = record.line,
-		.column = record.column,
-		.usr_id = record.usr_id,
-		.context_usr_id = record.context_usr_id,
-		.local = record.local,
-	};
+	SemindexQueryRecord result;
+
+	result.variant = record.variant;
+	result.path = record.path;
+	result.symbol = record.symbol;
+	result.context = record.context;
+	result.record = record.record;
+	result.kind = record.kind;
+	result.action = record.action;
+	result.mode = record.mode;
+	result.line = record.line;
+	result.column = record.column;
+	result.usr_id = record.usr_id;
+	result.context_usr_id = record.context_usr_id;
+	result.local = record.local;
+
+	return result;
 }
 
 namespace
@@ -76,10 +74,7 @@ namespace
 RecordKey recordKey(const semindex_db_record_t &record)
 {
 	RecordKey key = {
-		.variant = record.variant,
-		.symbol = record.symbol,
-		.kind = record.kind,
-		.usr_id = record.usr_id,
+		.identity = SemindexIdentity{ record.variant, record.symbol, record.kind, record.usr_id },
 	};
 
 	if (!record.usr_id) {

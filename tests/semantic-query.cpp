@@ -6,6 +6,21 @@
 #include <string>
 #include <vector>
 
+static bool validIdentity()
+{
+	SemindexIdentity identity{ "general", "Outer.y", SEMINDEX_SYMBOL_FIELD, 42 };
+	semindex_db_identity_t view = identity.view();
+	SemindexIdentity later{ "general", "Outer.z", SEMINDEX_SYMBOL_FIELD, 42 };
+
+	if (std::string(view.variant) != identity.variant || std::string(view.symbol) != identity.symbol)
+		return false;
+
+	if (view.kind != identity.kind || view.usr_id != identity.usr_id)
+		return false;
+
+	return identity < later;
+}
+
 static bool validRecord(const SemindexQueryRecord &record, const std::string &path)
 {
 	if (record.path != path || record.symbol != "Outer.y")
@@ -28,7 +43,7 @@ int main(int argc, char **argv)
 	std::string relative;
 	int ret = 1;
 
-	if (argc != 4)
+	if (argc != 4 || !validIdentity())
 		return 1;
 
 	root = std::filesystem::path(argv[1]).lexically_normal();

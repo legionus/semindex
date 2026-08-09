@@ -3,7 +3,6 @@
 
 #include <deque>
 #include <set>
-#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -19,23 +18,10 @@ struct CallCollector {
 	bool stopped = false;
 };
 
-struct GraphFunctionKey {
-	std::string variant;
-	std::string symbol;
-	unsigned long long usr_id;
-
-	bool operator<(const GraphFunctionKey &other) const
-	{
-		return std::tie(variant, symbol, usr_id) < std::tie(other.variant, other.symbol, other.usr_id);
-	}
-};
-
 struct GraphFunction {
-	std::string variant;
-	std::string symbol;
-	unsigned long long usr_id;
+	SemindexIdentity identity;
 	unsigned depth;
-	std::set<GraphFunctionKey> ancestors;
+	std::set<SemindexIdentity> ancestors;
 };
 
 struct GraphRecord {
@@ -150,19 +136,18 @@ McpToolResult callRecords(semindex_db_t *database, const llvm::json::Object *arg
 
 	if (depth > 1) {
 		std::deque<GraphFunction> pending;
-		std::set<GraphFunctionKey> visited;
+		std::set<SemindexIdentity> visited;
 		std::vector<GraphRecord> records;
 		bool node_limit_hit = false;
 		bool cycles_detected = false;
+		SemindexIdentity root{ *selected, symbol->str(), SEMINDEX_SYMBOL_FUNCTION, *id };
 
 		pending.push_back(GraphFunction{
-			.variant = *selected,
-			.symbol = symbol->str(),
-			.usr_id = *id,
+			.identity = root,
 			.depth = 0,
-			.ancestors = { GraphFunctionKey{ *selected, symbol->str(), *id } },
+			.ancestors = { root },
 		});
-		visited.insert(GraphFunctionKey{ *selected, symbol->str(), *id });
+		visited.insert(std::move(root));
 
 		while (!pending.empty() && records.size() <= limit) {
 			GraphFunction function = std::move(pending.front());
@@ -173,9 +158,9 @@ McpToolResult callRecords(semindex_db_t *database, const llvm::json::Object *arg
 				continue;
 
 			semindex_db_call_options_t query = {
-				.function = function.symbol.c_str(),
-				.variant = function.variant.c_str(),
-				.usr_id = function.usr_id,
+				.function = function.identity.symbol.c_str(),
+				.variant = function.identity.variant.c_str(),
+				.usr_id = function.identity.usr_id,
 				.direction = direction,
 			};
 			size_t remaining = limit + 1 - records.size();
@@ -189,40 +174,44 @@ McpToolResult callRecords(semindex_db_t *database, const llvm::json::Object *arg
 				return { McpToolStatus::DatabaseError, {}, "Database query failed" };
 
 			for (auto &record : collector.records) {
-				GraphFunction next;
+				SemindexIdentity next;
 
 				if (direction == SEMINDEX_DB_CALLERS) {
-					next = GraphFunction{
-						.variant = record.variant,
-						.symbol = record.context,
-						.usr_id = record.context_usr_id,
-						.depth = function.depth + 1,
+					next = SemindexIdentity{
+						record.variant,
+						record.context,
+						SEMINDEX_SYMBOL_FUNCTION,
+						record.context_usr_id,
 					};
 				} else {
-					next = GraphFunction{
-						.variant = record.variant,
-						.symbol = record.symbol,
-						.usr_id = record.usr_id,
-						.depth = function.depth + 1,
+					next = SemindexIdentity{
+						record.variant,
+						record.symbol,
+						SEMINDEX_SYMBOL_FUNCTION,
+						record.usr_id,
 					};
 				}
 
-				GraphFunctionKey key{ next.variant, next.symbol, next.usr_id };
-				bool cycle = function.ancestors.find(key) != function.ancestors.end();
+				bool cycle = function.ancestors.find(next) != function.ancestors.end();
 
 				if (cycle) {
 					cycles_detected = true;
-				} else if (visited.find(key) == visited.end()) {
+				} else if (visited.find(next) == visited.end()) {
 					if (visited.size() >= node_limit) {
 						node_limit_hit = true;
 
 						continue;
 					}
 
-					next.ancestors = function.ancestors;
-					next.ancestors.insert(key);
-					visited.insert(key);
-					pending.push_back(std::move(next));
+					std::set<SemindexIdentity> ancestors = function.ancestors;
+
+					ancestors.insert(next);
+					visited.insert(next);
+					pending.push_back(GraphFunction{
+						.identity = std::move(next),
+						.depth = function.depth + 1,
+						.ancestors = std::move(ancestors),
+					});
 				}
 
 				records.push_back(GraphRecord{

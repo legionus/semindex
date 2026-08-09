@@ -9,23 +9,12 @@
 #include <sstream>
 #include <string>
 #include <system_error>
-#include <tuple>
 #include <utility>
 #include <vector>
 
 static constexpr int FUNCTION_SYMBOL_KIND = 12;
 
-struct FunctionIdentity {
-	std::string variant;
-	std::string symbol;
-	unsigned long long usr_id;
-
-	bool operator<(const FunctionIdentity &other) const
-	{
-		return std::tie(variant, symbol, usr_id) < std::tie(other.variant, other.symbol, other.usr_id);
-	}
-};
-
+using FunctionIdentity = SemindexIdentity;
 using CallRecord = SemindexQueryRecord;
 
 static bool parsePosition(const llvm::json::Object *params, llvm::StringRef &uri, unsigned &line, unsigned &character)
@@ -80,6 +69,7 @@ static bool parseIdentity(const llvm::json::Object *params, const std::string &v
 
 	identity.variant = parsed_variant->str();
 	identity.symbol = symbol->str();
+	identity.kind = SEMINDEX_SYMBOL_FUNCTION;
 	auto parsed = std::from_chars(id->begin(), id->end(), identity.usr_id, 16);
 	return parsed.ec == std::errc() && parsed.ptr == id->end();
 }
@@ -93,7 +83,8 @@ static int collectFunctionIdentity(void *data, const semindex_db_record_t *recor
 	auto &collector = *static_cast<FunctionCollector *>(data);
 
 	if (record->kind == SEMINDEX_SYMBOL_FUNCTION && record->usr_id)
-		collector.identities.insert(FunctionIdentity{ record->variant, record->symbol, record->usr_id });
+		collector.identities.insert(
+			FunctionIdentity{ record->variant, record->symbol, record->kind, record->usr_id });
 	return 0;
 }
 
@@ -104,7 +95,7 @@ struct FunctionRecordCollector {
 static int collectFunctionRecord(void *data, const semindex_db_record_t *record)
 {
 	auto &collector = *static_cast<FunctionRecordCollector *>(data);
-	FunctionIdentity identity{ record->variant, record->symbol, record->usr_id };
+	FunctionIdentity identity{ record->variant, record->symbol, record->kind, record->usr_id };
 	auto found = collector.records.find(identity);
 
 	if (found == collector.records.end() || (!found->second.action && record->action))
@@ -162,6 +153,7 @@ static int collectCall(void *data, const semindex_db_record_t *record)
 	FunctionIdentity identity;
 
 	identity.variant = record->variant;
+	identity.kind = SEMINDEX_SYMBOL_FUNCTION;
 
 	if (collector.direction == SEMINDEX_DB_CALLERS) {
 		identity.symbol = record->context;
