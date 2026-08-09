@@ -1,23 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-#include "command_db_common.h"
 #include "lsp_indexer.h"
 #include "lsp_server.h"
 #include "lsp_transport.h"
-#include "semindex_database.h"
-#include "repository.h"
+#include "server_environment.h"
 #include "semindex_paths.h"
 
-#include <cstdlib>
 #include <filesystem>
-#include <fstream>
 #include <getopt.h>
 #include <iostream>
 #include <string>
 #include <utility>
-
-extern "C" {
-#include "index_db_writer.h"
-}
 
 static void usage(std::ostream &stream)
 {
@@ -42,19 +34,6 @@ static void help()
 		     "      --logfile=FILE         append JSON-RPC requests and responses to FILE\n"
 		     "  -h, --help                 display this help and exit\n"
 		     "\n";
-}
-
-static std::string defaultDatabasePath()
-{
-	char *allocated = semindex_default_database_path(".", SEMINDEX_SYMBOL_DATABASE);
-	std::string path;
-
-	if (allocated) {
-		path = allocated;
-		free(allocated);
-	}
-
-	return path;
 }
 
 int main(int argc, char **argv)
@@ -85,7 +64,6 @@ int main(int argc, char **argv)
 	bool include_local = true;
 	bool logfile_requested = false;
 
-	semindex_db_t *database = nullptr;
 	int opt;
 
 	optind = 1;
@@ -134,59 +112,31 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if (!database_explicit)
-		database_path = defaultDatabasePath();
-
-	if (database_path.empty()) {
-		std::cerr << "semindex-lsp: failed to allocate database path\n";
-
-		return 1;
-	}
-
-	if (commands_database_path.empty()) {
-		char *path = command_db_default_path(database_path.c_str());
-
-		if (!path) {
-			std::cerr << "semindex-lsp: failed to allocate command database path\n";
-			return 1;
-		}
-		commands_database_path = path;
-		free(path);
-	}
-	database_path = std::filesystem::absolute(database_path).lexically_normal().string();
-	commands_database_path = std::filesystem::absolute(commands_database_path).lexically_normal().string();
-
 	if (!compile_commands_path.empty())
 		compile_commands_path = std::filesystem::absolute(compile_commands_path).lexically_normal().string();
-	std::ofstream logfile;
-	std::error_code database_error;
 
-	if (!logfile_path.empty()) {
-		logfile.open(logfile_path, std::ios::app);
+	SemindexServerEnvironment environment;
+	std::string error;
+	SemindexServerEnvironmentOptions environment_options = {
+		.root = ".",
+		.database = std::move(database_path),
+		.commands_database = std::move(commands_database_path),
+		.logfile = std::move(logfile_path),
+		.database_explicit = database_explicit,
+		.create_database = true,
+		.open_database = true,
+	};
 
-		if (!logfile) {
-			std::cerr << "semindex-lsp: failed to open log file: " << logfile_path << '\n';
-			return 1;
-		}
-	}
-	if (!std::filesystem::exists(database_path, database_error)) {
-		if (database_error) {
-			std::cerr << "semindex-lsp: failed to inspect database: " << database_error.message() << '\n';
-			return 1;
-		}
+	if (!environment.initialize(environment_options, error)) {
+		std::cerr << "semindex-lsp: " << error << '\n';
 
-		if (index_db_create(database_path.c_str()) < 0)
-			return 1;
-	}
-	if (semindex_db_open(database_path.c_str(), &database) < 0)
 		return 1;
+	}
 
-	LspTransport transport(std::cin, std::cout, std::cerr, logfile.is_open() ? &logfile : nullptr);
-	LspIndexer indexer(database_path, commands_database_path, compile_commands_path,
+	LspTransport transport(std::cin, std::cout, std::cerr, environment.logStream());
+	LspIndexer indexer(environment.databasePath(), environment.commandsDatabasePath(), compile_commands_path,
 		variant.empty() ? "general" : variant, include_local);
-	LspServer server(transport, database, indexer, std::move(variant));
-	int ret = server.run();
+	LspServer server(transport, environment.database(), indexer, std::move(variant));
 
-	semindex_db_close(database);
-	return ret;
+	return server.run();
 }

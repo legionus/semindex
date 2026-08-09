@@ -3,6 +3,7 @@
 #include "mcp_tools_internal.h"
 
 #include "index_updater.h"
+#include "server_environment.h"
 #include "semantic_query.h"
 #include "semantic_names.h"
 #include "semindex_database.h"
@@ -30,15 +31,6 @@ static constexpr size_t MAX_GRAPH_NODES = 200;
 
 namespace McpTools
 {
-
-struct DatabaseCloser {
-	void operator()(semindex_db_t *database) const
-	{
-		semindex_db_close(database);
-	}
-};
-
-using Database = std::unique_ptr<semindex_db_t, DatabaseCloser>;
 
 const char *recordName(semindex_db_record_type_t record)
 {
@@ -252,18 +244,6 @@ McpToolResult stoppedResult(const McpRequestControl &control)
 	return { McpToolStatus::DeadlineExceeded, {}, "Request deadline exceeded" };
 }
 
-bool openDatabase(const std::string &path, Database &database)
-{
-	semindex_db_t *handle = nullptr;
-
-	if (semindex_db_open(path.c_str(), &handle) < 0)
-		return false;
-
-	database.reset(handle);
-
-	return true;
-}
-
 llvm::json::Object recordsResult(std::vector<SemindexQueryRecord> &records, size_t limit)
 {
 	bool more = records.size() > limit;
@@ -422,7 +402,7 @@ bool McpToolService::canReindex() const
 McpToolResult McpToolService::call(llvm::StringRef name, const llvm::json::Object *arguments,
 	McpRequestControl &control) const
 {
-	Database handle;
+	SemindexDatabase handle;
 
 	if (control.stopped())
 		return stoppedResult(control);
@@ -434,7 +414,7 @@ McpToolResult McpToolService::call(llvm::StringRef name, const llvm::json::Objec
 		return reindexFile(arguments, options.workspace, options.variant, *updater, control);
 	}
 
-	if (!openDatabase(options.database, handle))
+	if (!handle.open(options.database))
 		return { McpToolStatus::DatabaseError, {}, "Failed to open database" };
 
 	control.bind(handle.get());

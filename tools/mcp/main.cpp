@@ -2,17 +2,11 @@
 #include "mcp_server.h"
 #include "mcp_tools.h"
 #include "mcp_transport.h"
-
-extern "C" {
-#include "command_db_common.h"
-#include "repository.h"
+#include "server_environment.h"
 #include "semindex_paths.h"
-}
 
 #include <chrono>
-#include <cstdlib>
 #include <filesystem>
-#include <fstream>
 #include <getopt.h>
 #include <iostream>
 #include <string>
@@ -135,50 +129,26 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if (!database_explicit) {
-		char *path = semindex_default_database_path(workspace_path.c_str(), SEMINDEX_SYMBOL_DATABASE);
-
-		if (!path) {
-			std::cerr << "semindex-mcp: failed to allocate database path\n";
-
-			return 1;
-		}
-
-		database = path;
-		free(path);
-	}
-
-	if (commands_database.empty()) {
-		char *path = command_db_default_path(database.c_str());
-
-		if (!path) {
-			std::cerr << "semindex-mcp: failed to allocate command database path\n";
-
-			return 1;
-		}
-
-		commands_database = path;
-		free(path);
-	}
-
-	database = std::filesystem::absolute(database).lexically_normal().string();
-	commands_database = std::filesystem::absolute(commands_database).lexically_normal().string();
-	std::ofstream logfile;
-
-	if (!logfile_path.empty()) {
-		logfile.open(logfile_path, std::ios::app);
-
-		if (!logfile) {
-			std::cerr << "semindex-mcp: failed to open log file: " << logfile_path << '\n';
-
-			return 1;
-		}
-	}
-
-	McpTransport transport(std::cin, std::cout, std::cerr, logfile.is_open() ? &logfile : nullptr);
-	McpToolService tools(McpToolOptions{
+	SemindexServerEnvironment environment;
+	std::string environment_error;
+	SemindexServerEnvironmentOptions environment_options = {
+		.root = workspace_path.string(),
 		.database = std::move(database),
 		.commands_database = std::move(commands_database),
+		.logfile = std::move(logfile_path),
+		.database_explicit = database_explicit,
+	};
+
+	if (!environment.initialize(environment_options, environment_error)) {
+		std::cerr << "semindex-mcp: " << environment_error << '\n';
+
+		return 1;
+	}
+
+	McpTransport transport(std::cin, std::cout, std::cerr, environment.logStream());
+	McpToolService tools(McpToolOptions{
+		.database = environment.databasePath(),
+		.commands_database = environment.commandsDatabasePath(),
 		.workspace = std::move(workspace_path),
 		.variant = std::move(variant),
 		.allow_reindex = allow_reindex,

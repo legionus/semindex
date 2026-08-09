@@ -388,9 +388,14 @@ target_link_libraries(semindex_index_update PUBLIC
 
 add_library(semindex_protocol STATIC
 	lib/semindex_protocol/protocol_logger.cpp
+	lib/semindex_protocol/server_environment.cpp
 )
 target_include_directories(semindex_protocol PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/semindex_protocol>
+)
+target_link_libraries(semindex_protocol PUBLIC
+	semindex_command_db
+	semindex_index_db
 )
 
 add_executable(semindex_lsp
