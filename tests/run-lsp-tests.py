@@ -1011,28 +1011,29 @@ def main():
             "range": source_range(1, 5, len("partial")),
         }
         if responses[2].get("result") != [expected_partial_definition]:
-            fail(f"partial overlay returned an unexpected definition: {responses[2]}")
+            fail(f"partial index returned an unexpected definition: {responses[2]}")
         expected_partial_reference = {
             "uri": uri,
             "range": source_range(9, partial_character, len("partial")),
         }
         if responses[3].get("result") != [expected_partial_reference]:
-            fail(f"partial overlay returned unexpected references: {responses[3]}")
+            fail(f"partial index returned unexpected references: {responses[3]}")
         if responses[4].get("result") != [
             expected_partial_reference, expected_partial_definition,
         ]:
-            fail(f"partial overlay omitted its declaration: {responses[4]}")
+            fail(f"partial index omitted its declaration: {responses[4]}")
         expected_local_definition = {
             "uri": uri,
             "range": source_range(13, 5, len("local_value")),
         }
         if responses[5].get("result") != [expected_local_definition]:
-            fail(f"partial overlay confused a local symbol: {responses[5]}")
+            fail(f"partial index confused a local symbol: {responses[5]}")
         if responses[6].get("result") != [
             {"range": expected_partial_definition["range"], "kind": 1},
             {"range": expected_partial_reference["range"], "kind": 2},
         ]:
-            fail(f"partial overlay returned unexpected highlights: {responses[6]}")
+            fail(f"partial index returned unexpected highlights: {responses[6]}")
+
         with sqlite3.connect(database) as connection:
             old_records = connection.execute(
                 "SELECT count(*) FROM records WHERE symbol = 'Nav.renamed'"
@@ -1040,8 +1041,62 @@ def main():
             partial_records = connection.execute(
                 "SELECT count(*) FROM records WHERE symbol = 'Nav.partial'"
             ).fetchone()[0]
-        if not old_records or partial_records:
-            fail("partial LSP overlay modified the persistent index")
+        if old_records or not partial_records:
+            fail("partial LSP index did not replace the persistent index")
+
+        partial_header = directory / "partial-header.h"
+        partial_header.write_text(
+            "#define PARTIAL_HEADER_VALUE 7\n", encoding="utf-8",
+        )
+        source.write_text(
+            "#include \"partial-header.h\"\n"
+            "int broken(void) { return ; }\n"
+            "int use_partial_macro(void) { return PARTIAL_HEADER_VALUE; }\n",
+            encoding="utf-8",
+        )
+        macro_line = source.read_text(encoding="utf-8").splitlines()[2]
+        macro_character = macro_line.index("PARTIAL_HEADER_VALUE")
+        process, responses = run_server(sys.argv[1], options, [
+            {
+                "jsonrpc": "2.0", "id": 67, "method": "initialize",
+                "params": {"rootUri": root_uri},
+            },
+            {"jsonrpc": "2.0", "method": "initialized", "params": {}},
+            {
+                "jsonrpc": "2.0", "method": "textDocument/didSave",
+                "params": {"textDocument": {"uri": uri}},
+            },
+            {
+                "jsonrpc": "2.0", "id": 68,
+                "method": "textDocument/definition",
+                "params": {
+                    "textDocument": {"uri": uri},
+                    "position": {
+                        "line": 2, "character": macro_character,
+                    },
+                },
+            },
+            {"jsonrpc": "2.0", "id": 69, "method": "shutdown"},
+            {"jsonrpc": "2.0", "method": "exit"},
+        ])
+        if process.returncode != 0 or len(responses) != 4:
+            fail("partial header index lifecycle failed", process)
+        expected_header_definition = {
+            "uri": partial_header.resolve().as_uri(),
+            "range": source_range(0, 8, len("PARTIAL_HEADER_VALUE")),
+        }
+        if responses[2].get("result") != [expected_header_definition]:
+            fail(
+                "partial index omitted a header definition: "
+                f"{responses[2]}"
+            )
+        with sqlite3.connect(database) as connection:
+            macro_records = connection.execute(
+                "SELECT count(*) FROM records "
+                "WHERE symbol = 'PARTIAL_HEADER_VALUE'"
+            ).fetchone()[0]
+        if macro_records < 2:
+            fail("partial LSP index did not persist header records")
 
 
 if __name__ == "__main__":

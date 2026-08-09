@@ -49,6 +49,7 @@ LspIndexResult LspIndexer::update(const std::string &file)
 	auto result = updater.update(SemindexIndexUpdateRequest{
 		.file = file,
 		.variant = variant,
+		.store_partial = true,
 	});
 
 	if (result.transient_index) {
