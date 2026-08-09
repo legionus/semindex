@@ -1,0 +1,26 @@
+
+FILE: tests/test22.c
+
+   7:9                    def   d _cleanup_
+   8:9                    def   d _cleanup_release_
+   8:27                   -r-   d _cleanup_
+  19:2                    -r-   d _cleanup_
+  26:2                    -r-   d _cleanup_release_
+   2:13                   def   f release_int                      void (int *)
+   2:30  release_int      def . v value                            int *
+   4:8   release_int      -r- . v value                            int *
+  10:6                    def   f direct_cleanup                   void (void)
+  12:35  direct_cleanup   --r   f release_int                      void (int *)
+  12:6   direct_cleanup   def . v value                            int
+  12:6   direct_cleanup   -w- . v value                            int
+  14:8   direct_cleanup   -r- . v value                            int
+  17:6                    def   f named_cleanup                    void (void)
+  19:12  named_cleanup    --r   f release_int                      void (int *)
+  19:29  named_cleanup    def . v value                            int
+  19:29  named_cleanup    -w- . v value                            int
+  21:8   named_cleanup    -r- . v value                            int
+  24:6                    def   f wrapped_cleanup                  void (void)
+  26:2   wrapped_cleanup  --r   f release_int                      void (int *)
+  26:24  wrapped_cleanup  def . v value                            int
+  26:24  wrapped_cleanup  -w- . v value                            int
+  28:8   wrapped_cleanup  -r- . v value                            int

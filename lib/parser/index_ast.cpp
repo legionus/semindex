@@ -402,6 +402,9 @@ public:
 		if (index.pointsToAnalysis() && D->hasInit() && isFunctionPointer(D->getType()))
 			addPointsToConstraints(D, D->getInit());
 
+		if (const auto *cleanup = D->getAttr<CleanupAttr>())
+			addFunctionCall(cleanup->getFunctionDecl(), cleanupLocation(D, cleanup));
+
 		if (getName(D).empty() || isNonDefinitionParameter(D))
 			return true;
 
@@ -849,24 +852,7 @@ public:
 		}
 
 		spelling = index.spellingLoc(E->getExprLoc());
-		const ValueInfo &info = valueInfo(FD);
-		SemindexUse u;
-
-		u.kind = SEMINDEX_USE_CALL;
-		u.symbol_kind = SEMINDEX_SYMBOL_FUNCTION;
-		u.mode = SEMINDEX_MODE_R_PTR;
-		u.name = info.name;
-		u.owner = "";
-		u.type = info.type;
-		u.usr = functionUSR(FD);
-		u.context = currentFunction;
-		u.context_usr = currentFunctionUSR;
-		u.usr_id = u.usr.empty() ? 0 : llvm::xxHash64(u.usr);
-		u.context_usr_id = currentFunctionUSRId;
-		u.loc = index.location(spelling);
-		u.local = false;
-
-		index.addUseInScope(std::move(u), spelling);
+		addFunctionCall(FD, spelling);
 		return true;
 	}
 
@@ -1027,6 +1013,53 @@ private:
 		if (inserted)
 			entry->second = getUSR(D, ctx);
 		return entry->second;
+	}
+
+	void addFunctionCall(const FunctionDecl *D, SourceLocation loc)
+	{
+		if (!D || loc.isInvalid())
+			return;
+
+		const ValueInfo &info = valueInfo(D);
+		SemindexUse u;
+
+		u.kind = SEMINDEX_USE_CALL;
+		u.symbol_kind = SEMINDEX_SYMBOL_FUNCTION;
+		u.mode = SEMINDEX_MODE_R_PTR;
+		u.name = info.name;
+		u.owner = "";
+		u.type = info.type;
+		u.usr = functionUSR(D);
+		u.context = currentFunction;
+		u.context_usr = currentFunctionUSR;
+		u.usr_id = u.usr.empty() ? 0 : llvm::xxHash64(u.usr);
+		u.context_usr_id = currentFunctionUSRId;
+		u.loc = index.location(loc);
+		u.local = false;
+
+		index.addUseInScope(std::move(u), loc);
+	}
+
+	SourceLocation cleanupLocation(const VarDecl *D, const CleanupAttr *cleanup) const
+	{
+		const SourceManager &sm = ctx.getSourceManager();
+		SourceLocation argument = cleanup->getArgLoc();
+
+		if (argument.isInvalid())
+			argument = cleanup->getLocation();
+
+		SourceLocation spelling = sm.getSpellingLoc(argument);
+		SourceLocation expansion = sm.getExpansionLoc(argument);
+		SourceLocation begin = sm.getExpansionLoc(D->getBeginLoc());
+		SourceLocation end = sm.getExpansionLoc(D->getEndLoc());
+		bool validRange;
+
+		validRange = spelling.isValid() && begin.isValid() && end.isValid();
+
+		if (validRange && sm.isPointWithin(spelling, begin, end))
+			return spelling;
+
+		return expansion;
 	}
 
 	static bool isNonDefinitionParameter(const VarDecl *D)

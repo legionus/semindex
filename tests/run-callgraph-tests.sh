@@ -19,12 +19,29 @@ db=$tmpdir/semindex.db
 commands_db=$tmpdir/commands.db
 source_a=$SOURCE_DIR/tests/callgraph-a.c
 source_b=$SOURCE_DIR/tests/callgraph-b.c
+source_cleanup=$SOURCE_DIR/tests/test22.c
 source_a_path=tests/callgraph-a.c
 
 "$SEMINDEX" compiler --root="$SOURCE_DIR" --database="$db" --commands-database="$commands_db" -- \
 	cc --no-default-config "$source_a"
 "$SEMINDEX" compiler --root="$SOURCE_DIR" --database="$db" --commands-database="$commands_db" -- \
 	cc --no-default-config "$source_b"
+"$SEMINDEX" compiler --root="$SOURCE_DIR" --database="$db" --commands-database="$commands_db" -- \
+	cc --no-default-config "$source_cleanup"
+
+for expected in \
+	'direct_cleanup -> release_int	general:tests/test22.c:12:35' \
+	'named_cleanup -> release_int	general:tests/test22.c:19:12' \
+	'wrapped_cleanup -> release_int	general:tests/test22.c:26:2'
+do
+	caller=${expected%% *}
+	actual=$("$SEMINDEX" callgraph --database="$db" --variant=general --callees="$caller")
+
+	if [ "$actual" != "$expected" ]; then
+		printf 'expected: %s\nactual:   %s\n' "$expected" "$actual" >&2
+		fail "cleanup call was omitted from the callgraph"
+	fi
+done
 
 "$SEMINDEX" callgraph --database="$db" --variant=general --callees=caller >"$tmpdir/callees.out"
 sed "s|$SOURCE_DIR|@SOURCE_DIR@|g" "$tmpdir/callees.out" >"$tmpdir/callees.normalized"
