@@ -399,6 +399,7 @@ add_executable(semindex_lsp
 	tools/lsp/lsp_overlay.cpp
 	tools/lsp/lsp_source.cpp
 	tools/lsp/lsp_server.cpp
+	tools/lsp/lsp_text_position.cpp
 	tools/lsp/lsp_transport.cpp
 	tools/lsp/main.cpp
 )

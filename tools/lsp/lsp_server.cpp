@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "lsp_server.h"
+#include "lsp_text_position.h"
 
 #include <llvm/Support/Error.h>
 
-#include <limits>
 #include <iostream>
 #include <map>
 #include <set>
@@ -93,32 +93,6 @@ static int collectHighlight(void *data, const semindex_db_record_t *record)
 		collector.highlights[entry->second].kind = kind;
 	}
 	return 0;
-}
-
-static bool parsePosition(const llvm::json::Object *params, llvm::StringRef &uri, unsigned &line, unsigned &character)
-{
-	if (!params)
-		return false;
-
-	const llvm::json::Object *document = params->getObject("textDocument");
-	const llvm::json::Object *position = params->getObject("position");
-
-	if (!document || !position)
-		return false;
-
-	auto parsed_uri = document->getString("uri");
-	auto parsed_line = position->getInteger("line");
-	auto parsed_character = position->getInteger("character");
-
-	if (!parsed_uri || !parsed_line || !parsed_character || *parsed_line < 0 || *parsed_character < 0 ||
-		*parsed_line >= std::numeric_limits<unsigned>::max() ||
-		*parsed_character > std::numeric_limits<unsigned>::max())
-		return false;
-
-	uri = *parsed_uri;
-	line = *parsed_line;
-	character = *parsed_character;
-	return true;
 }
 
 static bool setRootUri(LspSourceMapper &sources, LspIndexer &indexer, llvm::StringRef uri)
@@ -233,17 +207,15 @@ static int symbolsAt(const SemindexQueryService &queries, const LspOverlay &over
 
 bool LspServer::definition(const llvm::json::Value &id, const llvm::json::Object *params)
 {
-	llvm::StringRef uri;
-	unsigned line;
-	unsigned character;
+	LspTextPosition position;
 
-	if (!parsePosition(params, uri, line, character))
+	if (!lspParseTextPosition(params, position))
 		return error(&id, INVALID_PARAMS, "Invalid params");
 
 	std::vector<SemindexQueryRecord> cursors;
 	const LspOverlay &overlay = indexer.overlay();
 
-	if (symbolsAt(queries, overlay, variant, sources, uri, line, character, cursors) < 0)
+	if (symbolsAt(queries, overlay, variant, sources, position.uri, position.line, position.character, cursors) < 0)
 		return error(&id, INTERNAL_ERROR, "Database query failed");
 
 	if (cursors.empty())
@@ -269,17 +241,15 @@ bool LspServer::definition(const llvm::json::Value &id, const llvm::json::Object
 
 bool LspServer::references(const llvm::json::Value &id, const llvm::json::Object *params)
 {
-	llvm::StringRef uri;
-	unsigned line;
-	unsigned character;
+	LspTextPosition position;
 
-	if (!parsePosition(params, uri, line, character))
+	if (!lspParseTextPosition(params, position))
 		return error(&id, INVALID_PARAMS, "Invalid params");
 
 	std::vector<SemindexQueryRecord> cursors;
 	const LspOverlay &overlay = indexer.overlay();
 
-	if (symbolsAt(queries, overlay, variant, sources, uri, line, character, cursors) < 0)
+	if (symbolsAt(queries, overlay, variant, sources, position.uri, position.line, position.character, cursors) < 0)
 		return error(&id, INTERNAL_ERROR, "Database query failed");
 
 	LocationCollector collector{ sources };
@@ -306,17 +276,15 @@ bool LspServer::references(const llvm::json::Value &id, const llvm::json::Object
 
 bool LspServer::documentHighlight(const llvm::json::Value &id, const llvm::json::Object *params)
 {
-	llvm::StringRef uri;
-	unsigned line;
-	unsigned character;
+	LspTextPosition position;
 
-	if (!parsePosition(params, uri, line, character))
+	if (!lspParseTextPosition(params, position))
 		return error(&id, INVALID_PARAMS, "Invalid params");
 
 	std::vector<SemindexQueryRecord> cursors;
 	const LspOverlay &overlay = indexer.overlay();
 
-	if (symbolsAt(queries, overlay, variant, sources, uri, line, character, cursors) < 0)
+	if (symbolsAt(queries, overlay, variant, sources, position.uri, position.line, position.character, cursors) < 0)
 		return error(&id, INTERNAL_ERROR, "Database query failed");
 
 	HighlightCollector collector{ sources };
@@ -341,7 +309,7 @@ bool LspServer::documentHighlight(const llvm::json::Value &id, const llvm::json:
 		if (collector.highlights.size() != before)
 			collector.excluded_uri = sources.uri(cursor.path.c_str());
 
-		for (const auto &path : sources.databasePaths(uri)) {
+		for (const auto &path : sources.databasePaths(position.uri)) {
 			options.path = path.c_str();
 
 			if (semindex_db_query(database, &options, collectHighlight, &collector) < 0) {

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "lsp_call_hierarchy.h"
+#include "lsp_text_position.h"
 
 #include <charconv>
 #include <iomanip>
-#include <limits>
 #include <map>
 #include <set>
 #include <sstream>
@@ -16,32 +16,6 @@ static constexpr int FUNCTION_SYMBOL_KIND = 12;
 
 using FunctionIdentity = SemindexIdentity;
 using CallRecord = SemindexQueryRecord;
-
-static bool parsePosition(const llvm::json::Object *params, llvm::StringRef &uri, unsigned &line, unsigned &character)
-{
-	if (!params)
-		return false;
-
-	const llvm::json::Object *document = params->getObject("textDocument");
-	const llvm::json::Object *position = params->getObject("position");
-
-	if (!document || !position)
-		return false;
-
-	auto parsed_uri = document->getString("uri");
-	auto parsed_line = position->getInteger("line");
-	auto parsed_character = position->getInteger("character");
-
-	if (!parsed_uri || !parsed_line || !parsed_character || *parsed_line < 0 || *parsed_character < 0 ||
-		*parsed_line >= std::numeric_limits<unsigned>::max() ||
-		*parsed_character > std::numeric_limits<unsigned>::max())
-		return false;
-
-	uri = *parsed_uri;
-	line = *parsed_line;
-	character = *parsed_character;
-	return true;
-}
 
 static std::string formatId(unsigned long long id)
 {
@@ -177,15 +151,13 @@ LspCallHierarchy::LspCallHierarchy(semindex_db_t *database, const SemindexQueryS
 
 LspCallHierarchy::Status LspCallHierarchy::prepare(const llvm::json::Object *params, llvm::json::Value &result) const
 {
-	llvm::StringRef uri;
-	unsigned line;
-	unsigned character;
+	LspTextPosition position;
 
-	if (!parsePosition(params, uri, line, character))
+	if (!lspParseTextPosition(params, position))
 		return Status::InvalidParams;
 
-	auto column = sources.byteColumn(uri, line, character);
-	auto path = sources.filePath(uri);
+	auto column = sources.byteColumn(position.uri, position.line, position.character);
+	auto path = sources.filePath(position.uri);
 
 	if (!column || !path) {
 		result = nullptr;
@@ -195,7 +167,7 @@ LspCallHierarchy::Status LspCallHierarchy::prepare(const llvm::json::Object *par
 	SemindexPositionQuery query = {
 		.path = std::move(*path),
 		.variant = variant,
-		.line = line + 1,
+		.line = position.line + 1,
 		.column = *column,
 	};
 	std::vector<SemindexQueryRecord> records;
