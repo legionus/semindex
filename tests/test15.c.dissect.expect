@@ -7,7 +7,7 @@ FILE: tests/test15.c
    8:6                    def   m task_struct.pid                  int
   11:6                    def   f set_pid                          void (struct task_struct *, int)
   11:34  set_pid          def . v task                             struct task_struct *
-  11:21  set_pid          -r- . s task_struct
+  11:21  set_pid          -r-   s task_struct
   11:44  set_pid          def . v pid                              int
   13:19  set_pid          -r-   m task_struct.pid                  int
   13:13  set_pid          --r . v task                             struct task_struct *

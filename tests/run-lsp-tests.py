@@ -343,7 +343,11 @@ def main():
 
         unconfigured_source = directory / "unconfigured.h"
         unconfigured_source.write_text(
-            "#define BASE 1\n#define VALUE BASE\n", encoding="utf-8"
+            "#define BASE 1\n"
+            "#define VALUE BASE\n"
+            "typedef struct command command_t;\n"
+            "command_t *load(void);\n",
+            encoding="utf-8",
         )
         unconfigured_database = directory / "unconfigured" / "semindex.db"
         unconfigured_commands = directory / "unconfigured" / "commands.db"
@@ -375,10 +379,20 @@ def main():
                     "position": {"line": 1, "character": 15},
                 },
             },
+            {
+                "jsonrpc": "2.0", "id": 75,
+                "method": "textDocument/definition",
+                "params": {
+                    "textDocument": {
+                        "uri": unconfigured_source.resolve().as_uri(),
+                    },
+                    "position": {"line": 3, "character": 3},
+                },
+            },
             {"jsonrpc": "2.0", "id": 73, "method": "shutdown"},
             {"jsonrpc": "2.0", "method": "exit"},
         ])
-        if process.returncode != 0 or len(responses) != 4:
+        if process.returncode != 0 or len(responses) != 5:
             fail("unconfigured LSP lifecycle failed", process)
         expected_document_definition = {
             "uri": unconfigured_source.resolve().as_uri(),
@@ -386,6 +400,15 @@ def main():
         }
         if responses[2].get("result") != [expected_document_definition]:
             fail("document index did not resolve the local macro")
+        expected_typedef_definition = {
+            "uri": unconfigured_source.resolve().as_uri(),
+            "range": source_range(2, 23, len("command_t")),
+        }
+        if responses[3].get("result") != [expected_typedef_definition]:
+            fail(
+                "document index did not resolve the typedef: "
+                f"{responses[3]}"
+            )
         with sqlite3.connect(unconfigured_database) as connection:
             indexed_files = connection.execute(
                 "SELECT count(*) FROM files"

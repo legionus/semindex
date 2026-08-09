@@ -1043,10 +1043,14 @@ private:
 
 	void addTypeUse(const TypeDecl *D, semindex_symbol_kind_t kind, SourceLocation loc, const std::string &type)
 	{
+		bool local;
+
 		if (!D || loc.isInvalid())
 			return;
 
-		if (!index.includeLocal() && !currentFunction.empty())
+		local = D->getDeclContext()->isFunctionOrMethod();
+
+		if (!index.includeLocal() && local)
 			return;
 
 		SourceLocation spelling = index.spellingLoc(loc);
@@ -1068,7 +1072,7 @@ private:
 		u.usr = detailedUSR(D);
 		u.context = currentFunction;
 		u.loc = index.location(spelling);
-		u.local = !currentFunction.empty();
+		u.local = local;
 
 		index.addUseInScope(std::move(u), spelling);
 	}

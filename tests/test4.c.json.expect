@@ -8,7 +8,7 @@
     {"kind":"variable","name":"p","owner":null,"type":"struct P *","usr":"c:test4.c@82@F@f@p","usr_id":"d101236ca6c144da","context":"f","file":"tests/test4.c","line":7,"column":17,"local":true,"definition":true}
   ],
   "uses": [
-    {"kind":"read","symbol_kind":"struct","mode":"-r-","mode_bits":4,"name":"P","owner":null,"type":null,"usr":"c:@S@P","usr_id":"f004a035475fca10","context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test4.c","line":7,"column":14,"local":true},
+    {"kind":"read","symbol_kind":"struct","mode":"-r-","mode_bits":4,"name":"P","owner":null,"type":null,"usr":"c:@S@P","usr_id":"f004a035475fca10","context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test4.c","line":7,"column":14,"local":false},
     {"kind":"read","symbol_kind":"field","mode":"-r-","mode_bits":4,"name":"x","owner":"P","type":"int","usr":"c:@S@P@FI@x","usr_id":"05168ed8f5b623b1","context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test4.c","line":9,"column":12,"local":false},
     {"kind":"read","symbol_kind":"variable","mode":"--r","mode_bits":16,"name":"p","owner":null,"type":"struct P *","usr":"c:test4.c@82@F@f@p","usr_id":"d101236ca6c144da","context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test4.c","line":9,"column":9,"local":true},
     {"kind":"read","symbol_kind":"field","mode":"-r-","mode_bits":4,"name":"y","owner":"P","type":"int","usr":"c:@S@P@FI@y","usr_id":"9b43ef0a6eed1edb","context":"f","context_usr":null,"context_usr_id":null,"file":"tests/test4.c","line":9,"column":19,"local":false},

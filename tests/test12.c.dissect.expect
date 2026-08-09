@@ -12,13 +12,13 @@ FILE: tests/test12.c
   11:17  f                -r- . v x                                int
   12:6   f                def . v b                                int
   12:6   f                -w- . v b                                int
-  12:24  f                -r- . s S
+  12:24  f                -r-   s S
   13:6   f                def . v c                                int
   13:6   f                -w- . v c                                int
-  13:17  f                -r- . t T                                int
+  13:17  f                -r-   t T                                int
   14:6   f                def . v d                                int
   14:6   f                -w- . v d                                int
-  14:19  f                -r- . t T                                int
+  14:19  f                -r-   t T                                int
   15:6   f                def . v e                                int
   15:6   f                -w- . v e                                int
   15:19  f                -r- . v x                                int
