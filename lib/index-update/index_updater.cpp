@@ -140,7 +140,7 @@ SemindexIndexUpdateResult SemindexIndexUpdater::update(const SemindexIndexUpdate
 		pipeline_request.commands_database = resolved->commandsDatabase().c_str();
 	} else {
 		pipeline_request.input = INDEX_PIPELINE_COMMAND;
-		pipeline_request.storage = INDEX_PIPELINE_STORE_SYMBOLS;
+		pipeline_request.storage = INDEX_PIPELINE_OUTPUT_ONLY;
 		pipeline_request.command = resolved->command();
 		pipeline_request.source_file = request.file.c_str();
 	}
@@ -175,11 +175,21 @@ SemindexIndexUpdateResult SemindexIndexUpdater::update(const SemindexIndexUpdate
 
 	copyDiagnostics(pipeline.index, result.directory.c_str(), request.diagnostic_limit, result);
 
+	if (resolved->source() == SemindexResolvedCommand::Source::Document) {
+		result.status = pipeline.frontend_ret != 0 || pipeline.frontend->status == SEMINDEX_INDEX_PARTIAL
+			? SemindexIndexUpdateResult::Status::Partial
+			: SemindexIndexUpdateResult::Status::Clean;
+		result.transient_index.reset(pipeline.index);
+		pipeline.index = nullptr;
+
+		goto out;
+	}
+
 	if (pipeline.frontend_ret != 0 || pipeline.frontend->status == SEMINDEX_INDEX_PARTIAL) {
 		result.status = SemindexIndexUpdateResult::Status::Partial;
 
 		if (!request.store_partial) {
-			result.partial_index.reset(pipeline.index);
+			result.transient_index.reset(pipeline.index);
 			pipeline.index = nullptr;
 		}
 
@@ -202,7 +212,7 @@ out:
 		if (fs_error) {
 			result.status = SemindexIndexUpdateResult::Status::Failed;
 			result.error = "failed to restore the current directory: " + fs_error.message();
-			result.partial_index.reset();
+			result.transient_index.reset();
 		}
 	}
 

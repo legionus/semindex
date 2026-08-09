@@ -341,81 +341,134 @@ def main():
         if not records:
             fail("LSP did not populate the newly created database")
 
-        fallback_database = directory / "fallback" / ".semindex" / "semindex.db"
-        fallback_commands = directory / "fallback" / ".semindex" / "commands.db"
-        include_directory = directory / "include"
-        include_directory.mkdir()
-        (include_directory / "fallback.h").write_text(
-            "#define FALLBACK_VALUE 1\n", encoding="utf-8"
+        unconfigured_source = directory / "unconfigured.h"
+        unconfigured_source.write_text(
+            "#define BASE 1\n#define VALUE BASE\n", encoding="utf-8"
         )
-        fallback_source = directory / "fallback.c"
-        fallback_source.write_text(
-            "#include <fallback.h>\n"
-            "int fallback(void)\n"
-            "{\n"
-            "\tint local = FALLBACK_VALUE;\n"
-            "\treturn local;\n"
-            "}\n",
-            encoding="utf-8",
-        )
-        fallback_uri = fallback_source.resolve().as_uri()
-        fallback_options = [
-            f"--database={fallback_database}",
-            f"--commands-database={fallback_commands}",
-            "--variant=general",
-        ]
-        process, responses = run_server(sys.argv[1], fallback_options, [
+        unconfigured_database = directory / "unconfigured" / "semindex.db"
+        unconfigured_commands = directory / "unconfigured" / "commands.db"
+        process, responses = run_server(sys.argv[1], [
+            f"--database={unconfigured_database}",
+            f"--commands-database={unconfigured_commands}",
+        ], [
             {
                 "jsonrpc": "2.0", "id": 72, "method": "initialize",
                 "params": {"rootUri": root_uri},
             },
-            {"jsonrpc": "2.0", "method": "initialized", "params": {}},
             {
                 "jsonrpc": "2.0", "method": "textDocument/didOpen",
                 "params": {
                     "textDocument": {
-                        "uri": fallback_uri, "languageId": "c", "version": 1,
-                        "text": fallback_source.read_text(encoding="utf-8"),
+                        "uri": unconfigured_source.resolve().as_uri(),
+                        "languageId": "c", "version": 1,
+                        "text": unconfigured_source.read_text(encoding="utf-8"),
                     },
                 },
             },
             {
-                "jsonrpc": "2.0", "id": 73,
-                "method": "textDocument/documentHighlight",
+                "jsonrpc": "2.0", "id": 74,
+                "method": "textDocument/definition",
                 "params": {
-                    "textDocument": {"uri": fallback_uri},
-                    "position": {"line": 4, "character": 8},
+                    "textDocument": {
+                        "uri": unconfigured_source.resolve().as_uri(),
+                    },
+                    "position": {"line": 1, "character": 15},
+                },
+            },
+            {"jsonrpc": "2.0", "id": 73, "method": "shutdown"},
+            {"jsonrpc": "2.0", "method": "exit"},
+        ])
+        if process.returncode != 0 or len(responses) != 4:
+            fail("unconfigured LSP lifecycle failed", process)
+        expected_document_definition = {
+            "uri": unconfigured_source.resolve().as_uri(),
+            "range": source_range(0, 8, len("BASE")),
+        }
+        if responses[2].get("result") != [expected_document_definition]:
+            fail("document index did not resolve the local macro")
+        with sqlite3.connect(unconfigured_database) as connection:
+            indexed_files = connection.execute(
+                "SELECT count(*) FROM files"
+            ).fetchone()[0]
+        if indexed_files:
+            fail("LSP indexed a source without a compiler command")
+
+        private_include = directory / "lib" / "common"
+        private_include.mkdir(parents=True)
+        private_header = private_include / "private.h"
+        private_header.write_text("#define PRIVATE_VALUE 7\n", encoding="utf-8")
+        private_source_directory = directory / "lib" / "query"
+        private_source_directory.mkdir(parents=True)
+        private_source = private_source_directory / "private.c"
+        private_source.write_text(
+            "#include \"private.h\"\n"
+            "int private_value(void)\n"
+            "{\n"
+            "\treturn PRIVATE_VALUE;\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        private_header_uri = private_header.resolve().as_uri()
+        private_source_uri = private_source.resolve().as_uri()
+        expected_macro_definition = {
+            "uri": private_header_uri,
+            "range": source_range(0, 8, len("PRIVATE_VALUE")),
+        }
+
+        (directory / "compile_commands.json").write_text(json.dumps([{
+            "directory": str(directory),
+            "file": str(private_source),
+            "arguments": [
+                "cc", "--no-default-config", "-I",
+                str(private_include), str(private_source),
+            ],
+        }]), encoding="utf-8")
+
+        private_database = directory / "private-command" / "semindex.db"
+        process, responses = run_server(sys.argv[1], [
+            f"--database={private_database}", "--variant=general",
+        ], [
+            {
+                "jsonrpc": "2.0", "id": 77, "method": "initialize",
+                "params": {"rootUri": private_include.resolve().as_uri()},
+            },
+            {
+                "jsonrpc": "2.0", "method": "textDocument/didOpen",
+                "params": {
+                    "textDocument": {
+                        "uri": private_source_uri, "languageId": "c",
+                        "version": 1,
+                        "text": private_source.read_text(encoding="utf-8"),
+                    },
                 },
             },
             {
-                "jsonrpc": "2.0", "id": 75,
+                "jsonrpc": "2.0", "id": 78,
                 "method": "textDocument/definition",
                 "params": {
-                    "textDocument": {"uri": fallback_uri},
-                    "position": {"line": 4, "character": 8},
+                    "textDocument": {"uri": private_source_uri},
+                    "position": {"line": 3, "character": 8},
                 },
             },
-            {"jsonrpc": "2.0", "id": 74, "method": "shutdown"},
+            {"jsonrpc": "2.0", "id": 79, "method": "shutdown"},
             {"jsonrpc": "2.0", "method": "exit"},
         ])
-        if process.returncode != 0 or len(responses) != 5:
-            fail("LSP fallback indexing lifecycle failed", process)
-        if not responses[2].get("result"):
-            fail("LSP fallback indexing returned no document highlights")
-        expected_local_definition = {
-            "uri": fallback_uri,
-            "range": source_range(3, 5, len("local")),
-        }
-        if responses[3].get("result") != [expected_local_definition]:
-            fail("LSP fallback indexing did not resolve a local definition")
-        with sqlite3.connect(fallback_database) as connection:
-            records = connection.execute(
-                "SELECT count(*) FROM records"
+        if process.returncode != 0 or len(responses) != 4:
+            fail("repository command lifecycle failed", process)
+        if responses[2].get("result") != [expected_macro_definition]:
+            fail(
+                "repository compiler command did not resolve the macro: "
+                f"{responses[2]}"
+            )
+
+        with sqlite3.connect(private_database) as connection:
+            indexed_source = connection.execute(
+                "SELECT count(*) FROM files WHERE path = ?",
+                ("lib/query/private.c",),
             ).fetchone()[0]
-        if not records:
-            fail("LSP fallback indexing did not populate the symbol database")
-        if fallback_commands.exists():
-            fail("LSP stored an approximate fallback compiler command")
+
+        if indexed_source != 1:
+            fail("repository compiler command did not persist the source")
 
         process, responses = run_server(
             sys.argv[1], options, [

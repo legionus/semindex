@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "lsp_indexer.h"
+#include "repository.h"
 
+#include <cstdlib>
 #include <filesystem>
 #include <utility>
 
@@ -12,7 +14,7 @@ LspIndexer::LspIndexer(std::string database, std::string commands_database, std:
 	      .command_resolver = {
 		      .commands_database = std::move(commands_database),
 		      .compile_commands = std::move(compile_commands),
-		      .allow_fallback = true,
+		      .allow_document = true,
 	      },
 	      .include_local = include_local,
       })
@@ -21,12 +23,22 @@ LspIndexer::LspIndexer(std::string database, std::string commands_database, std:
 
 void LspIndexer::setWorkspaceRoot(const std::string &root)
 {
-	updater.setRepositoryRoot(root);
+	char *discovered_root;
+	std::string project_root = root;
+
+	discovered_root = semindex_repository_root(root.c_str());
+
+	if (discovered_root) {
+		project_root = discovered_root;
+		free(discovered_root);
+	}
+
+	updater.setRepositoryRoot(project_root);
 
 	if (compile_commands_explicit)
 		return;
 
-	std::filesystem::path path = std::filesystem::path(root) / "compile_commands.json";
+	std::filesystem::path path = std::filesystem::path(project_root) / "compile_commands.json";
 
 	if (std::filesystem::is_regular_file(path))
 		updater.setCompileCommands(path.string());
@@ -39,8 +51,8 @@ LspIndexResult LspIndexer::update(const std::string &file)
 		.variant = variant,
 	});
 
-	if (result.status == LspIndexResult::Status::Partial && result.partial_index) {
-		overlays.replace(file, result.directory, result.partial_index.get());
+	if (result.transient_index) {
+		overlays.replace(file, result.directory, result.transient_index.get());
 	} else {
 		overlays.erase(file);
 	}

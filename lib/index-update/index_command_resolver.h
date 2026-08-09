@@ -13,7 +13,7 @@ struct SemindexCommandResolverOptions {
 	std::string commands_database;
 	std::string compile_commands;
 	std::string repository_root;
-	bool allow_fallback = false;
+	bool allow_document = false;
 };
 
 class SemindexResolvedCommand
@@ -22,7 +22,7 @@ public:
 	enum class Source {
 		Saved,
 		CompilationDatabase,
-		Fallback,
+		Document,
 	};
 
 	~SemindexResolvedCommand();
@@ -41,7 +41,7 @@ private:
 		void operator()(command_db_command_t *command) const;
 	};
 
-	Source command_source = Source::Fallback;
+	Source command_source = Source::Saved;
 	std::unique_ptr<command_db_command_t, SavedCommandDeleter> saved;
 	std::string compile_commands;
 	std::string commands_database;
@@ -49,7 +49,7 @@ private:
 	std::string command_file;
 	std::vector<std::string> arguments;
 	std::vector<const char *> argument_views;
-	semindex_compile_command_t fallback = {};
+	semindex_compile_command_t document = {};
 	bool available = false;
 };
 

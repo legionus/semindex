@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "lsp_source.h"
+#include "repository.h"
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 
 static int hexDigit(char value)
@@ -158,11 +160,22 @@ LspSourceMapper::LspSourceMapper() = default;
 bool LspSourceMapper::setRootUri(llvm::StringRef uri)
 {
 	auto path = pathFromUri(uri);
+	char *repository_root;
+	bool ret;
 
 	if (!path || !path->is_absolute())
 		return false;
 
-	return resolver.setWorkspaceRoot(*path);
+	repository_root = semindex_repository_root(path->string().c_str());
+
+	if (!repository_root)
+		return resolver.setWorkspaceRoot(*path);
+
+	ret = resolver.setWorkspaceRoot(repository_root);
+
+	free(repository_root);
+
+	return ret;
 }
 
 std::optional<std::string> LspSourceMapper::filePath(llvm::StringRef uri) const

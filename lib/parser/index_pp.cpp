@@ -9,6 +9,8 @@
 #include <clang/Frontend/FrontendActions.h>
 #include <clang/Tooling/Tooling.h>
 
+#include <set>
+
 using namespace clang;
 
 namespace
@@ -17,8 +19,8 @@ namespace
 class SemindexPPCallbacks : public PPCallbacks
 {
 public:
-	SemindexPPCallbacks(SemindexContext index, DiagnosticsEngine &diagnostics)
-	    : index(index), diagnostics(diagnostics)
+	SemindexPPCallbacks(SemindexContext index, Preprocessor &preprocessor, DiagnosticsEngine &diagnostics)
+	    : index(index), preprocessor(preprocessor), diagnostics(diagnostics)
 	{
 	}
 
@@ -27,7 +29,7 @@ public:
 		return true;
 	}
 
-	void MacroDefined(const Token &macroNameTok, const MacroDirective *) override
+	void MacroDefined(const Token &macroNameTok, const MacroDirective *directive) override
 	{
 		IdentifierInfo *ident = macroNameTok.getIdentifierInfo();
 
@@ -50,6 +52,8 @@ public:
 		s.definition = true;
 
 		index.addSymbolInScope(std::move(s), loc);
+
+		addReplacementUses(directive->getMacroInfo());
 	}
 
 	void MacroExpands(const Token &macroNameTok, const MacroDefinition &, SourceRange, const MacroArgs *) override
@@ -98,6 +102,24 @@ public:
 	}
 
 private:
+	void addReplacementUses(const MacroInfo *macro)
+	{
+		for (const Token &token : macro->tokens()) {
+			IdentifierInfo *ident = token.getIdentifierInfo();
+
+			if (!ident)
+				continue;
+
+			if (macro->isFunctionLike() && macro->getParameterNum(ident) >= 0)
+				continue;
+
+			if (!preprocessor.getMacroDefinition(ident))
+				continue;
+
+			addMacroUse(token, token.getLocation());
+		}
+	}
+
 	std::string includeTarget(StringRef fileName, bool isAngled, OptionalFileEntryRef file) const
 	{
 		if (isAngled)
@@ -141,6 +163,10 @@ private:
 			return;
 
 		SourceLocation spelling = index.spellingLoc(loc);
+		auto key = std::make_pair(spelling.getRawEncoding(), ident);
+
+		if (!macro_uses.insert(key).second)
+			return;
 
 		SemindexUse u;
 
@@ -161,7 +187,9 @@ private:
 	}
 
 	SemindexContext index;
+	Preprocessor &preprocessor;
 	DiagnosticsEngine &diagnostics;
+	std::set<std::pair<unsigned, const IdentifierInfo *>> macro_uses;
 };
 
 class SemindexPreprocessorAction : public PreprocessOnlyAction
@@ -178,7 +206,8 @@ protected:
 		SemindexContext index(out, CI.getSourceManager());
 		auto finish_asm_index = installSemindexAsmIndexer(index, CI.getPreprocessor());
 
-		CI.getPreprocessor().addPPCallbacks(createSemindexPPCallbacks(index, CI.getDiagnostics()));
+		CI.getPreprocessor().addPPCallbacks(
+			createSemindexPPCallbacks(index, CI.getPreprocessor(), CI.getDiagnostics()));
 		PreprocessOnlyAction::ExecuteAction();
 		finish_asm_index();
 		out->has_index_data = true;
@@ -206,9 +235,10 @@ private:
 
 } // namespace
 
-std::unique_ptr<PPCallbacks> createSemindexPPCallbacks(SemindexContext index, DiagnosticsEngine &diagnostics)
+std::unique_ptr<PPCallbacks> createSemindexPPCallbacks(SemindexContext index, Preprocessor &preprocessor,
+	DiagnosticsEngine &diagnostics)
 {
-	return std::make_unique<SemindexPPCallbacks>(index, diagnostics);
+	return std::make_unique<SemindexPPCallbacks>(index, preprocessor, diagnostics);
 }
 
 std::unique_ptr<tooling::FrontendActionFactory> createSemindexPreprocessorActionFactory(semindex *out)

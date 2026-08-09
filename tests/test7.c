@@ -3,3 +3,5 @@
 #define BAR(x) ((x) + FOO)
 
 int v = BAR(2);
+
+#define UNUSED FOO

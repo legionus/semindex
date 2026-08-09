@@ -34,7 +34,7 @@ struct SemindexIndexUpdateResult {
 	std::vector<SemindexIndexDiagnostic> diagnostics;
 	std::string error;
 	std::string directory;
-	SemindexOwnedIndex partial_index;
+	SemindexOwnedIndex transient_index;
 	bool command_available = false;
 	bool diagnostics_truncated = false;
 };

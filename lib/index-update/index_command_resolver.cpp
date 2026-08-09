@@ -22,8 +22,8 @@ const semindex_compile_command_t *SemindexResolvedCommand::command() const
 	if (saved)
 		return command_db_command_get(saved.get());
 
-	if (command_source == Source::Fallback)
-		return &fallback;
+	if (command_source == Source::Document)
+		return &document;
 
 	return nullptr;
 }
@@ -110,35 +110,25 @@ SemindexCommandResolution SemindexCommandResolver::resolve(const std::string &fi
 		return { std::move(resolved), {} };
 	}
 
-	if (!options.allow_fallback)
-		return { nullptr, "no saved compiler command for '" + file + "' in variant '" + variant + "'" };
+	if (options.allow_document) {
+		resolved->command_source = SemindexResolvedCommand::Source::Document;
+		resolved->command_directory = std::filesystem::path(file).parent_path().string();
+		resolved->command_file = file;
+		resolved->arguments = { "cc", "--no-default-config", file };
+		resolved->argument_views.reserve(resolved->arguments.size());
 
-	resolved->command_source = SemindexResolvedCommand::Source::Fallback;
-	resolved->command_directory = options.repository_root.empty()
-		? std::filesystem::path(file).parent_path().string()
-		: options.repository_root;
-	resolved->command_file = file;
-	resolved->arguments = { "cc", "--no-default-config", "-I", resolved->command_directory };
+		for (const auto &argument : resolved->arguments)
+			resolved->argument_views.push_back(argument.c_str());
 
-	std::string include = (std::filesystem::path(resolved->command_directory) / "include").string();
+		resolved->document = {
+			.directory = resolved->command_directory.c_str(),
+			.file = resolved->command_file.c_str(),
+			.argc = resolved->argument_views.size(),
+			.argv = resolved->argument_views.data(),
+		};
 
-	if (std::filesystem::is_directory(include)) {
-		resolved->arguments.push_back("-I");
-		resolved->arguments.push_back(std::move(include));
+		return { std::move(resolved), {} };
 	}
 
-	resolved->arguments.push_back(file);
-	resolved->argument_views.reserve(resolved->arguments.size());
-
-	for (const auto &argument : resolved->arguments)
-		resolved->argument_views.push_back(argument.c_str());
-
-	resolved->fallback = {
-		.directory = resolved->command_directory.c_str(),
-		.file = resolved->command_file.c_str(),
-		.argc = resolved->argument_views.size(),
-		.argv = resolved->argument_views.data(),
-	};
-
-	return { std::move(resolved), {} };
+	return { nullptr, "no compiler command for '" + file + "' in variant '" + variant + "'" };
 }
