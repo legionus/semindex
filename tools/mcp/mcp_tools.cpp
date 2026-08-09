@@ -177,7 +177,7 @@ std::optional<unsigned long long> parseId(llvm::StringRef value)
 	return id;
 }
 
-std::string encodeHex(llvm::StringRef input)
+static std::string encodeHex(llvm::StringRef input)
 {
 	static constexpr char digits[] = "0123456789abcdef";
 	std::string result;
@@ -192,7 +192,7 @@ std::string encodeHex(llvm::StringRef input)
 	return result;
 }
 
-std::optional<std::string> decodeHex(llvm::StringRef input)
+static std::optional<std::string> decodeHex(llvm::StringRef input)
 {
 	std::string result;
 
@@ -214,9 +214,43 @@ std::optional<std::string> decodeHex(llvm::StringRef input)
 	return result;
 }
 
+std::string encodeCursor(llvm::json::Object cursor)
+{
+	std::string serialized;
+	llvm::raw_string_ostream stream(serialized);
+
+	stream << llvm::json::Value(std::move(cursor));
+	stream.flush();
+
+	return encodeHex(serialized);
+}
+
+std::optional<llvm::json::Object> decodeCursor(llvm::StringRef encoded)
+{
+	auto decoded = decodeHex(encoded);
+
+	if (!decoded)
+		return std::nullopt;
+
+	auto parsed = llvm::json::parse(*decoded);
+
+	if (!parsed) {
+		llvm::consumeError(parsed.takeError());
+
+		return std::nullopt;
+	}
+
+	llvm::json::Object *object = parsed->getAsObject();
+
+	if (!object)
+		return std::nullopt;
+
+	return std::move(*object);
+}
+
 std::string recordCursor(const SemindexQueryRecord &record)
 {
-	llvm::json::Object cursor{
+	return encodeCursor(llvm::json::Object{
 		{ "variant", record.variant },
 		{ "path", record.path },
 		{ "line", record.line },
@@ -226,14 +260,7 @@ std::string recordCursor(const SemindexQueryRecord &record)
 		{ "action", record.action },
 		{ "kind", static_cast<int>(record.kind) },
 		{ "mode", record.mode },
-	};
-	std::string serialized;
-	llvm::raw_string_ostream stream(serialized);
-
-	stream << llvm::json::Value(std::move(cursor));
-	stream.flush();
-
-	return encodeHex(serialized);
+	});
 }
 
 McpToolResult stoppedResult(const McpRequestControl &control)

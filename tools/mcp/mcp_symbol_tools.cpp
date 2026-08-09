@@ -118,26 +118,19 @@ std::optional<semindex_symbol_kind_t> parseKind(llvm::StringRef value)
 
 std::string typeCursor(const SymbolTypeRecord &record)
 {
-	llvm::json::Object cursor{
+	return encodeCursor(llvm::json::Object{
 		{ "declaredType", record.declared_type },
 		{ "canonicalType", record.canonical_type },
 		{ "typeSymbol", record.type_symbol },
 		{ "typeKind", static_cast<int64_t>(record.type_kind) },
 		{ "typeUsrId", idString(record.type_usr_id) },
 		{ "path", record.path },
-	};
-	std::string serialized;
-	llvm::raw_string_ostream stream(serialized);
-
-	stream << llvm::json::Value(std::move(cursor));
-	stream.flush();
-
-	return encodeHex(serialized);
+	});
 }
 
 std::string functionTypeCursor(const FunctionTypeRecord &record)
 {
-	llvm::json::Object cursor{
+	return encodeCursor(llvm::json::Object{
 		{ "position", record.position },
 		{ "declaredType", record.declared_type },
 		{ "canonicalType", record.canonical_type },
@@ -145,32 +138,12 @@ std::string functionTypeCursor(const FunctionTypeRecord &record)
 		{ "typeKind", static_cast<int64_t>(record.type_kind) },
 		{ "typeUsrId", idString(record.type_usr_id) },
 		{ "path", record.path },
-	};
-	std::string serialized;
-	llvm::raw_string_ostream stream(serialized);
-
-	stream << llvm::json::Value(std::move(cursor));
-	stream.flush();
-
-	return encodeHex(serialized);
+	});
 }
 
 bool parseTypeCursor(llvm::StringRef encoded, OwnedTypeCursor &result)
 {
-	auto decoded = decodeHex(encoded);
-
-	if (!decoded)
-		return false;
-
-	auto parsed = llvm::json::parse(*decoded);
-
-	if (!parsed) {
-		llvm::consumeError(parsed.takeError());
-
-		return false;
-	}
-
-	const llvm::json::Object *object = parsed->getAsObject();
+	auto object = decodeCursor(encoded);
 
 	if (!object)
 		return false;
@@ -203,20 +176,7 @@ bool parseTypeCursor(llvm::StringRef encoded, OwnedTypeCursor &result)
 
 bool parseFunctionTypeCursor(llvm::StringRef encoded, OwnedFunctionTypeCursor &result)
 {
-	auto decoded = decodeHex(encoded);
-
-	if (!decoded)
-		return false;
-
-	auto parsed = llvm::json::parse(*decoded);
-
-	if (!parsed) {
-		llvm::consumeError(parsed.takeError());
-
-		return false;
-	}
-
-	const llvm::json::Object *object = parsed->getAsObject();
+	auto object = decodeCursor(encoded);
 
 	if (!object)
 		return false;
@@ -271,20 +231,7 @@ struct OwnedCursor {
 
 bool parseCursor(llvm::StringRef encoded, OwnedCursor &result)
 {
-	auto decoded = decodeHex(encoded);
-
-	if (!decoded)
-		return false;
-
-	auto parsed = llvm::json::parse(*decoded);
-
-	if (!parsed) {
-		llvm::consumeError(parsed.takeError());
-
-		return false;
-	}
-
-	const llvm::json::Object *object = parsed->getAsObject();
+	auto object = decodeCursor(encoded);
 
 	if (!object)
 		return false;
