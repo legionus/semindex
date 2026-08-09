@@ -1,0 +1,15 @@
+
+FILE: tests/test23.c
+
+  12:9                    def   d _alias_
+  13:8                    -r-   d _alias_
+   2:5                    def   f target_function                  int (void)
+   7:48                   m--   f target_function                  int (void)
+   7:5                    def   f function_alias                   int (void)
+   9:5                    def   v target_variable                  int
+   9:5                    -w-   v target_variable                  int
+  10:49                   m--   v target_variable                  int
+  10:12                   def   v variable_alias                   int
+  13:8                    m--   f target_function                  int (void)
+  13:33                   def   f macro_alias                      typeof (target_function)
+  13:16  macro_alias      --r   f target_function                  int (void)

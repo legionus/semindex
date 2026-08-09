@@ -9,6 +9,7 @@
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Frontend/FrontendActions.h>
 #include <clang/Index/USRGeneration.h>
+#include <clang/Lex/Lexer.h>
 #include <clang/Lex/Preprocessor.h>
 #include <clang/Tooling/Tooling.h>
 
@@ -399,6 +400,8 @@ public:
 
 	bool VisitVarDecl(VarDecl *D)
 	{
+		addAliasUse(D);
+
 		if (index.pointsToAnalysis() && D->hasInit() && isFunctionPointer(D->getType()))
 			addPointsToConstraints(D, D->getInit());
 
@@ -777,6 +780,8 @@ public:
 
 	bool VisitFunctionDecl(FunctionDecl *D)
 	{
+		addAliasUse(D);
+
 		if (!D->isThisDeclarationADefinition() && !D->hasPrototype())
 			return true;
 
@@ -1060,6 +1065,66 @@ private:
 			return spelling;
 
 		return expansion;
+	}
+
+	const ValueDecl *aliasTarget(const ValueDecl *alias, const AliasAttr *attribute) const
+	{
+		IdentifierInfo &identifier = ctx.Idents.get(attribute->getAliasee());
+		auto declarations = ctx.getTranslationUnitDecl()->lookup(&identifier);
+
+		for (const NamedDecl *declaration : declarations) {
+			const auto *target = dyn_cast<ValueDecl>(declaration);
+			bool functionAlias;
+			bool variableAlias;
+			bool sameKind;
+
+			if (!target || target->getCanonicalDecl() == alias->getCanonicalDecl())
+				continue;
+
+			functionAlias = isa<FunctionDecl>(alias) && isa<FunctionDecl>(target);
+			variableAlias = isa<VarDecl>(alias) && isa<VarDecl>(target);
+			sameKind = functionAlias || variableAlias;
+
+			if (sameKind)
+				return target;
+		}
+
+		return nullptr;
+	}
+
+	SourceLocation aliasLocation(const AliasAttr *attribute) const
+	{
+		const SourceManager &sm = ctx.getSourceManager();
+		SourceLocation location = attribute->getLocation();
+
+		if (location.isMacroID())
+			return sm.getExpansionLoc(location);
+
+		CharSourceRange range = CharSourceRange::getTokenRange(attribute->getRange());
+		StringRef text = Lexer::getSourceText(range, sm, ctx.getLangOpts());
+		size_t offset = text.find(attribute->getAliasee());
+
+		if (offset != StringRef::npos)
+			return range.getBegin().getLocWithOffset(offset);
+
+		return location;
+	}
+
+	void addAliasUse(const ValueDecl *alias)
+	{
+		const auto *attribute = alias->getAttr<AliasAttr>();
+
+		if (!attribute)
+			return;
+
+		const ValueDecl *target = aliasTarget(alias, attribute);
+
+		if (!target)
+			return;
+
+		unsigned mode = SEMINDEX_MODE_R_AOF | SEMINDEX_MODE_W_AOF;
+
+		addValueUse(target, SEMINDEX_USE_ADDR, mode, "", aliasLocation(attribute), false);
 	}
 
 	static bool isNonDefinitionParameter(const VarDecl *D)
