@@ -217,6 +217,9 @@ SEMINDEX_API int semindex_db_query_functions(semindex_db_t *db, const semindex_d
 SEMINDEX_API int semindex_db_query_identity(semindex_db_t *db, const semindex_db_identity_query_t *query,
 	semindex_db_record_callback_t callback, void *data);
 
+SEMINDEX_API int semindex_db_query_properties(semindex_db_t *db, const semindex_db_identity_t *identity,
+	unsigned long long *properties);
+
 /* Variants are returned in name order. Provenance fields may be NULL. */
 SEMINDEX_API int semindex_db_list_variants(semindex_db_t *db, semindex_db_variant_callback_t callback, void *data);
 

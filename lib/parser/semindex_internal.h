@@ -41,6 +41,7 @@ struct SemindexSymbol {
 	SemindexSourceLocation loc;
 	bool local;
 	bool definition;
+	unsigned long long properties = 0;
 	unsigned long long order;
 };
 

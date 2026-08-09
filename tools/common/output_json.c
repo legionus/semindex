@@ -101,8 +101,26 @@ static void print_json_symbol(FILE *out, const semindex_symbol_t *symbol)
 	print_optional_json_string(out, symbol->context);
 	fputs(",\"file\":", out);
 	print_json_string(out, symbol->file);
-	fprintf(out, ",\"line\":%u,\"column\":%u,\"local\":%s,\"definition\":%s}", symbol->line, symbol->column,
+	fprintf(out, ",\"line\":%u,\"column\":%u,\"local\":%s,\"definition\":%s", symbol->line, symbol->column,
 		symbol->local ? "true" : "false", symbol->definition ? "true" : "false");
+
+	if (symbol->properties) {
+		const char *separator = "";
+
+		fputs(",\"properties\":[", out);
+
+		if (symbol->properties & SEMINDEX_PROPERTY_CONSTRUCTOR) {
+			fprintf(out, "%s\"constructor\"", separator);
+			separator = ",";
+		}
+
+		if (symbol->properties & SEMINDEX_PROPERTY_DESTRUCTOR)
+			fprintf(out, "%s\"destructor\"", separator);
+
+		fputc(']', out);
+	}
+
+	fputc('}', out);
 }
 
 static void print_json_use(FILE *out, const semindex_use_t *use)

@@ -416,6 +416,41 @@ int semindex_db_query_identity(semindex_db_t *db, const semindex_db_identity_que
 	return semindex_db_query(db, &options, callback, data);
 }
 
+int semindex_db_query_properties(semindex_db_t *db, const semindex_db_identity_t *identity,
+	unsigned long long *properties)
+{
+	static const char *sql = "SELECT symbol_properties.properties FROM symbol_properties JOIN files"
+				 " ON files.id = symbol_properties.file_id"
+				 " WHERE symbol_properties.symbol = ?1 AND symbol_properties.kind = ?2"
+				 " AND symbol_properties.usr_id = ?3 AND files.variant = ?4";
+	sqlite3_stmt *stmt = NULL;
+	int step;
+	int ret = -1;
+
+	if (!db || !identity || !identity->variant || !identity->symbol || !identity->usr_id || !properties)
+		return -1;
+
+	*properties = 0;
+
+	if (prepare(db, sql, &stmt) < 0)
+		goto out;
+
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 1, identity->symbol));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int(stmt, 2, identity->kind));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_int64(stmt, 3, (sqlite3_int64)identity->usr_id));
+	SEMINDEX_SQLITE_BIND_OR_GOTO(out, semindex_sqlite_bind_text(stmt, 4, identity->variant));
+
+	while ((step = sqlite3_step(stmt)) == SQLITE_ROW)
+		*properties |= (unsigned long long)sqlite3_column_int64(stmt, 0);
+
+	if (step == SQLITE_DONE)
+		ret = 0;
+out:
+	sqlite3_finalize(stmt);
+
+	return ret;
+}
+
 int semindex_db_query_symbol_types(semindex_db_t *db, const semindex_db_symbol_type_query_t *query,
 	semindex_db_symbol_type_callback_t callback, void *data)
 {

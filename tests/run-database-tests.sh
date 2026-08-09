@@ -130,7 +130,9 @@ if [ "$(sqlite3 "$repo_db" "SELECT git_commit FROM variants WHERE name = 'genera
 	fail "indexing without provenance discarded the recorded commit"
 fi
 
-printf '%s\n' 'struct shared { int pid; int other; };' >"$tmpdir/shared.h"
+printf '%s\n' 'struct shared { int pid; int other; };' \
+	'static void shared_init(void) __attribute__((constructor));' \
+	'static void shared_init(void) {}' >"$tmpdir/shared.h"
 
 pids=
 for worker in 1 2 3 4 5 6 7 8; do
@@ -161,6 +163,9 @@ if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM records JOIN files ON files.id = rec
 fi
 if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM symbol_types JOIN files ON files.id = symbol_types.file_id WHERE symbol_types.symbol = 'shared.pid' AND files.path = '$tmpdir/shared.h'")" != 1 ]; then
 	fail "shared header declared type was duplicated"
+fi
+if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM symbol_properties JOIN files ON files.id = symbol_properties.file_id WHERE symbol_properties.symbol = 'shared_init' AND files.path = '$tmpdir/shared.h'")" != 1 ]; then
+	fail "parallel writers duplicated shared symbol properties"
 fi
 if [ "$(sqlite3 "$db" "SELECT COUNT(*) FROM file_fingerprints JOIN files ON files.id = file_fingerprints.file_id WHERE files.path = '$tmpdir/shared.h'")" != 1 ]; then
 	fail "parallel writers duplicated the shared header fingerprint"

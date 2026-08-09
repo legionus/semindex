@@ -43,6 +43,12 @@ the declared and canonical spelling. Parameters that name a typedef, record, or
 enum also carry that type's compact identity. A variadic flag belongs to the
 return row, so functions without parameters still have a complete signature.
 
+The sparse `symbol_properties` table stores a 64-bit property mask only for
+symbols with semantic entry-point attributes. Constructor and destructor
+priorities are intentionally omitted because they do not affect symbol
+navigation or callgraph reachability. Properties from multiple declarations
+of one symbol are combined.
+
 ## Reader API
 
 `libsemindex_database` exposes a read-only C API in
@@ -172,8 +178,8 @@ rebuilding the index. This is an intentional tradeoff for a reproducible cache.
 
 ## Compatibility
 
-The database is an experimental interface. Schema version 17 stores structured
-function signatures and does not migrate older databases.
+The database is an experimental interface. Schema version 18 stores sparse
+symbol properties and does not migrate older databases.
 Dropping old tables in place would also leave their original multi-gigabyte file allocation.
 Remove an old database before indexing:
 

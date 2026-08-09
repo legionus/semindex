@@ -52,6 +52,11 @@ typedef enum {
 } semindex_scope_t;
 
 typedef enum {
+	SEMINDEX_PROPERTY_CONSTRUCTOR = 1ULL << 0,
+	SEMINDEX_PROPERTY_DESTRUCTOR = 1ULL << 1,
+} semindex_symbol_property_t;
+
+typedef enum {
 	SEMINDEX_INDEX_CLEAN,	/* frontend completed without errors */
 	SEMINDEX_INDEX_PARTIAL, /* frontend produced index data with errors */
 	SEMINDEX_INDEX_FAILED,	/* frontend produced no usable index data */
@@ -128,6 +133,7 @@ typedef struct {
 	unsigned column;
 	int local;
 	int definition;
+	unsigned long long properties;
 	unsigned long long order;
 } semindex_symbol_t;
 

@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "symbols": [
+    {"kind":"function","name":"startup","owner":null,"type":"void (void)","usr":"c:test25.c@F@startup","usr_id":"1abd6eccff7b1818","context":null,"file":"tests/test25.c","line":4,"column":13,"local":false,"definition":true,"properties":["constructor"]},
+    {"kind":"function","name":"shutdown","owner":null,"type":"void (void)","usr":"c:test25.c@F@shutdown","usr_id":"2f1c3f1379f2c15e","context":null,"file":"tests/test25.c","line":11,"column":13,"local":false,"definition":true,"properties":["destructor"]}
+  ],
+  "uses": [
+  ]
+}

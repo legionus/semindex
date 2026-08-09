@@ -39,6 +39,7 @@ struct FingerprintRecord {
 	const char *type_symbol;
 	int type_kind;
 	uint64_t type_usr_id;
+	uint64_t properties;
 };
 
 static void hashInteger(llvm::BLAKE3 &hash, uint64_t value)
@@ -79,6 +80,7 @@ static void hashRecord(llvm::BLAKE3 &hash, const FingerprintRecord &record)
 	hashString(hash, record.type_symbol);
 	hashInteger(hash, record.type_kind);
 	hashInteger(hash, record.type_usr_id);
+	hashInteger(hash, record.properties);
 }
 
 static void updateFingerprints(FileFingerprintState &state, const FingerprintRecord &record)
@@ -376,6 +378,7 @@ void rebuildRecords(semindex *s)
 		rec.column = sym.loc.column;
 		rec.local = sym.local;
 		rec.definition = sym.definition;
+		rec.properties = sym.properties;
 		rec.order = sym.order;
 
 		s->symbol_records.push_back(rec);
@@ -469,6 +472,7 @@ void rebuildFingerprints(semindex *s)
 			.type_symbol = rec.type_symbol,
 			.type_kind = rec.type_usr_id ? rec.type_kind : -1,
 			.type_usr_id = rec.type_usr_id,
+			.properties = rec.properties,
 		};
 
 		if (rec.file_index >= fingerprints.size())
@@ -495,6 +499,7 @@ void rebuildFingerprints(semindex *s)
 			.type_symbol = "",
 			.type_kind = -1,
 			.type_usr_id = 0,
+			.properties = 0,
 		};
 
 		if (rec.file_index >= fingerprints.size())

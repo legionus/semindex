@@ -129,6 +129,35 @@ static int collect_function(void *data, const semindex_db_record_t *record)
 	return 0;
 }
 
+static int check_properties(semindex_db_t *db, const char *symbol, unsigned long long expected)
+{
+	struct function_state function = { .symbol = symbol };
+	semindex_db_query_options_t options = {
+		.symbol = symbol,
+		.variant = "general",
+		.record = SEMINDEX_DB_RECORD_DEFINITION,
+		.kind = SEMINDEX_SYMBOL_FUNCTION,
+		.has_kind = 1,
+	};
+	semindex_db_identity_t identity;
+	unsigned long long properties;
+
+	if (semindex_db_query(db, &options, collect_function, &function) < 0 || function.count != 1)
+		return -1;
+
+	identity = (semindex_db_identity_t){
+		.variant = "general",
+		.symbol = symbol,
+		.usr_id = function.usr_id,
+		.kind = SEMINDEX_SYMBOL_FUNCTION,
+	};
+
+	if (semindex_db_query_properties(db, &identity, &properties) < 0)
+		return -1;
+
+	return properties == expected ? 0 : -1;
+}
+
 static int check_call(void *data, const semindex_db_record_t *record)
 {
 	struct call_state *state = data;
@@ -538,6 +567,9 @@ int main(int argc, char **argv)
 	if (check_pagination(db, argv[3]) < 0)
 		goto unexpected;
 	if (check_identity_queries(db, argv[2]) < 0)
+		goto unexpected;
+	if (check_properties(db, "startup", SEMINDEX_PROPERTY_CONSTRUCTOR) < 0 ||
+		check_properties(db, "shutdown", SEMINDEX_PROPERTY_DESTRUCTOR) < 0)
 		goto unexpected;
 	ret = 0;
 	goto out;

@@ -1,0 +1,5 @@
+
+FILE: tests/test25.c
+
+   4:13                   def   f startup                          void (void)
+  11:13                   def   f shutdown                         void (void)

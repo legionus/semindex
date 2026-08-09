@@ -11,6 +11,7 @@
 		semindex_db_query_functions;
 		semindex_db_query_function_types;
 		semindex_db_query_identity;
+		semindex_db_query_properties;
 		semindex_db_query_symbol_types;
 
 	local:

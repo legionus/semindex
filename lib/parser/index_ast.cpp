@@ -803,6 +803,7 @@ public:
 		s.loc = index.location(D->getLocation());
 		s.local = false;
 		s.definition = D->isThisDeclarationADefinition();
+		s.properties = functionProperties(D);
 
 		index.addSymbolInScope(std::move(s), D->getLocation());
 
@@ -862,6 +863,21 @@ public:
 	}
 
 private:
+	static unsigned long long functionProperties(const FunctionDecl *D)
+	{
+		unsigned long long properties = 0;
+
+		for (const FunctionDecl *declaration : D->redecls()) {
+			if (declaration->hasAttr<ConstructorAttr>())
+				properties |= SEMINDEX_PROPERTY_CONSTRUCTOR;
+
+			if (declaration->hasAttr<DestructorAttr>())
+				properties |= SEMINDEX_PROPERTY_DESTRUCTOR;
+		}
+
+		return properties;
+	}
+
 	static bool isFunctionPointer(QualType type)
 	{
 		return !type.isNull() && type->isFunctionPointerType();

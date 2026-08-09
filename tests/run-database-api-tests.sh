@@ -30,6 +30,8 @@ callgraph_path=tests/callgraph-a.c
 	cc --no-default-config "$source"
 "$SEMINDEX" compiler --root="$SOURCE_DIR" --database="$db" --no-store-command -- \
 	cc --no-default-config "$SOURCE_DIR/tests/test8.c"
+"$SEMINDEX" compiler --root="$SOURCE_DIR" --database="$db" --no-store-command -- \
+	cc --no-default-config "$SOURCE_DIR/tests/test25.c"
 "$DATABASE_API_TEST" "$db" "$source_path" "$callgraph_path" "$SOURCE_DIR"
 
 if [ "$(sqlite3 "$db" "SELECT declared_type || ':' || canonical_type FROM symbol_types
@@ -131,6 +133,23 @@ fi
 if printf '%s\n' "$function_type_plan" | grep -q 'SCAN function_types'; then
 	printf '%s\n' "$function_type_plan" >&2
 	fail "function type lookup scans all function types"
+fi
+
+property_id=$(sqlite3 "$db" "SELECT printf('%016x', usr_id) FROM records
+WHERE symbol = 'startup' AND record = 0 LIMIT 1")
+property_plan=$(sqlite3 "$db" "EXPLAIN QUERY PLAN
+SELECT symbol_properties.properties FROM symbol_properties
+JOIN files ON files.id = symbol_properties.file_id
+WHERE symbol_properties.symbol = 'startup' AND symbol_properties.kind = 7
+AND symbol_properties.usr_id = 0x$property_id AND files.variant = 'general'")
+if ! printf '%s\n' "$property_plan" |
+	grep -q 'SEARCH symbol_properties USING PRIMARY KEY (symbol=? AND kind=? AND usr_id=?)'; then
+	printf '%s\n' "$property_plan" >&2
+	fail "symbol property lookup does not use the primary key"
+fi
+if printf '%s\n' "$property_plan" | grep -q 'SCAN symbol_properties'; then
+	printf '%s\n' "$property_plan" >&2
+	fail "symbol property lookup scans all properties"
 fi
 if printf '%s\n' "$identity_plan" | grep -q 'SCAN records'; then
 	printf '%s\n' "$identity_plan" >&2

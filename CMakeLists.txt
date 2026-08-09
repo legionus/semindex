@@ -98,6 +98,7 @@ set(SEMINDEX_FORMAT_SOURCES
 	tests/test22.c
 	tests/test23.c
 	tests/test24.c
+	tests/test25.c
 	lib/common/array_size.h
 	tools/callgraph/cmd.c
 	tools/cc/cmd.c
@@ -566,6 +567,7 @@ if(BUILD_TESTING)
 		tests/test22.c
 		tests/test23.c
 		tests/test24.c
+		tests/test25.c
 	)
 		get_filename_component(test_name ${test_source} NAME)
 		add_test(
