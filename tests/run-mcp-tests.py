@@ -117,17 +117,21 @@ class Client:
 			fail(f"server exited with status {status}: {self.process.stderr.read()}")
 
 
-def index_fixture(semindex, database, workspace, source, store_command=False):
+def index_fixture(semindex, database, workspace, source, store_command=False, compiler_arguments=None):
 	arguments = [
-			semindex,
-			"compiler",
-			f"--database={database}",
-			f"--root={workspace}",
-			"--",
-			"cc",
-			"--no-default-config",
-			source,
-		]
+		semindex,
+		"compiler",
+		f"--database={database}",
+		f"--root={workspace}",
+		"--",
+		"cc",
+		"--no-default-config",
+	]
+
+	if compiler_arguments:
+		arguments.extend(compiler_arguments)
+
+	arguments.append(source)
 
 	if not store_command:
 		arguments.insert(4, "--no-store-command")
@@ -479,8 +483,21 @@ def main():
 		update_database = Path(temporary) / "update.db"
 		update_log = Path(temporary) / "update.log"
 		update_source = update_workspace / "update.c"
-		update_source.write_text("int before(void) { return 0; }\n", encoding="utf-8")
-		index_fixture(semindex, update_database, update_workspace, "update.c", store_command=True)
+		update_include = update_workspace / "include"
+		update_include.mkdir()
+		(update_include / "update.h").write_text("#define UPDATE_VALUE 0\n", encoding="utf-8")
+		update_source.write_text(
+			'#include "update.h"\nint before(void) { return UPDATE_VALUE; }\n',
+			encoding="utf-8",
+		)
+		index_fixture(
+			semindex,
+			update_database,
+			update_workspace,
+			"update.c",
+			store_command=True,
+			compiler_arguments=["-Iinclude"],
+		)
 
 		update_client = Client(mcp, update_database, update_workspace, update_log, ["--allow-reindex"])
 		update_client.send(
@@ -508,7 +525,10 @@ def main():
 		if not update_status.get("compilerCommandAvailable"):
 			fail("index_status did not find the saved compiler command")
 
-		update_source.write_text("int after(void) { return missing; }\n", encoding="utf-8")
+		update_source.write_text(
+			'#include "update.h"\nint after(void) { return UPDATE_VALUE + missing; }\n',
+			encoding="utf-8",
+		)
 		partial = update_client.tool("reindex_file", {"path": "update.c", "variant": "general"})
 
 		if partial.get("status") != "partial" or not partial.get("diagnostics"):
@@ -519,7 +539,10 @@ def main():
 		if not partial_records.get("records"):
 			fail("reindex_file did not store the partial index")
 
-		update_source.write_text("int after(void) { return 0; }\n", encoding="utf-8")
+		update_source.write_text(
+			'#include "update.h"\nint after(void) { return UPDATE_VALUE; }\n',
+			encoding="utf-8",
+		)
 		clean = update_client.tool("reindex_file", {"path": "update.c", "variant": "general"})
 
 		if clean.get("status") != "clean" or clean.get("diagnostics"):

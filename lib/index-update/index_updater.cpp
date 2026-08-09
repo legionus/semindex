@@ -7,7 +7,6 @@ extern "C" {
 
 #include <filesystem>
 #include <mutex>
-#include <system_error>
 #include <utility>
 
 namespace
@@ -87,9 +86,6 @@ SemindexIndexUpdateResult SemindexIndexUpdater::update(const SemindexIndexUpdate
 	SemindexIndexUpdateResult result;
 	SemindexCommandResolution resolution;
 	const SemindexResolvedCommand *resolved;
-	std::error_code fs_error;
-	std::filesystem::path old_directory;
-	bool changed_directory = false;
 
 	if (request.stopped && request.stopped()) {
 		result.error = "index update cancelled";
@@ -110,24 +106,6 @@ SemindexIndexUpdateResult SemindexIndexUpdater::update(const SemindexIndexUpdate
 	result.directory = resolved->directory();
 
 	if (resolved->source() == SemindexResolvedCommand::Source::Saved) {
-		old_directory = std::filesystem::current_path(fs_error);
-
-		if (fs_error) {
-			result.error = "failed to read the current directory: " + fs_error.message();
-
-			goto out;
-		}
-
-		std::filesystem::current_path(resolved->directory(), fs_error);
-
-		if (fs_error) {
-			result.error = "failed to enter compiler directory '" + resolved->directory() +
-				"': " + fs_error.message();
-
-			goto out;
-		}
-
-		changed_directory = true;
 		pipeline_request.input = INDEX_PIPELINE_COMMAND;
 		pipeline_request.storage = INDEX_PIPELINE_STORE_SYMBOLS;
 		pipeline_request.command = resolved->command();
@@ -205,16 +183,6 @@ SemindexIndexUpdateResult SemindexIndexUpdater::update(const SemindexIndexUpdate
 	result.status = SemindexIndexUpdateResult::Status::Clean;
 out:
 	index_pipeline_result_destroy(&pipeline, nullptr);
-
-	if (changed_directory) {
-		std::filesystem::current_path(old_directory, fs_error);
-
-		if (fs_error) {
-			result.status = SemindexIndexUpdateResult::Status::Failed;
-			result.error = "failed to restore the current directory: " + fs_error.message();
-			result.transient_index.reset();
-		}
-	}
 
 	return result;
 }
