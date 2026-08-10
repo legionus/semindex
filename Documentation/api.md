@@ -53,13 +53,31 @@ Use `semindex_symbol_count()` and `semindex_get_symbol()` to enumerate
 declarations and definitions. Uses are available through
 `semindex_use_count()` and `semindex_get_use()`.
 
+Symbol records include the written and canonical type spellings when Clang can
+resolve them. A field whose written type names a typedef, record, or enum also
+identifies that type symbol. Function symbols may carry the
+`SEMINDEX_PROPERTY_CONSTRUCTOR` or `SEMINDEX_PROPERTY_DESTRUCTOR` property
+bits. Attribute priorities are intentionally not recorded.
+
 `semindex_use_t.kind` gives the broad operation (`READ`, `WRITE`,
 `ADDR`, or `CALL`). Its `mode` field is the more detailed
 `semindex_use_mode_t` bitmask for address, value, and pointer access.
 
+Structured function signatures are available through
+`semindex_function_signature_count()` and
+`semindex_get_function_signature()`. A signature contains written and
+canonical return types, ordered parameters, optional parameter type
+identities, and the variadic flag.
+
 Local symbols are included by default. Disable them before indexing with
 `semindex_set_include_local(s, 0)`. The source scope is selected with
 `semindex_set_scope()`.
+
+`semindex_set_points_to_analysis()` enables the experimental, in-memory
+indirect-call constraint collector. Its counters are returned by
+`semindex_get_points_to_stats()`. This facility is intended for trace-based
+capacity measurements: it does not add inferred calls to normal records or
+persist constraints in SQLite.
 
 ## File fingerprints
 

@@ -104,6 +104,41 @@ subcommands without changing the dispatcher.
 CMake also writes `build/compile_commands.json`, which can be used to index the
 project itself.
 
+## Install
+
+Install the configured build with:
+
+```sh
+cmake --install build
+```
+
+Set a different installation prefix while configuring when `/usr/local` is not
+appropriate:
+
+```sh
+cmake -S . -B build \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX="$HOME/.local"
+cmake --build build -j"$(nproc)"
+cmake --install build
+```
+
+The installation contains the `semindex` dispatcher, built-in
+`semindex-*` helpers, LSP and MCP servers, `libsemindex`,
+`libsemindex_database`, and the public C headers. When Git support is enabled,
+the runtime-loaded libgit2 backend is installed in the same library directory.
+
+The dispatcher first searches for a helper beside its own executable and then
+uses `PATH`. Add the selected binary directory to `PATH` when installing below
+a user prefix:
+
+```sh
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+The project does not currently provide an uninstall target. Use CMake's
+`install_manifest.txt` to identify files installed from a build tree.
+
 ## Tests and formatting
 
 Run the test suite with:

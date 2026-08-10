@@ -1,9 +1,10 @@
 # Compiler command database
 
-`semindex compiler` stores its compiler arguments and `semindex index` stores
-the command selected from `compile_commands.json`.  Both write to `commands.db`
-beside the selected symbol database.  With the default paths, the state
-directory contains:
+`semindex compiler` stores its compiler arguments, `semindex index` stores the
+command selected from `compile_commands.json`, and `semindex cc` stores each
+eligible compiler invocation before running the real compiler. All three write
+to `commands.db` beside the selected symbol database. With the default paths,
+the state directory contains:
 
 ```text
 .semindex/semindex.db
@@ -13,8 +14,8 @@ directory contains:
 The default paths are below the repository root when a `.git` marker is found,
 or below the current directory otherwise.
 
-Both indexing commands accept `--commands-database=PATH` to select another
-command database and `--no-store-command` to disable command storage.  Commands
+All indexing commands accept `--commands-database=PATH` to select another
+command database and `--no-store-command` to disable command storage. Commands
 are keyed by index variant and canonical source path, so indexing the same
 source again replaces its command only within that variant.
 

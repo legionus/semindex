@@ -68,3 +68,11 @@ specific function has already been identified.
 `semindex_db_query_functions()` resolves a set of variant-qualified stable
 function IDs to their stored records. As with the CLI callgraph, indirect calls
 are not resolved.
+
+## Symbol properties
+
+`semindex_db_query_properties()` returns the combined 64-bit property mask for
+one exact symbol identity. The current public bits identify constructor and
+destructor entry points. A successful lookup with no stored property row
+returns a zero mask; properties from multiple declarations of the identity are
+combined by the writer.

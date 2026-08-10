@@ -59,6 +59,13 @@ probe, and link-only invocations are passed through. The exact real compiler
 argument vector, including its driver name, is stored in `commands.db` for
 indexed commands.
 
+Clean and partial frontend results are stored before the real compiler runs. A
+partial result therefore replaces stale records for the saved source in the
+same way as `semindex compiler`; a failed result with no usable records leaves
+the previous index unchanged. The selected `--index-errors` policy controls
+whether that indexing outcome is reported, ignored, or prevents compiler
+execution.
+
 The wrapper sets `SEMINDEX_CC_ACTIVE` before executing the real compiler and
 rejects an already guarded invocation. This prevents accidental recursion when
 `REAL_CC` or a launcher points back to `semindex-cc`.

@@ -30,11 +30,11 @@ the Git repository root used when the index was created.
 If the symbol database does not exist, the server creates it with an empty
 index instead of refusing to start. Opening and saving files begins populating
 that database. The server prefers a command already stored in the command
-database, then `compile_commands.json` in the workspace root. If neither is
-available, it indexes the file with a minimal command and retains partial
-results produced by Clang. The fallback command searches the workspace root
-and its `include` directory when present. The approximate command is not stored
-in the command database.
+database, then the compilation database selected with
+`--compile-commands=PATH`, then `compile_commands.json` in the repository root.
+If none is available, it indexes the file with a minimal command. The fallback
+command searches the repository root and its `include` directory when present;
+it is approximate and is not stored in the command database.
 
 The server reads `Content-Length` framed JSON-RPC messages from standard input
 and writes responses and notifications to standard output.
@@ -66,24 +66,28 @@ a statically resolved callee and are therefore omitted from the hierarchy.
 
 ## Index updates
 
-The server advertises save-only text synchronization. On
-`textDocument/didSave`, it loads the compiler command previously stored by
-`semindex compiler` or `semindex index`, indexes the saved file, and replaces
-that file's records in the symbol database before processing the next request.
-Unsaved buffer contents are not indexed.
+The server indexes a file on `textDocument/didOpen` and
+`textDocument/didSave`. It reads the saved file from disk; unsaved buffer text
+and incremental `textDocument/didChange` updates are not indexed.
 
-When Clang recovers a partial AST after an error, the server publishes its
-diagnostics with `textDocument/publishDiagnostics` and keeps the recovered
-main-file records in memory. Definition, reference, and document-highlight
-requests use this overlay while records from other files continue to come from
-the last clean database. A clean save replaces the database records and clears
-the overlay and diagnostics. A failed frontend run discards the overlay and
-falls back to the last clean database. Partial records never replace persistent
-records.
+When a saved command or compilation-database command is available, clean and
+partial results replace that source's records in the symbol database before
+the next request is processed. This matches `semindex compiler` and
+`semindex index`: a partial index describes the current saved source instead of
+retaining stale clean records. The selected compilation-database command is
+also saved in `commands.db`. A failed frontend run with no usable records
+leaves the existing persistent index unchanged.
 
-Call hierarchy requests continue to use the persistent index. Recovery
-expressions may preserve a referenced function without preserving enough
-semantics to classify the operation as a call.
+When only the approximate fallback command is available, its clean or partial
+main-file records are kept in a transient overlay rather than persisted.
+Definition, reference, and document-highlight requests consult that overlay
+and the persistent database. Opening a header without a compiler command can
+therefore provide navigation within that document without treating the
+approximate command as project configuration.
+
+Frontend diagnostics are published through
+`textDocument/publishDiagnostics`. Call hierarchy always uses persistent
+records; a fallback overlay is not added to the stored call graph.
 
 The compiler command database defaults to `commands.db` beside the symbol
 database. Select another path with `--commands-database=PATH`. When no variant
@@ -92,19 +96,8 @@ query all variants. Use `--variant=NAME` to update and query another variant.
 Save updates preserve local symbols by default. Use `--no-include-local` when
 the existing index intentionally omits them.
 
-## Integration with Editor
+## Editor integration
 
-### Vim
-
-If you're using [vim-lsp](https://github.com/prabirshrestha/vim-lsp), to use
-`semindex-lsp` you'll need to add something like this to your `~/.vimrc`:
-
-```vim
-if executable('semindex-lsp')
-    au User lsp_setup call lsp#register_server({
-                \ 'name': 'semindex-lsp',
-                \ 'cmd': {server_info->['semindex-lsp']},
-                \ 'allowlist': ['c', 'cpp'],
-                \ })
-endif
-```
+See [lsp-editors.md](lsp-editors.md) for editor setup and protocol-log
+diagnostics. The editor must use the same project root as the index so
+repository-relative paths resolve consistently.

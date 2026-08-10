@@ -47,6 +47,10 @@ Also make sure the project still builds:
 cmake --build build
 ```
 
+A documentation-only patch does not require a rebuild or CTest run. It must
+still pass `git diff --check`, and its links, commands, and references must be
+checked against the current implementation.
+
 For changes that affect indexed source locations, update the corresponding
 `tests/*.json.expect` and `tests/*.dissect.expect` files in the same patch.
 
@@ -76,3 +80,6 @@ Before sending a patch, verify:
 * `ctest --test-dir build --output-on-failure` succeeds;
 * generated expectation changes are intentional and reviewed;
 * performance-sensitive changes include baseline and candidate measurements.
+
+The build, source-format, and CTest items may be marked not applicable for a
+documentation-only patch.

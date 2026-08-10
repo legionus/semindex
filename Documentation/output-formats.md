@@ -147,6 +147,12 @@ mode string and its numeric bitmask. Optional strings and unavailable stable
 IDs are `null`. Function and call identities are hexadecimal strings rather
 than JSON numbers so all 64 bits remain exact.
 
+Function symbols with entry-point attributes include a `properties` array.
+The currently emitted values are `constructor` and `destructor`; symbols
+without properties omit the field. Structured function signatures and
+canonical type relationships are parser and database APIs and are not part of
+JSON output version 1.
+
 Consumers must check `version` before interpreting the document. New optional
 fields may be added without changing the version; incompatible structural or
 semantic changes require a new version.

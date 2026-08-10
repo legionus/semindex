@@ -36,44 +36,73 @@ An indexing operation reports a clean, partial, or failed result. Partial
 results contain records recovered by Clang despite frontend errors; failed
 results contain no usable records. Callers of the parser API must inspect
 `semindex_get_index_result()` instead of relying only on the integer return
-value. The `compiler` and `index` commands store clean and partial results so
-the persistent index describes the latest saved source. See
+value. The `compiler`, `index`, and `cc` commands store clean and partial
+results so the persistent index describes the latest saved source. See
 [Documentation/api.md](Documentation/api.md) for result semantics, diagnostics,
 record lifetime, and fingerprints.
 
 ## Architecture
 
-The project is split into two layers.
+semindex is organized as a set of command-line and protocol frontends over
+shared indexing, query, and storage libraries.
 
 ```
-          +----------------------+
-          |      C programs      |
-          |  CLI / database / UI |
-          +----------+-----------+
-                     |
-                 semindex.h
-                     |
-          +----------v-----------+
-          |    libsemindex.so    |
-          |                      |
-          |  Clang LibTooling    |
-          |  AST traversal       |
-          |  semantic analysis   |
-          +----------------------+
+ +-------------------------+       +-------------------------+
+ | semindex dispatcher and |       | LSP and MCP servers     |
+ | semindex-* commands     |       |                         |
+ +------------+------------+       +------------+------------+
+              |                                 |
+              +---------------+-----------------+
+                              |
+              +---------------v-----------------+
+              | indexing pipeline and semantic  |
+              | query services                  |
+              +---------+-------------+---------+
+                        |             |
+          +-------------v--+       +--v----------------------+
+          | Clang parser,  |       | source and Git          |
+          | AST, PP, and   |       | resolution              |
+          | assembly index |       +-------------------------+
+          +-------+--------+
+                  |
+       +----------v-----------+     +-------------------------+
+       | symbol index         |     | compiler command        |
+       | semindex.db          |     | commands.db             |
+       +----------------------+     +-------------------------+
 ```
 
-Only the parser implementation library is written in C++. Public parser and
-database interfaces are exposed through plain C APIs; their C++ and internal
-storage implementation symbols are hidden.
+The `semindex` executable is a dispatcher for independently runnable
+`semindex-*` tools. The parser, semantic query layer, LSP server, and MCP server
+use C++ where Clang integration or owned protocol data benefits from it. CLI,
+SQLite storage, and output code remain in C. Public parser and database
+interfaces are plain C APIs, and implementation symbols are hidden.
 
-## Future work
+Symbol records and compiler commands deliberately use separate SQLite
+databases. The indexing pipeline coordinates parsing, fingerprints,
+provenance, and persistence without making the parser depend on either CLI or
+database policy. Protocol-neutral semantic and source-resolution libraries are
+shared by LSP and MCP, while wire-format behavior remains in each server.
 
-The remaining long-term work is to deepen the semantic model beyond the
-implemented symbol index, direct call graph, and SQLite queries. This includes:
+The README files under [`lib/`](lib/) describe the ownership boundary of each
+internal library. Database layouts and update rules are documented in
+[Documentation/index-database.md](Documentation/index-database.md) and
+[Documentation/command-database.md](Documentation/command-database.md).
 
-* richer struct, union, and enum relationships beyond field type identities;
-* indirect-call target resolution;
-* semantic queries beyond the original Sparse semind interface.
+## Development direction
+
+The immediate direction is to make the existing index useful as a dependable
+foundation for editor and agent workflows. Work is focused on:
+
+* broadening protocol-neutral semantic queries while keeping result sets
+  bounded and indexed;
+* improving incomplete-source and multi-configuration indexing without
+  weakening replacement or provenance rules;
+* extending type and call relationships where they can be represented without
+  copying source text into the database;
+* completing practical LSP and MCP workflows on top of the shared query layer.
+
+Specific unsupported language and protocol features are listed in
+[Current limitations](#current-limitations).
 
 ## Building
 
@@ -85,6 +114,9 @@ The project requires:
 
 See [Documentation/building.md](Documentation/building.md) for Fedora and
 Ubuntu package lists, versioned LLVM setup, tests, and troubleshooting.
+New users can follow
+[Documentation/getting-started.md](Documentation/getting-started.md) for a
+complete indexing and query workflow.
 
 Typical build:
 
@@ -120,9 +152,9 @@ It can also be used as CMake's `CMAKE_C_COMPILER_LAUNCHER`. See
 [Documentation/compiler-wrapper.md](Documentation/compiler-wrapper.md) for
 pass-through behavior, options, and indexing error policies.
 
-After a clean frontend result, the indexing commands replace the source's
-index records in `.semindex/semindex.db`. Partial or failed results make the
-command fail without replacing the last clean records. `compiler` is quiet
+After a clean or partial frontend result, the indexing commands replace the
+source's index records in `.semindex/semindex.db`. A failed result contains no
+usable records and does not replace the stored index. `compiler` is quiet
 unless `--format` is specified. For either indexing command, explicitly
 selecting a format prints the in-memory index without creating either database.
 Selected compiler arguments are stored
@@ -184,6 +216,27 @@ remain unavailable through MCP.
 
 See [Documentation/mcp.md](Documentation/mcp.md) for the tool set, pagination,
 source limits, protocol version, and security boundary.
+
+## Documentation
+
+User guides:
+
+* [Getting started](Documentation/getting-started.md);
+* [Command reference](Documentation/command-reference.md);
+* [Index management](Documentation/index-management.md);
+* [Building and installation](Documentation/building.md);
+* [LSP editor integration](Documentation/lsp-editors.md).
+
+Interface and implementation details:
+
+* [Parser API](Documentation/api.md) and
+  [database API](Documentation/database-api.md);
+* [symbol index](Documentation/index-database.md) and
+  [compiler command database](Documentation/command-database.md);
+* [output formats](Documentation/output-formats.md),
+  [callgraph](Documentation/callgraph.md), and
+  [source resolution](Documentation/source-resolution.md);
+* [LSP](Documentation/lsp.md) and [MCP](Documentation/mcp.md).
 
 The current database format is intentionally incompatible with earlier
 prototype versions. Remove an old `.semindex/semindex.db` before rebuilding an
