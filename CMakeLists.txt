@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
-project(semindex C CXX)
+project(semindex VERSION 1.0.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -229,6 +229,8 @@ add_library(semindex_database SHARED
 set_target_properties(semindex_database PROPERTIES
 	C_VISIBILITY_PRESET hidden
 	LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/lib/semindex_database/libsemindex_database.map
+	SOVERSION ${PROJECT_VERSION_MAJOR}
+	VERSION ${PROJECT_VERSION}
 )
 target_link_options(semindex_database PRIVATE
 	-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/lib/semindex_database/libsemindex_database.map
@@ -337,6 +339,8 @@ set_target_properties(semindex_parser PROPERTIES
 	CXX_VISIBILITY_PRESET hidden
 	LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/lib/semindex_parser/libsemindex.map
 	OUTPUT_NAME semindex
+	SOVERSION ${PROJECT_VERSION_MAJOR}
+	VERSION ${PROJECT_VERSION}
 	VISIBILITY_INLINES_HIDDEN YES
 )
 target_link_options(semindex_parser PRIVATE
