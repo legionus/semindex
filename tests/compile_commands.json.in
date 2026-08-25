@@ -12,6 +12,16 @@
   },
   {
     "directory": "@CMAKE_CURRENT_SOURCE_DIR@",
+    "file": "@CMAKE_CURRENT_SOURCE_DIR@/tests/test_cpp_hello.cpp",
+    "arguments": [
+      "@CMAKE_CXX_COMPILER@",
+      "--no-default-config",
+      "-c",
+      "@CMAKE_CURRENT_SOURCE_DIR@/tests/test_cpp_hello.cpp"
+    ]
+  },
+  {
+    "directory": "@CMAKE_CURRENT_SOURCE_DIR@",
     "file": "@CMAKE_CURRENT_SOURCE_DIR@/tests/test21.S",
     "arguments": [
       "@CMAKE_C_COMPILER@",

@@ -23,7 +23,8 @@ static int has_suffix(const char *str, const char *suffix)
 
 static int is_source(const char *arg)
 {
-	return has_suffix(arg, ".c") || has_suffix(arg, ".S");
+	return has_suffix(arg, ".c") || has_suffix(arg, ".S") || has_suffix(arg, ".cpp") || has_suffix(arg, ".cc") ||
+		has_suffix(arg, ".cxx") || has_suffix(arg, ".c++");
 }
 
 int compiler_command_driver_is_omitted(const char *arg)

@@ -99,6 +99,7 @@ set(SEMINDEX_FORMAT_SOURCES
 	tests/test23.c
 	tests/test24.c
 	tests/test25.c
+	tests/test_cpp_hello.cpp
 	lib/semindex_support/array_size.h
 	lib/semindex_command_db/command_db_common.c
 	lib/semindex_command_db/command_db_common.h
@@ -595,6 +596,7 @@ if(BUILD_TESTING)
 		tests/test23.c
 		tests/test24.c
 		tests/test25.c
+		tests/test_cpp_hello.cpp
 	)
 		get_filename_component(test_name ${test_source} NAME)
 		add_test(

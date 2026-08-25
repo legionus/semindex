@@ -19,12 +19,12 @@ static void compiler_help(void)
 {
 	compiler_usage(stdout);
 	printf("\n"
-	       "Index a C or preprocessed assembly source file from an explicit\n"
-	       "compiler argument vector.\n"
+	       "Index a C, C++, or preprocessed assembly source file from an\n"
+	       "explicit compiler argument vector.\n"
 	       "\n"
 	       "Arguments after '--' are treated as compiler arguments. COMPILER is\n"
 	       "optional and defaults to `cc'.\n"
-	       "Commands with exactly one .c or .S source file are indexed.\n"
+	       "Commands with exactly one C, C++, or .S source file are indexed.\n"
 	       "\n"
 	       "Options:\n"
 	       "  -f, --format=FORMAT        print index without storing it using selected\n"

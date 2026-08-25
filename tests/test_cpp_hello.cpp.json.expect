@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "symbols": [
+    {"kind":"struct","name":"Greeting","owner":null,"type":null,"usr":"c:@S@Greeting","usr_id":"36d039aa72309fec","context":null,"file":"tests/test_cpp_hello.cpp","line":3,"column":7,"local":false,"definition":true},
+    {"kind":"field","name":"value","owner":"Greeting","type":"int","usr":"c:@S@Greeting@FI@value","usr_id":"6515e215da7fcc16","context":null,"file":"tests/test_cpp_hello.cpp","line":6,"column":6,"local":false,"definition":true},
+    {"kind":"function","name":"Greeting","owner":null,"type":"void (int)","usr":"c:@S@Greeting@F@Greeting#I#","usr_id":"bd27bb32fcda7d0f","context":null,"file":"tests/test_cpp_hello.cpp","line":8,"column":2,"local":false,"definition":false},
+    {"kind":"function","name":"value_plus","owner":null,"type":"int (int)","usr":"c:@S@Greeting@F@value_plus#I#","usr_id":"ecd96a45673fdbe3","context":null,"file":"tests/test_cpp_hello.cpp","line":9,"column":6,"local":false,"definition":false},
+    {"kind":"function","name":"main","owner":null,"type":"int (void)","usr":"c:@F@main#","usr_id":"8ee1ab9c21451584","context":null,"file":"tests/test_cpp_hello.cpp","line":12,"column":5,"local":false,"definition":true},
+    {"kind":"variable","name":"greeting","owner":null,"type":"Greeting","usr":"c:test_cpp_hello.cpp@155@F@main#@greeting","usr_id":"2d4f2783ed8d5288","context":"main","file":"tests/test_cpp_hello.cpp","line":14,"column":11,"local":true,"definition":true}
+  ],
+  "uses": [
+    {"kind":"write","symbol_kind":"variable","mode":"-w-","mode_bits":8,"name":"greeting","owner":null,"type":"Greeting","usr":"c:test_cpp_hello.cpp@155@F@main#@greeting","usr_id":"2d4f2783ed8d5288","context":"main","context_usr":null,"context_usr_id":null,"file":"tests/test_cpp_hello.cpp","line":14,"column":11,"local":true},
+    {"kind":"read","symbol_kind":"struct","mode":"-r-","mode_bits":4,"name":"Greeting","owner":null,"type":null,"usr":"c:@S@Greeting","usr_id":"36d039aa72309fec","context":"main","context_usr":null,"context_usr_id":null,"file":"tests/test_cpp_hello.cpp","line":14,"column":2,"local":false},
+    {"kind":"call","symbol_kind":"function","mode":"--r","mode_bits":16,"name":"value_plus","owner":null,"type":"int (int)","usr":"c:@S@Greeting@F@value_plus#I#","usr_id":"ecd96a45673fdbe3","context":"main","context_usr":"c:@F@main#","context_usr_id":"8ee1ab9c21451584","file":"tests/test_cpp_hello.cpp","line":15,"column":18,"local":false},
+    {"kind":"read","symbol_kind":"function","mode":"--r","mode_bits":16,"name":"value_plus","owner":null,"type":"int (int)","usr":"c:@S@Greeting@F@value_plus#I#","usr_id":"ecd96a45673fdbe3","context":"main","context_usr":null,"context_usr_id":null,"file":"tests/test_cpp_hello.cpp","line":15,"column":18,"local":false},
+    {"kind":"read","symbol_kind":"variable","mode":"-r-","mode_bits":4,"name":"greeting","owner":null,"type":"Greeting","usr":"c:test_cpp_hello.cpp@155@F@main#@greeting","usr_id":"2d4f2783ed8d5288","context":"main","context_usr":null,"context_usr_id":null,"file":"tests/test_cpp_hello.cpp","line":15,"column":9,"local":true}
+  ]
+}
