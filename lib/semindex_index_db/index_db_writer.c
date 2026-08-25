@@ -771,6 +771,7 @@ static int stage_records(sqlite3 *db, semindex_t *s, const struct stored_paths *
 
 	for (i = 0; i < semindex_function_signature_count(s); i++) {
 		const semindex_function_signature_t *signature = semindex_get_function_signature(s, i);
+		char *symbol;
 		struct function_type_record record;
 		size_t parameter;
 
@@ -780,8 +781,12 @@ static int stage_records(sqlite3 *db, semindex_t *s, const struct stored_paths *
 		if (signature->file_index < cached_count && cached[signature->file_index])
 			continue;
 
+		symbol = qualified_name(signature->owner, signature->name);
+		if (!symbol)
+			goto out;
+
 		record = (struct function_type_record){
-			.symbol = signature->name,
+			.symbol = symbol,
 			.usr_id = signature->usr_id,
 			.path = record_path(paths, signature->file_index, signature->file),
 			.position = -1,
@@ -794,8 +799,10 @@ static int stage_records(sqlite3 *db, semindex_t *s, const struct stored_paths *
 			.variadic = signature->variadic,
 		};
 
-		if (stage_function_type(function_type_stmt, &record) < 0)
+		if (stage_function_type(function_type_stmt, &record) < 0) {
+			sqlite3_free(symbol);
 			goto out;
+		}
 
 		counts->function_types += sqlite3_changes64(db);
 
@@ -811,11 +818,15 @@ static int stage_records(sqlite3 *db, semindex_t *s, const struct stored_paths *
 			record.type_usr_id = param->type_usr_id;
 			record.variadic = 0;
 
-			if (stage_function_type(function_type_stmt, &record) < 0)
+			if (stage_function_type(function_type_stmt, &record) < 0) {
+				sqlite3_free(symbol);
 				goto out;
+			}
 
 			counts->function_types += sqlite3_changes64(db);
 		}
+
+		sqlite3_free(symbol);
 	}
 
 	ret = 0;

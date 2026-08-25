@@ -435,6 +435,7 @@ void rebuildRecords(semindex *s)
 
 		s->function_signature_records.push_back({
 			.name = signature.name.c_str(),
+			.owner = signature.owner.c_str(),
 			.usr = signature.usr.c_str(),
 			.usr_id = signature.usr.empty() ? 0 : llvm::xxHash64(signature.usr),
 			.return_type = signature.return_type.c_str(),

@@ -103,6 +103,7 @@ typedef struct {
 
 typedef struct {
 	const char *name;
+	const char *owner;
 	const char *usr;
 	unsigned long long usr_id;
 	const char *return_type;

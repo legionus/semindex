@@ -73,6 +73,7 @@ struct SemindexParameter {
 
 struct SemindexFunctionSignature {
 	std::string name;
+	std::string owner;
 	std::string usr;
 	std::string return_type;
 	std::string canonical_return_type;

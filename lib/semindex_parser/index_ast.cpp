@@ -825,6 +825,7 @@ public:
 		SemindexFunctionSignature signature;
 
 		signature.name = getName(D);
+		signature.owner = getOwnerName(D);
 		signature.usr = functionUSR(D);
 		signature.return_type = stableTypeName(D->getReturnType(), ctx);
 		signature.canonical_return_type = canonicalTypeName(D->getReturnType(), ctx);
