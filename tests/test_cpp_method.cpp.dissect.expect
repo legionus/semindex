@@ -1,0 +1,25 @@
+
+FILE: tests/test_cpp_method.cpp
+
+   3:8                    def   c Point
+   4:7                    def   m Point.x                          long
+   5:7                    def   m Point.y                          long
+   7:2                    decl   f Point.Point                      void (long, long)
+   8:7                    decl   f Point.process                    long (long)
+  11:7                    def   c Circle
+  14:7                    def   m Circle.radius                    long
+  16:2                    decl   f Circle.Circle                    void (long)
+  17:7                    decl   f Circle.process                   long (long)
+  20:5                    def   f main                             int (void)
+  22:8   main             def . v p                                Point
+  22:8   main             -w- . v p                                Point
+  22:2   main             -r-   c Point
+  22:8   main             --r   f Point.Point                      void (long, long)
+  23:9   main             def . v c                                Circle
+  23:9   main             -w- . v c                                Circle
+  23:2   main             -r-   c Circle
+  23:9   main             --r   f Circle.Circle                    void (long)
+  24:4   main             --r   f Circle.process                   long (long)
+  24:2   main             -r- . v c                                Circle
+  25:11  main             --r   f Point.process                    long (long)
+  25:9   main             -r- . v p                                Point
