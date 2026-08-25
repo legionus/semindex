@@ -32,6 +32,7 @@ static const struct symbol_kind_name symbol_kind_names[] = {
 	{ SEMINDEX_SYMBOL_FUNCTION, "function" },
 	{ SEMINDEX_SYMBOL_MACRO, "macro" },
 	{ SEMINDEX_SYMBOL_FILE, "file" },
+	{ SEMINDEX_SYMBOL_CLASS, "class" },
 };
 
 int parse_format(const char *value, enum output_format *format)

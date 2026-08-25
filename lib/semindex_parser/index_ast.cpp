@@ -210,9 +210,14 @@ static semindex_symbol_kind_t symbolKindForDecl(const ValueDecl *D)
 	return SEMINDEX_SYMBOL_VAR;
 }
 
+static bool hasRecordOwner(const Decl *D)
+{
+	return isa<FieldDecl>(D) || isa<IndirectFieldDecl>(D) || isa<CXXMethodDecl>(D);
+}
+
 static std::string getOwnerName(const Decl *D)
 {
-	if (!isa<FieldDecl>(D) && !isa<IndirectFieldDecl>(D))
+	if (!hasRecordOwner(D))
 		return "";
 
 	const auto *RD = dyn_cast<RecordDecl>(D->getDeclContext());
@@ -221,6 +226,17 @@ static std::string getOwnerName(const Decl *D)
 		return "";
 
 	return getName(RD);
+}
+
+static semindex_symbol_kind_t recordKindForDecl(const RecordDecl *D)
+{
+	if (D->isUnion())
+		return SEMINDEX_SYMBOL_UNION;
+
+	if (isa<CXXRecordDecl>(D))
+		return SEMINDEX_SYMBOL_CLASS;
+
+	return SEMINDEX_SYMBOL_STRUCT;
 }
 
 static const RecordDecl *recordDeclForType(QualType type)
@@ -311,7 +327,7 @@ static DeclaredTypeIdentity declaredTypeIdentity(TypeSourceInfo *info)
 		if (auto recordLoc = loc.getAs<RecordTypeLoc>()) {
 			const RecordDecl *D = recordLoc.getDecl();
 
-			return { D->isUnion() ? SEMINDEX_SYMBOL_UNION : SEMINDEX_SYMBOL_STRUCT, D };
+			return { recordKindForDecl(D), D };
 		}
 
 		if (auto enumLoc = loc.getAs<EnumTypeLoc>())
@@ -591,7 +607,7 @@ public:
 		if (isAnonymousRecord(D))
 			return true;
 
-		addTypeUse(D, D->isUnion() ? SEMINDEX_SYMBOL_UNION : SEMINDEX_SYMBOL_STRUCT, TL.getNameLoc(), "");
+		addTypeUse(D, recordKindForDecl(D), TL.getNameLoc(), "");
 		return true;
 	}
 
@@ -713,8 +729,7 @@ public:
 
 		SemindexSymbol s;
 
-		s.kind = D->isUnion() ? SEMINDEX_SYMBOL_UNION : SEMINDEX_SYMBOL_STRUCT;
-
+		s.kind = recordKindForDecl(D);
 		s.name = getName(D);
 		s.owner = "";
 		s.type = ""; // TODO: fill it later
@@ -795,7 +810,7 @@ public:
 
 		s.kind = SEMINDEX_SYMBOL_FUNCTION;
 		s.name = getName(D);
-		s.owner = "";
+		s.owner = getOwnerName(D);
 		s.type = stableTypeName(D->getType(), ctx);
 		s.canonical_type = canonicalTypeName(D->getType(), ctx);
 		s.usr = functionUSR(D);
@@ -862,6 +877,19 @@ public:
 		return true;
 	}
 
+	bool VisitCXXConstructExpr(CXXConstructExpr *E)
+	{
+		const FunctionDecl *FD = E->getConstructor();
+
+		if (FD) {
+			SourceLocation spelling = index.spellingLoc(E->getExprLoc());
+
+			addFunctionCall(FD, spelling);
+		}
+
+		return true;
+	}
+
 private:
 	static unsigned long long functionProperties(const FunctionDecl *D)
 	{
@@ -872,6 +900,12 @@ private:
 				properties |= SEMINDEX_PROPERTY_CONSTRUCTOR;
 
 			if (declaration->hasAttr<DestructorAttr>())
+				properties |= SEMINDEX_PROPERTY_DESTRUCTOR;
+
+			if (isa<CXXConstructorDecl>(declaration))
+				properties |= SEMINDEX_PROPERTY_CONSTRUCTOR;
+
+			if (isa<CXXDestructorDecl>(declaration))
 				properties |= SEMINDEX_PROPERTY_DESTRUCTOR;
 		}
 
@@ -1048,7 +1082,7 @@ private:
 		u.symbol_kind = SEMINDEX_SYMBOL_FUNCTION;
 		u.mode = SEMINDEX_MODE_R_PTR;
 		u.name = info.name;
-		u.owner = "";
+		u.owner = info.owner;
 		u.type = info.type;
 		u.usr = functionUSR(D);
 		u.context = currentFunction;
@@ -1335,7 +1369,7 @@ private:
 	{
 		SemindexSymbol s;
 
-		s.kind = D->isUnion() ? SEMINDEX_SYMBOL_UNION : SEMINDEX_SYMBOL_STRUCT;
+		s.kind = recordKindForDecl(D);
 		s.name = name;
 		s.owner = "";
 		s.type = "";

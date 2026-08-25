@@ -1,13 +1,14 @@
 
 FILE: tests/test_cpp_hello.cpp
 
-   3:7                    def   s Greeting
+   3:7                    def   c Greeting
    6:6                    def   m Greeting.value                   int
-   8:2                    decl   f Greeting                         void (int)
-   9:6                    decl   f value_plus                       int (int)
+   8:2                    decl   f Greeting.Greeting                void (int)
+   9:6                    decl   f Greeting.value_plus              int (int)
   12:5                    def   f main                             int (void)
   14:11  main             def . v greeting                         Greeting
   14:11  main             -w- . v greeting                         Greeting
-  14:2   main             -r-   s Greeting
-  15:18  main             --r   f value_plus                       int (int)
+  14:2   main             -r-   c Greeting
+  14:11  main             --r   f Greeting.Greeting                void (int)
+  15:18  main             --r   f Greeting.value_plus              int (int)
   15:9   main             -r- . v greeting                         Greeting

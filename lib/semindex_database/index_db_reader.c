@@ -398,7 +398,7 @@ int semindex_db_query_identity(semindex_db_t *db, const semindex_db_identity_que
 		!query->identity->symbol[0] || !query->identity->usr_id)
 		return -1;
 
-	if (query->identity->kind < SEMINDEX_SYMBOL_VAR || query->identity->kind > SEMINDEX_SYMBOL_FILE)
+	if (query->identity->kind < SEMINDEX_SYMBOL_VAR || query->identity->kind > SEMINDEX_SYMBOL_CLASS)
 		return -1;
 
 	options = (semindex_db_query_options_t){
@@ -496,7 +496,7 @@ int semindex_db_query_symbol_types(semindex_db_t *db, const semindex_db_symbol_t
 			return -1;
 	}
 
-	if (identity->kind < SEMINDEX_SYMBOL_VAR || identity->kind > SEMINDEX_SYMBOL_FILE)
+	if (identity->kind < SEMINDEX_SYMBOL_VAR || identity->kind > SEMINDEX_SYMBOL_CLASS)
 		return -1;
 
 	if (prepare(db, query->after ? after_sql : base_sql, &stmt) < 0)
