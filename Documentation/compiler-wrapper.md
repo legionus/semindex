@@ -53,7 +53,7 @@ another policy with `--index-errors=warn|fail|ignore`. `fail` prevents the real
 compiler from running after an indexing failure. `ignore` suppresses indexing
 diagnostics and continues. A compiler failure is never hidden by these modes.
 
-Only commands with exactly one `.c` or `.S` source are indexed. Preprocess-only,
+Only commands with exactly one C, C++, or `.S` source are indexed. Preprocess-only,
 assembly-output, dependency-only, multiple-source, response-file, compiler
 probe, and link-only invocations are passed through. The exact real compiler
 argument vector, including its driver name, is stored in `commands.db` for

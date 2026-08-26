@@ -53,9 +53,17 @@ Use `semindex_symbol_count()` and `semindex_get_symbol()` to enumerate
 declarations and definitions. Uses are available through
 `semindex_use_count()` and `semindex_get_use()`.
 
+Symbol kinds cover C and C++ sources. C++ classes and structs are symbols of
+kind `SEMINDEX_SYMBOL_CLASS`; their member functions are `SEMINDEX_SYMBOL_FUNCTION`
+symbols qualified by the class name, and members are `SEMINDEX_SYMBOL_FIELD`
+symbols. Owner-qualified names use the `.owner.name` form (for example
+`Circle.process`), the same convention as ordinary structure fields. Two
+methods with the same name in different classes have distinct USRs and thus
+distinct `usr_id` values.
+
 Symbol records include the written and canonical type spellings when Clang can
 resolve them. A field whose written type names a typedef, record, or enum also
-identifies that type symbol. Function symbols may carry the
+identifies that type symbol. C++ constructor and destructor methods carry the
 `SEMINDEX_PROPERTY_CONSTRUCTOR` or `SEMINDEX_PROPERTY_DESTRUCTOR` property
 bits. Attribute priorities are intentionally not recorded.
 
@@ -67,7 +75,9 @@ Structured function signatures are available through
 `semindex_function_signature_count()` and
 `semindex_get_function_signature()`. A signature contains written and
 canonical return types, ordered parameters, optional parameter type
-identities, and the variadic flag.
+identities, and the variadic flag. C++ method signatures are stored under the
+qualified symbol name and list only the declared parameters; the implicit
+`this` parameter is not part of the signature.
 
 Local symbols are included by default. Disable them before indexing with
 `semindex_set_include_local(s, 0)`. The source scope is selected with

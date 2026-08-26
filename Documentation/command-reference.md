@@ -17,8 +17,8 @@ describes each command's role, inputs, and persistent effects.
 semindex index [OPTION]... SOURCE
 ```
 
-Indexes one `.c` or preprocessed `.S` source using the command selected from a
-compilation database. `--compile-commands=PATH` accepts either
+Indexes one C or C++ source, or a preprocessed `.S` source, using the command
+selected from a compilation database. `--compile-commands=PATH` accepts either
 `compile_commands.json` or its directory. The default is the current directory.
 
 Clean and partial results update the symbol database and, unless
@@ -31,8 +31,8 @@ Clean and partial results update the symbol database and, unless
 semindex compiler [OPTION]... -- [COMPILER] ARG...
 ```
 
-Indexes exactly one `.c` or `.S` source from an explicit compiler argument
-vector. It does not execute the compiler. The driver is optional and defaults
+Indexes exactly one C or C++ source, or a preprocessed `.S` source, from an
+explicit compiler argument vector. It does not execute the compiler. The driver is optional and defaults
 to `cc`.
 
 The command has the same storage, scope, variant, provenance, tracing, and
@@ -94,8 +94,8 @@ semindex lsp [OPTION]...
 ```
 
 Runs the Language Server Protocol server over standard input and output. It
-supports definition, references, document highlights, direct-call hierarchy,
-diagnostics, and indexing on document open and save.
+supports definition, references, hover, document highlights, direct-call
+hierarchy, diagnostics, and indexing on document open and save.
 
 The server uses saved commands, an explicitly selected compilation database,
 or `compile_commands.json` in the repository root. If none is available, it

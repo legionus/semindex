@@ -40,16 +40,17 @@ Recent Emacs versions include
                  . ("semindex-lsp"))))
 ```
 
-Open a C source file and run `M-x eglot`. Definition and reference requests are
-exposed through the normal Emacs Xref commands, including `M-.` and `M-?`.
+Open a C or C++ source file and run `M-x eglot`. Definition, hover, and
+reference requests are exposed through the normal Emacs Xref commands,
+including `M-.` and `M-?`.
 Use `M-x eglot-events-buffer` and `M-x eglot-stderr-buffer` to inspect the
 client protocol log and server diagnostics.
 
 Eglot normally selects one server program for a major mode in one project.
 This registration takes precedence over a later matching C server entry. If
-another C language server is required for completion or hover, choose which
-server Eglot should manage or use a client setup that supports multiple servers
-for one buffer.
+another C language server is required for completion, choose which server Eglot
+should manage or use a client setup that supports multiple servers for one
+buffer.
 
 ## Visual Studio Code
 
@@ -62,7 +63,7 @@ extension. After installing it, add the following workspace settings:
 {
     "glspc.server.command": "semindex-lsp",
     "glspc.server.commandArguments": [],
-    "glspc.server.languageId": ["c"]
+    "glspc.server.languageId": ["c", "cpp"]
 }
 ```
 

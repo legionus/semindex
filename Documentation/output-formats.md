@@ -76,18 +76,21 @@ The local marker column is:
 The kind column uses one-character tags:
 
 ```text
-v variable or enum constant
+v variable
 m struct/union member
 s struct or union
-e enum
+E enum
+e enum constant
 t typedef
 f function
+c class
 d macro definition/reference
 i include file
 ```
 
-For fields, the printed name is `owner.name`, for example `S.x`.  For other
-records, the printed name is the symbol name.
+For fields and C++ methods, the printed name is `owner.name`, for example
+`S.x` or `Circle.process`. For other records, the printed name is the symbol
+name.
 
 Consecutive duplicate use records in the same file are suppressed when their
 printed dissect identity is the same.  This mirrors the compact style expected

@@ -95,6 +95,13 @@ semindex search --mode=w task_struct.pid
 semindex search 'worker*'
 ```
 
+C++ members are searched the same way, qualified by their class:
+
+```sh
+semindex search Circle.process
+semindex search --kind=function 'Circle.*'
+```
+
 Query direct call relationships:
 
 ```sh

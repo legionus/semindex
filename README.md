@@ -1,6 +1,8 @@
 # semindex
 
-**semindex** (Semantic Indexer for C) is an experimental semantic indexer for the C programming language built on top of the Clang frontend.
+**semindex** (Semantic Indexer for C and C++) is an experimental semantic
+indexer for the C and C++ programming languages built on top of the Clang
+frontend.
 
 The long-term goal of the project is to provide functionality similar to the original **semind** from the Sparse project while using an actively maintained parser and semantic analysis framework.
 
@@ -10,10 +12,12 @@ This repository is an early prototype.
 
 Implemented so far:
 
-* parsing C translation units with Clang LibTooling and preprocessing `.S`
-  sources, including explicitly marked assembler functions and direct calls;
+* parsing C and C++ translation units with Clang LibTooling and preprocessing
+  `.S` sources, including explicitly marked assembler functions and direct
+  calls;
 * indexing declarations, definitions, and references for variables, fields,
-  records, enums, enumerators, typedefs, functions, macros, and included files;
+  records, classes, enums, enumerators, typedefs, functions (including C++
+  member methods), macros, and included files;
 * access classification:
 
   * `READ`
@@ -26,8 +30,8 @@ Implemented so far:
 * transparent compiler wrapping for indexing during Make and CMake builds;
 * indexed search by qualified symbol name and access mode;
 * direct caller and callee queries with stable function identities;
-* LSP definition, reference, document-highlight, call-hierarchy, diagnostics,
-  and saved-file update support;
+* LSP definition, hover, reference, document-highlight, call-hierarchy,
+  diagnostics, and saved-file update support;
 * bounded MCP tools for semantic search, call relationships, source context,
   variants, index status, and opt-in single-file updates;
 * a C API exported from the C++ indexing implementation.
@@ -258,8 +262,9 @@ Among the missing features are:
 * general assembly labels, directives, and references in `.S` files; functions
   marked with `.type` or `.ent` and common direct-call instructions are
   recognized, but indirect calls and assembler `.macro` expansion are not;
-* LSP support for unsaved buffers, completion, hover, rename, and workspace
-  symbols.
+* LSP support for unsaved buffers, completion, rename, and workspace symbols;
+* C++ namespaces, templates, lambdas, and multiple inheritance; `new`/`delete`
+  expressions and virtual-dispatch calls are not recorded as references.
 
 ## Motivation
 

@@ -25,7 +25,7 @@ computed before SQLite staging; adding a record does not perform an identity
 lookup. A secondary file index supports file
 replacement and narrows source-position lookup to one indexed file.
 
-The `symbol_types` table stores nonempty declared and canonical C types for
+The `symbol_types` table stores nonempty declared and canonical types for
 symbol records with stable identities. A type relationship is stored once per
 symbol and source file, not on every reference. Its primary key begins with
 `(symbol, kind, usr_id)`, so an exact identity lookup does not scan unrelated
@@ -42,6 +42,8 @@ nonnegative positions preserve parameter order and names. Each row stores both
 the declared and canonical spelling. Parameters that name a typedef, record, or
 enum also carry that type's compact identity. A variadic flag belongs to the
 return row, so functions without parameters still have a complete signature.
+C++ methods are stored under their owner-qualified symbol
+(`Class.method`); the implicit `this` parameter is not stored.
 
 The sparse `symbol_properties` table stores a 64-bit property mask only for
 symbols with semantic entry-point attributes. Constructor and destructor
@@ -59,6 +61,9 @@ until that callback returns, so large searches do not require a buffered copy
 of the result set.
 
 Name queries accept the same exact and glob patterns as `semindex search`.
+C++ member symbols are stored owner-qualified (`Class.method`,
+`Class.field`) in the same column, so they use the same key and the same exact
+and glob lookups as structure fields.
 They may also restrict local records by their containing function and local
 status, allowing language-server queries to distinguish same-named local
 variables without adding an index or changing the database layout.
