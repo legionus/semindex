@@ -66,7 +66,8 @@ def function_id(database, source, symbol):
             "JOIN files ON files.id = records.file_id "
             "WHERE files.variant = 'general' AND files.path = ? "
             "AND records.symbol = ? AND records.record = 0 "
-            "AND records.action != 0 AND records.kind = 7",
+            "AND records.kind = 7 AND records.usr_id IS NOT NULL "
+            "ORDER BY records.action DESC LIMIT 1",
             (source.name, symbol),
         ).fetchone()
     if not row or row[0] is None:
@@ -74,10 +75,10 @@ def function_id(database, source, symbol):
     return f"{row[0] & ((1 << 64) - 1):016x}"
 
 
-def hierarchy_item(source, name, line, character, identity):
+def hierarchy_item(source, name, line, character, identity, width=None):
     selection = {
         "start": {"line": line, "character": character},
-        "end": {"line": line, "character": character + len(name)},
+        "end": {"line": line, "character": character + (width or len(name))},
     }
     return {
         "name": name,
@@ -286,6 +287,147 @@ def main():
         reference_character = len(
             reference_line[:reference_line.index("field")].encode("utf-16-le")
         ) // 2
+
+        cpp_source = directory / "method.cpp"
+        cpp_source.write_text(
+            (fixtures / "test_cpp_method.cpp").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+        cpp_database = directory / "cpp" / "semindex.db"
+        cpp_commands = directory / "cpp" / "commands.db"
+        indexed = subprocess.run(
+            [
+                sys.argv[2], "compiler", f"--database={cpp_database}",
+                f"--commands-database={cpp_commands}", "--no-store-command",
+                "--", "cc", "--no-default-config", cpp_source.name,
+            ],
+            cwd=directory,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        if indexed.returncode != 0:
+            fail(f"failed to index {cpp_source.name}", indexed)
+
+        cpp_method = hierarchy_item(
+            cpp_source, "Circle.process", 16, 6,
+            function_id(cpp_database, cpp_source, "Circle.process"),
+            width=len("process"),
+        )
+        cpp_caller = hierarchy_item(
+            cpp_source, "main", 19, 4,
+            function_id(cpp_database, cpp_source, "main"),
+        )
+        cpp_uri = cpp_source.resolve().as_uri()
+        process, responses = run_server(
+            sys.argv[1], [
+                f"--database={cpp_database}",
+                f"--commands-database={cpp_commands}",
+                "--variant=general",
+            ], [
+                {
+                    "jsonrpc": "2.0", "id": 80, "method": "initialize",
+                    "params": {"rootUri": root_uri},
+                },
+                {
+                    "jsonrpc": "2.0", "id": 81, "method": "textDocument/hover",
+                    "params": {
+                        "textDocument": {"uri": cpp_uri},
+                        "position": {"line": 16, "character": 6},
+                    },
+                },
+                {
+                    "jsonrpc": "2.0", "id": 82,
+                    "method": "textDocument/definition",
+                    "params": {
+                        "textDocument": {"uri": cpp_uri},
+                        "position": {"line": 23, "character": 3},
+                    },
+                },
+                {
+                    "jsonrpc": "2.0", "id": 83,
+                    "method": "textDocument/definition",
+                    "params": {
+                        "textDocument": {"uri": cpp_uri},
+                        "position": {"line": 24, "character": 10},
+                    },
+                },
+                {
+                    "jsonrpc": "2.0", "id": 84,
+                    "method": "textDocument/references",
+                    "params": {
+                        "textDocument": {"uri": cpp_uri},
+                        "position": {"line": 23, "character": 3},
+                        "context": {"includeDeclaration": True},
+                    },
+                },
+                {
+                    "jsonrpc": "2.0", "id": 85,
+                    "method": "textDocument/prepareCallHierarchy",
+                    "params": {
+                        "textDocument": {"uri": cpp_uri},
+                        "position": {"line": 16, "character": 6},
+                    },
+                },
+                {
+                    "jsonrpc": "2.0", "id": 86,
+                    "method": "callHierarchy/incomingCalls",
+                    "params": {"item": cpp_method},
+                },
+                {"jsonrpc": "2.0", "id": 87, "method": "shutdown"},
+                {"jsonrpc": "2.0", "method": "exit"},
+            ],
+        )
+        if process.returncode != 0 or len(responses) != 8:
+            fail("C++ method lifecycle failed", process)
+        expected_hover = {
+            "contents": {
+                "kind": "markdown",
+                "value": "**method** `Circle.process`",
+            },
+        }
+        if responses[1].get("result") != expected_hover:
+            fail(f"C++ method hover is unexpected: {responses[1]}")
+        expected_cpp_definition = {
+            "uri": cpp_uri,
+            "range": source_range(16, 6, len("process")),
+        }
+        if responses[2].get("result") != [expected_cpp_definition]:
+            fail(
+                "C++ call did not resolve its method definition: "
+                f"{responses[2]}"
+            )
+        expected_point_definition = {
+            "uri": cpp_uri,
+            "range": source_range(7, 6, len("process")),
+        }
+        if responses[3].get("result") != [expected_point_definition]:
+            fail(
+                "C++ method lookup confused sibling classes: "
+                f"{responses[3]}"
+            )
+        expected_cpp_references = [
+            {
+                "uri": cpp_uri,
+                "range": source_range(23, 3, len("process")),
+            },
+            expected_cpp_definition,
+        ]
+        if responses[4].get("result") != expected_cpp_references:
+            fail(f"C++ method references are unexpected: {responses[4]}")
+        if responses[5].get("result") != [cpp_method]:
+            fail(
+                "prepareCallHierarchy returned an unexpected C++ item: "
+                f"expected {[cpp_method]}, got {responses[5]}"
+            )
+        expected_cpp_incoming = [{
+            "from": cpp_caller,
+            "fromRanges": [source_range(23, 3, len("process"))],
+        }]
+        if responses[6].get("result") != expected_cpp_incoming:
+            fail(f"C++ incoming calls differ: {responses[6].get('result')}")
+        if responses[7] != {"id": 87, "jsonrpc": "2.0", "result": None}:
+            fail("C++ lifecycle shutdown response is malformed")
 
         asm_uri = asm_caller.resolve().as_uri()
         process, responses = run_server(sys.argv[1], options[:3], [
@@ -584,10 +726,12 @@ def main():
         ) != "utf-16" or capabilities.get("definitionProvider") is not True or (
             capabilities.get("referencesProvider") is not True
         ) or capabilities.get("documentHighlightProvider") is not True or (
-            capabilities.get("callHierarchyProvider") is not True
-        ) or capabilities.get("textDocumentSync") != {
-            "change": 0, "openClose": True, "save": True,
-        }:
+            capabilities.get("hoverProvider") is not True
+        ) or capabilities.get("callHierarchyProvider") is not True or (
+            capabilities.get("textDocumentSync") != {
+                "change": 0, "openClose": True, "save": True,
+            }
+        ):
             fail("initialize response has unexpected capabilities")
         if responses[2].get("id") != 3 or responses[2].get("error", {}).get(
             "code"

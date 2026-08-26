@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "lsp_server.h"
 #include "lsp_text_position.h"
+#include "semantic_names.h"
 
 #include <llvm/Support/Error.h>
 
@@ -333,6 +334,39 @@ bool LspServer::documentHighlight(const llvm::json::Value &id, const llvm::json:
 	return reply(id, std::move(result));
 }
 
+static std::string hoverKindName(semindex_symbol_kind_t kind, llvm::StringRef symbol)
+{
+	if (kind == SEMINDEX_SYMBOL_FUNCTION && symbol.contains('.'))
+		return "method";
+
+	return semindex_symbol_kind_name(kind);
+}
+
+bool LspServer::hover(const llvm::json::Value &id, const llvm::json::Object *params)
+{
+	LspTextPosition position;
+
+	if (!lspParseTextPosition(params, position))
+		return error(&id, INVALID_PARAMS, "Invalid params");
+
+	std::vector<SemindexQueryRecord> cursors;
+
+	if (symbolsAt(queries, indexer.overlay(), variant, sources, position.uri, position.line, position.character,
+		    cursors) < 0)
+		return error(&id, INTERNAL_ERROR, "Database query failed");
+
+	if (cursors.empty())
+		return reply(id, nullptr);
+
+	const SemindexQueryRecord &cursor = cursors.front();
+	llvm::json::Object contents{
+		{ "kind", "markdown" },
+		{ "value", "**" + hoverKindName(cursor.kind, cursor.symbol) + "** `" + cursor.symbol + '`' },
+	};
+
+	return reply(id, llvm::json::Object{ { "contents", std::move(contents) } });
+}
+
 bool LspServer::didSave(const llvm::json::Object *params)
 {
 	const llvm::json::Object *document = params ? params->getObject("textDocument") : nullptr;
@@ -454,6 +488,7 @@ bool LspServer::dispatch(const llvm::json::Object &message)
 						{ "callHierarchyProvider", true },
 						{ "definitionProvider", true },
 						{ "documentHighlightProvider", true },
+						{ "hoverProvider", true },
 						{ "positionEncoding", "utf-16" },
 						{ "referencesProvider", true },
 						{ "textDocumentSync",
@@ -490,6 +525,9 @@ bool LspServer::dispatch(const llvm::json::Object &message)
 
 	if (*method == "textDocument/references")
 		return id ? references(*id, message.getObject("params")) : true;
+
+	if (*method == "textDocument/hover")
+		return id ? hover(*id, message.getObject("params")) : true;
 
 	if (*method == "textDocument/prepareCallHierarchy") {
 		if (!id)

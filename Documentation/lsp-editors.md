@@ -1,12 +1,12 @@
 # LSP editor integration
 
 `semindex-lsp` communicates over standard input and output. An editor must
-start it as a Language Server Protocol process for C files with the project
-root set to the source repository.
+start it as a Language Server Protocol process for C and C++ files with the
+project root set to the source repository.
 
-The server does not currently provide completion, hover, formatting, rename,
-or C++ language support. It can run alongside another language server when the
-client supports multiple servers for one document.
+The server does not currently provide completion, formatting, or rename. It
+can run alongside another language server when the client supports multiple
+servers for one document.
 
 ## Vim
 
@@ -18,7 +18,7 @@ if executable('semindex-lsp')
     au User lsp_setup call lsp#register_server({
                 \ 'name': 'semindex-lsp',
                 \ 'cmd': {server_info->['semindex-lsp']},
-                \ 'allowlist': ['c'],
+                \ 'allowlist': ['c', 'cpp'],
                 \ })
 endif
 ```
@@ -31,12 +31,13 @@ when relative indexed paths do not resolve correctly.
 
 Recent Emacs versions include
 [Eglot](https://www.gnu.org/software/emacs/manual/html_mono/eglot.html). Register
-`semindex-lsp` for the traditional and tree-sitter C modes:
+`semindex-lsp` for the traditional and tree-sitter C and C++ modes:
 
 ```elisp
 (with-eval-after-load 'eglot
   (add-to-list 'eglot-server-programs
-               '((c-mode c-ts-mode) . ("semindex-lsp"))))
+               '((c-mode c-ts-mode c++-mode c++-ts-mode)
+                 . ("semindex-lsp"))))
 ```
 
 Open a C source file and run `M-x eglot`. Definition and reference requests are
