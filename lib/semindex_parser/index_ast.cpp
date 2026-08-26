@@ -584,6 +584,10 @@ public:
 		if (isAnonymousRecord(D->getParent()))
 			return true;
 
+		if (const auto *CXX = dyn_cast_or_null<CXXRecordDecl>(D->getParent()))
+			if (CXX->getTemplateSpecializationKind() != TSK_Undeclared)
+				return true;
+
 		SemindexSymbol s;
 
 		s.kind = symbolKindForDecl(D);
@@ -773,6 +777,10 @@ public:
 		if (isAnonymousRecord(D))
 			return true;
 
+		if (const auto *CXX = dyn_cast<CXXRecordDecl>(D))
+			if (CXX->getTemplateSpecializationKind() != TSK_Undeclared)
+				return true;
+
 		SemindexSymbol s;
 
 		s.kind = recordKindForDecl(D);
@@ -842,6 +850,13 @@ public:
 	bool VisitFunctionDecl(FunctionDecl *D)
 	{
 		addAliasUse(D);
+
+		if (const auto *M = dyn_cast_or_null<CXXMethodDecl>(D)) {
+			const CXXRecordDecl *R = M->getParent();
+
+			if (R && R->getTemplateSpecializationKind() != TSK_Undeclared)
+				return true;
+		}
 
 		if (!D->isThisDeclarationADefinition() && !D->hasPrototype())
 			return true;
@@ -1089,8 +1104,63 @@ private:
 		return details ? getUSR(D, ctx) : "";
 	}
 
+	const CXXRecordDecl *primaryRecord(const CXXRecordDecl *R) const
+	{
+		if (!R || R->getTemplateSpecializationKind() == TSK_Undeclared)
+			return R;
+
+		const CXXRecordDecl *pat = R->getTemplateInstantiationPattern();
+
+		if (pat)
+			return pat;
+
+		if (const auto *CT = R->getDescribedClassTemplate())
+			return CT->getTemplatedDecl();
+
+		return R;
+	}
+
+	const ValueDecl *primaryValueDecl(const ValueDecl *D) const
+	{
+		if (const auto *M = dyn_cast_or_null<CXXMethodDecl>(D)) {
+			const CXXRecordDecl *R = M->getParent();
+
+			if (R && R->getTemplateSpecializationKind() != TSK_Undeclared) {
+				const CXXRecordDecl *primary = primaryRecord(R);
+
+				if (primary != R) {
+					for (const Decl *P : primary->decls()) {
+						const CXXMethodDecl *PM = dyn_cast_or_null<CXXMethodDecl>(P);
+
+						if (PM && PM->getName() == M->getName() &&
+							PM->getNumParams() == M->getNumParams())
+							return PM;
+					}
+				}
+			}
+		} else if (const auto *F = dyn_cast_or_null<FieldDecl>(D)) {
+			const CXXRecordDecl *R = dyn_cast_or_null<CXXRecordDecl>(F->getParent());
+
+			if (R && R->getTemplateSpecializationKind() != TSK_Undeclared) {
+				const CXXRecordDecl *primary = primaryRecord(R);
+
+				if (primary != R) {
+					for (const Decl *P : primary->decls()) {
+						const FieldDecl *PF = dyn_cast_or_null<FieldDecl>(P);
+
+						if (PF && PF->getName() == F->getName())
+							return PF;
+					}
+				}
+			}
+		}
+
+		return D;
+	}
+
 	const ValueInfo &valueInfo(const ValueDecl *D)
 	{
+		D = primaryValueDecl(D);
 		auto [entry, inserted] = valueInfoCache.try_emplace(D);
 
 		if (inserted) {
@@ -1109,7 +1179,7 @@ private:
 
 	const std::string &functionUSR(const FunctionDecl *D)
 	{
-		D = D->getCanonicalDecl();
+		D = dyn_cast_or_null<FunctionDecl>(primaryValueDecl(D))->getCanonicalDecl();
 		auto [entry, inserted] = functionUSRCache.try_emplace(D);
 
 		if (inserted)

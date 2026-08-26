@@ -263,7 +263,10 @@ Among the missing features are:
   marked with `.type` or `.ent` and common direct-call instructions are
   recognized, but indirect calls and assembler `.macro` expansion are not;
 * LSP support for unsaved buffers, completion, rename, and workspace symbols;
-* C++ namespaces, templates, lambdas, and multiple inheritance; `new`/`delete`
+* C++ lambdas and multiple inheritance; templates have no dedicated template
+  symbol (the primary template is indexed as a regular class, and
+  specializations are not recorded separately; see
+  [Documentation/api.md](Documentation/api.md)); `new`/`delete`
   expressions and virtual-dispatch calls are not recorded as references.
 
 ## Motivation

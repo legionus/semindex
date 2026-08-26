@@ -62,6 +62,17 @@ C++ members use the C++ spelling `ns::Circle.member` instead. Two
 methods with the same name in different classes have distinct USRs and thus
 distinct `usr_id` values.
 
+C++ templates currently produce no dedicated "template" symbol. The primary
+template record is indexed once, as a regular `SEMINDEX_SYMBOL_CLASS` (with its
+members as the usual `SEMINDEX_SYMBOL_FUNCTION` / `SEMINDEX_SYMBOL_FIELD`
+records); the template nature is observable only through the USR prefix
+(`ST>`) and the placeholder spellings in member types (for example the
+parameter type `T` in `long (T)`). Specializations and explicit
+instantiations such as `S<int>` and `S<const char *>` are not recorded as
+separate symbols, and uses of their members resolve to the primary record's
+symbols. A distinct template kind is intentionally not implemented at this
+time.
+
 Symbol records include the written and canonical type spellings when Clang can
 resolve them. A field whose written type names a typedef, record, or enum also
 identifies that type symbol. C++ constructor and destructor methods carry the

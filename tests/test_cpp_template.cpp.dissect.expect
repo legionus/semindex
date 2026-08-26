@@ -1,0 +1,38 @@
+
+FILE: tests/test_cpp_template.cpp
+
+   3:27                   def   c S
+   4:4                    def   m S.value                          T
+   5:7                    decl   f S.use                            long (T)
+  15:8                    def   c Outer
+  16:10                   def   m Outer.sp                         S<long>
+  17:9                    def   m Outer.si                         S<int>
+  20:6                    def   f sum_field                        long (Outer)
+  20:22  sum_field        def . v o                                Outer
+  20:16  sum_field        -r-   c Outer
+  22:14  sum_field        -r-   m S.value                          T
+  22:11  sum_field        -r-   m Outer.sp                         S<long>
+  22:9   sum_field        -r- . v o                                Outer
+  22:27  sum_field        -r-   m S.value                          T
+  22:24  sum_field        -r-   m Outer.si                         S<int>
+  22:22  sum_field        -r- . v o                                Outer
+  25:5                    def   f main                             int (void)
+  27:10  main             def . v s                                S<long>
+  27:10  main             -w- . v s                                S<long>
+  28:8   main             def . v o                                Outer
+  28:8   main             -w- . v o                                Outer
+  28:2   main             -r-   c Outer
+  29:18  main             def . v sp                               S<const char *>
+  29:18  main             -w- . v sp                               S<const char *>
+  30:9   main             def . v si                               S<int>
+  30:9   main             -w- . v si                               S<int>
+  32:7   main             def . v r                                long
+  32:7   main             -w- . v r                                long
+  32:13  main             --r   f S.use                            long (T)
+  32:11  main             -r- . v s                                S<long>
+  33:7   main             -w-   m S.value                          T
+  33:4   main             -r-   m Outer.sp                         S<long>
+  33:2   main             -r- . v o                                Outer
+  34:5   main             -w-   m S.value                          T
+  34:2   main             -r- . v si                               S<int>
+  36:14  main             -r- . v r                                long
