@@ -43,7 +43,8 @@ the declared and canonical spelling. Parameters that name a typedef, record, or
 enum also carry that type's compact identity. A variadic flag belongs to the
 return row, so functions without parameters still have a complete signature.
 C++ methods are stored under their owner-qualified symbol
-(`Class.method`); the implicit `this` parameter is not stored.
+(`Class.method`, or `ns::Class.method` when the record is inside a namespace);
+the implicit `this` parameter is not stored.
 
 The sparse `symbol_properties` table stores a 64-bit property mask only for
 symbols with semantic entry-point attributes. Constructor and destructor
@@ -62,7 +63,8 @@ of the result set.
 
 Name queries accept the same exact and glob patterns as `semindex search`.
 C++ member symbols are stored owner-qualified (`Class.method`,
-`Class.field`) in the same column, so they use the same key and the same exact
+`Class.field`, or the `ns::Class.member` namespace form) in the same column, so
+they use the same key and the same exact
 and glob lookups as structure fields.
 They may also restrict local records by their containing function and local
 status, allowing language-server queries to distinguish same-named local

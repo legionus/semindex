@@ -101,6 +101,7 @@ set(SEMINDEX_FORMAT_SOURCES
 	tests/test25.c
 	tests/test_cpp_hello.cpp
 	tests/test_cpp_method.cpp
+	tests/test_cpp_namespace.cpp
 	lib/semindex_support/array_size.h
 	lib/semindex_command_db/command_db_common.c
 	lib/semindex_command_db/command_db_common.h
@@ -599,6 +600,7 @@ if(BUILD_TESTING)
 		tests/test25.c
 		tests/test_cpp_hello.cpp
 		tests/test_cpp_method.cpp
+		tests/test_cpp_namespace.cpp
 	)
 		get_filename_component(test_name ${test_source} NAME)
 		add_test(

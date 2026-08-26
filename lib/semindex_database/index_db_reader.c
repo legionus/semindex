@@ -91,6 +91,25 @@ static int valid_cursor(const semindex_db_cursor_t *cursor)
 	return 1;
 }
 
+static const char *qualified_leaf(const char *symbol)
+{
+	const char *last = NULL;
+	const char *p;
+
+	for (p = symbol; *p; p++) {
+		if (*p == '.')
+			last = p;
+
+		if (p[0] == ':' && p[1] == ':' && (last == NULL || p >= last))
+			last = p + 1;
+	}
+
+	if (!last)
+		return symbol;
+
+	return last + 1;
+}
+
 static int emit_records(semindex_db_t *db, sqlite3_stmt *stmt, semindex_db_record_callback_t callback, void *data,
 	unsigned position_column)
 {
@@ -118,10 +137,9 @@ static int emit_records(semindex_db_t *db, sqlite3_stmt *stmt, semindex_db_recor
 		};
 
 		if (position_column) {
-			const char *name = strrchr(record.symbol, '.');
+			const char *name = qualified_leaf(record.symbol);
 			size_t length;
 
-			name = name ? name + 1 : record.symbol;
 			length = strlen(name);
 
 			if (position_column < record.column || position_column - record.column >= length)

@@ -225,16 +225,28 @@ std::string LspSourceMapper::displayPath(const char *path) const
 	return resolver.resolve(path ? path : "").string();
 }
 
+static const char *qualifiedLeaf(const char *symbol)
+{
+	const char *last = NULL;
+	const char *p;
+
+	for (p = symbol; *p; p++) {
+		if (*p == '.')
+			last = p;
+
+		if (p[0] == ':' && p[1] == ':' && (last == NULL || p >= last))
+			last = p + 1;
+	}
+	return last ? last + 1 : symbol;
+}
+
 llvm::json::Value LspSourceMapper::range(const semindex_db_record_t &record, Cache &cache) const
 {
 	std::filesystem::path path = resolver.resolve(record.path ? record.path : "");
 	unsigned start = record.column ? record.column - 1 : 0;
 	unsigned end;
 	unsigned line_number = record.line ? record.line - 1 : 0;
-	const char *leaf = record.symbol;
-
-	if (const char *dot = strrchr(leaf, '.'))
-		leaf = dot + 1;
+	const char *leaf = qualifiedLeaf(record.symbol);
 	std::string path_string = path.string();
 
 	if (cache.path != path_string) {

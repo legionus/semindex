@@ -336,7 +336,7 @@ bool LspServer::documentHighlight(const llvm::json::Value &id, const llvm::json:
 
 static std::string hoverKindName(semindex_symbol_kind_t kind, llvm::StringRef symbol)
 {
-	if (kind == SEMINDEX_SYMBOL_FUNCTION && symbol.contains('.'))
+	if (kind == SEMINDEX_SYMBOL_FUNCTION && (symbol.contains('.') || symbol.contains("::")))
 		return "method";
 
 	return semindex_symbol_kind_name(kind);

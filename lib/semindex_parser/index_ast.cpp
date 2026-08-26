@@ -215,6 +215,41 @@ static bool hasRecordOwner(const Decl *D)
 	return isa<FieldDecl>(D) || isa<IndirectFieldDecl>(D) || isa<CXXMethodDecl>(D);
 }
 
+static std::string namespacePrefix(const NamedDecl *D)
+{
+	std::string prefix;
+
+	for (const DeclContext *DC = D->getDeclContext(); DC; DC = DC->getParent()) {
+		const auto *NS = dyn_cast<NamespaceDecl>(DC);
+
+		if (!NS)
+			break;
+
+		prefix = NS->getNameAsString() + "::" + prefix;
+	}
+	return prefix;
+}
+
+static std::string qualifiedRecordName(const RecordDecl *D)
+{
+	std::string prefix = namespacePrefix(D);
+
+	if (!prefix.empty())
+		prefix += D->getNameAsString();
+
+	return prefix.empty() ? D->getNameAsString() : prefix;
+}
+
+static std::string qualifiedEnumName(const EnumDecl *D)
+{
+	std::string prefix = namespacePrefix(D);
+
+	if (!prefix.empty())
+		prefix += D->getNameAsString();
+
+	return prefix.empty() ? D->getNameAsString() : prefix;
+}
+
 static std::string getOwnerName(const Decl *D)
 {
 	if (!hasRecordOwner(D))
@@ -225,7 +260,7 @@ static std::string getOwnerName(const Decl *D)
 	if (!RD)
 		return "";
 
-	return getName(RD);
+	return qualifiedRecordName(RD);
 }
 
 static semindex_symbol_kind_t recordKindForDecl(const RecordDecl *D)
@@ -337,6 +372,17 @@ static DeclaredTypeIdentity declaredTypeIdentity(TypeSourceInfo *info)
 	return {};
 }
 
+static std::string typeIdentityName(const NamedDecl *D)
+{
+	if (const auto *RD = dyn_cast<RecordDecl>(D))
+		return qualifiedRecordName(RD);
+
+	if (const auto *ED = dyn_cast<EnumDecl>(D))
+		return qualifiedEnumName(ED);
+
+	return getName(D);
+}
+
 static void setDeclaredTypeIdentity(SemindexSymbol &symbol, TypeSourceInfo *info, const ASTContext &ctx)
 {
 	DeclaredTypeIdentity identity = declaredTypeIdentity(info);
@@ -345,7 +391,7 @@ static void setDeclaredTypeIdentity(SemindexSymbol &symbol, TypeSourceInfo *info
 		return;
 
 	symbol.type_kind = identity.kind;
-	symbol.type_symbol = getName(identity.decl);
+	symbol.type_symbol = typeIdentityName(identity.decl);
 	symbol.type_usr = getUSR(identity.decl, ctx);
 }
 
@@ -357,7 +403,7 @@ static void setDeclaredTypeIdentity(SemindexParameter &parameter, TypeSourceInfo
 		return;
 
 	parameter.type_kind = identity.kind;
-	parameter.type_symbol = getName(identity.decl);
+	parameter.type_symbol = typeIdentityName(identity.decl);
 	parameter.type_usr = getUSR(identity.decl, ctx);
 }
 
@@ -730,7 +776,7 @@ public:
 		SemindexSymbol s;
 
 		s.kind = recordKindForDecl(D);
-		s.name = getName(D);
+		s.name = qualifiedRecordName(D);
 		s.owner = "";
 		s.type = ""; // TODO: fill it later
 		s.usr = getUSR(D, ctx);
@@ -760,7 +806,7 @@ public:
 		SemindexSymbol s;
 
 		s.kind = SEMINDEX_SYMBOL_ENUM;
-		s.name = getName(D);
+		s.name = qualifiedEnumName(D);
 		s.owner = "";
 		s.type = "";
 		s.usr = getUSR(D, ctx);
@@ -1215,7 +1261,7 @@ private:
 		u.kind = SEMINDEX_USE_READ;
 		u.symbol_kind = kind;
 		u.mode = SEMINDEX_MODE_R_VAL;
-		u.name = getName(D);
+		u.name = typeIdentityName(D);
 		u.owner = "";
 		u.type = type;
 		u.usr = detailedUSR(D);

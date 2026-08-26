@@ -472,8 +472,14 @@ static int create_staging(sqlite3 *db)
 
 static char *qualified_name(const char *owner, const char *name)
 {
-	if (owner && owner[0])
-		return sqlite3_mprintf("%s.%s", owner, name ? name : "");
+	const char *separator = ".";
+
+	if (owner && owner[0]) {
+		if (strstr(owner, "::"))
+			separator = "::";
+
+		return sqlite3_mprintf("%s%s%s", owner, separator, name ? name : "");
+	}
 
 	return sqlite3_mprintf("%s", name ? name : "");
 }

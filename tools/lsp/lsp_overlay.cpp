@@ -7,10 +7,31 @@
 
 static std::string qualifiedName(const char *owner, const char *name)
 {
-	if (owner && owner[0])
-		return std::string(owner) + "." + (name ? name : "");
+	if (owner && owner[0]) {
+		std::string separator = ".";
+
+		if (std::string(owner).find("::") != std::string::npos)
+			separator = "::";
+
+		return std::string(owner) + separator + (name ? std::string(name) : std::string());
+	}
 
 	return name ? name : "";
+}
+
+static const char *qualifiedLeaf(const char *symbol)
+{
+	const char *last = NULL;
+	const char *p;
+
+	for (p = symbol; *p; p++) {
+		if (*p == '.')
+			last = p;
+
+		if (p[0] == ':' && p[1] == ':' && (last == NULL || p >= last))
+			last = p + 1;
+	}
+	return last ? last + 1 : symbol;
 }
 
 static bool matchesFilter(semindex_db_record_type_t record, const semindex_db_query_options_t &options)
@@ -63,9 +84,7 @@ static bool matchesOptions(const semindex_db_record_t &record, const semindex_db
 
 static const char *leafName(const std::string &symbol)
 {
-	size_t dot = symbol.rfind('.');
-
-	return dot == std::string::npos ? symbol.c_str() : symbol.c_str() + dot + 1;
+	return qualifiedLeaf(symbol.c_str());
 }
 
 void LspOverlay::replace(const std::string &path, const std::string &directory, const semindex_t *index)

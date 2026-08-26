@@ -1,0 +1,39 @@
+
+FILE: tests/test_cpp_namespace.cpp
+
+   6:8                    def   c alpha::Point
+   7:7                    def   m alpha::Point.x                   long
+   8:7                    def   m alpha::Point.y                   long
+  10:2                    decl   f alpha::Point.Point               void (long, long)
+  11:7                    decl   f alpha::Point.process             long (long)
+  14:6                    def   E alpha::Color
+  15:2                    def   e RED                              enum alpha::Color
+  16:2                    def   e GREEN                            enum alpha::Color
+  26:7                    def   c alpha::beta::Node
+  29:7                    def   m alpha::beta::Node.value          long
+  35:8                    def   c Outer
+  36:15                   def   m Outer.p                          alpha::Point
+  36:9                    -r-   c alpha::Point
+  37:15                   def   m Outer.color                      alpha::Color
+  37:9                    -r-   E alpha::Color
+  40:5                    def   f main                             int (void)
+  42:15  main             def . v p                                alpha::Point
+  42:15  main             -w- . v p                                alpha::Point
+  42:9   main             -r-   c alpha::Point
+  42:15  main             --r   f alpha::Point.Point               void (long, long)
+  43:8   main             def . v o                                Outer
+  43:8   main             -w- . v o                                Outer
+  43:2   main             -r-   c Outer
+  43:14  main             --r   f alpha::Point.Point               void (long, long)
+  43:21  main             -r-   c alpha::Point
+  43:34  main             -r-   e RED                              enum alpha::Color
+  45:4   main             --r   f alpha::Point.process             long (long)
+  45:2   main             -r- . v p                                alpha::Point
+  46:6   main             -w-   m alpha::Point.x                   long
+  46:4   main             -r-   m Outer.p                          alpha::Point
+  46:2   main             -r- . v o                                Outer
+  47:4   main             -w-   m Outer.color                      alpha::Color
+  47:2   main             -r- . v o                                Outer
+  47:12  main             -r-   e GREEN                            enum alpha::Color
+  48:11  main             -r-   m alpha::Point.x                   long
+  48:9   main             -r- . v p                                alpha::Point

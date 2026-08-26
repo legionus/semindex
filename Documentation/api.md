@@ -57,7 +57,8 @@ Symbol kinds cover C and C++ sources. C++ classes and structs are symbols of
 kind `SEMINDEX_SYMBOL_CLASS`; their member functions are `SEMINDEX_SYMBOL_FUNCTION`
 symbols qualified by the class name, and members are `SEMINDEX_SYMBOL_FIELD`
 symbols. Owner-qualified names use the `.owner.name` form (for example
-`Circle.process`), the same convention as ordinary structure fields. Two
+`Circle.process`), the same convention as ordinary structure fields. Namespaced
+C++ members use the C++ spelling `ns::Circle.member` instead. Two
 methods with the same name in different classes have distinct USRs and thus
 distinct `usr_id` values.
 
