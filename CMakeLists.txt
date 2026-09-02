@@ -99,6 +99,7 @@ set(SEMINDEX_FORMAT_SOURCES
 	tests/test23.c
 	tests/test24.c
 	tests/test25.c
+	tests/test_cpp_base.cpp
 	tests/test_cpp_casts.cpp
 	tests/test_cpp_hello.cpp
 	tests/test_cpp_lambda.cpp
@@ -608,6 +609,7 @@ if(BUILD_TESTING)
 		tests/test_cpp_method.cpp
 		tests/test_cpp_namespace.cpp
 		tests/test_cpp_template.cpp
+		tests/test_cpp_base.cpp
 		tests/test_cpp_casts.cpp
 	)
 		get_filename_component(test_name ${test_source} NAME)

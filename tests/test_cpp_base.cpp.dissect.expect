@@ -1,0 +1,13 @@
+
+FILE: tests/test_cpp_base.cpp
+
+   3:8                    def   c B
+   4:6                    def   m B.v                              int
+   6:8                    def   c D1
+   6:20                   -r-   c B
+   8:8                    def   c D2
+   8:23                   -r-   c B
+  10:8                    def   c D3
+  10:21                   -r-   c B
+  12:8                    def   c X
+  13:6                    def   m X.w                              int

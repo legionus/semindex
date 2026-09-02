@@ -92,6 +92,13 @@ only on the explicit cast being user-written in source.  A cast to a primitive
 type (`int`, `long`, ...) is also not recorded, consistent with the treatment
 of other primitive operands.
 
+A C++ base-class specifier appearing in a class definition (for example the
+`B` in `class D : public B {}`) is recorded as a `SEMINDEX_USE_READ` use on
+the base record `B`, the same way a `static_cast` is recorded on its target.
+It is not recorded as a `SEMINDEX_USE_CALL`; virtual-method dispatch and
+virtual-function calls keep their existing treatment and are not affected by
+this rule.
+
 Symbol records include the written and canonical type spellings when Clang can
 resolve them. A field whose written type names a typedef, record, or enum also
 identifies that type symbol. C++ constructor and destructor methods carry the
