@@ -32,6 +32,9 @@ char output_symbol_kind_char(semindex_symbol_kind_t kind)
 	case SEMINDEX_SYMBOL_CLASS:
 		return 'c';
 
+	case SEMINDEX_SYMBOL_LAMBDA:
+		return 'L';
+
 	case SEMINDEX_SYMBOL_VAR:
 	default:
 		return 'v';

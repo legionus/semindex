@@ -1,0 +1,11 @@
+
+FILE: tests/test_cpp_lambda.cpp
+
+   3:5                    def   f main                             int (void)
+   5:18                   def . L __lambda
+   5:7   main             def . v l                                struct :l
+   5:7   main             -w- . v l                                struct :l
+   5:18  main             def . v x                                int
+   5:30  main             -r- . v x                                int
+   6:9   main             --r   L __lambda
+   6:9   main             -r- . v l                                class (lambda at tests/test_cpp_lambda.cpp:5:11)

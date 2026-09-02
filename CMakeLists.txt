@@ -100,6 +100,8 @@ set(SEMINDEX_FORMAT_SOURCES
 	tests/test24.c
 	tests/test25.c
 	tests/test_cpp_hello.cpp
+	tests/test_cpp_lambda.cpp
+	tests/test_cpp_lambda1.cpp
 	tests/test_cpp_method.cpp
 	tests/test_cpp_namespace.cpp
 	tests/test_cpp_template.cpp
@@ -600,6 +602,8 @@ if(BUILD_TESTING)
 		tests/test24.c
 		tests/test25.c
 		tests/test_cpp_hello.cpp
+		tests/test_cpp_lambda.cpp
+		tests/test_cpp_lambda1.cpp
 		tests/test_cpp_method.cpp
 		tests/test_cpp_namespace.cpp
 		tests/test_cpp_template.cpp

@@ -73,6 +73,14 @@ separate symbols, and uses of their members resolve to the primary record's
 symbols. A distinct template kind is intentionally not implemented at this
 time.
 
+A C++ lambda declaration is indexed once as a symbol of kind
+`SEMINDEX_SYMBOL_LAMBDA` (kind value 11, string name `lambda`). By convention
+the symbol name is `__lambda`; the enclosing function context is recorded in
+the `usr_id`, and the `local` flag is set when the lambda is captured inside a
+function body. A direct call to the lambda (for example `l(1)`) is recorded as
+a `SEMINDEX_USE_CALL` use on that symbol, the same way an ordinary call is
+recorded on a `SEMINDEX_SYMBOL_FUNCTION`.
+
 Symbol records include the written and canonical type spellings when Clang can
 resolve them. A field whose written type names a typedef, record, or enum also
 identifies that type symbol. C++ constructor and destructor methods carry the

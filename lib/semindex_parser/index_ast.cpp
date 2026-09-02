@@ -274,6 +274,23 @@ static semindex_symbol_kind_t recordKindForDecl(const RecordDecl *D)
 	return SEMINDEX_SYMBOL_STRUCT;
 }
 
+/* A lambda closure is a CXXRecordDecl marked isLambda(); it is indexed as a
+ * first-class symbol of kind SEMINDEX_SYMBOL_LAMBDA, and a direct call to the
+ * lambda resolves to its operator() method whose parent is that closure. */
+static bool isLambdaClosure(const RecordDecl *D)
+{
+	const auto *CXX = dyn_cast_or_null<CXXRecordDecl>(D);
+
+	return CXX && CXX->isLambda();
+}
+
+static const CXXRecordDecl *lambdaClosureFor(const CXXMethodDecl *D)
+{
+	const CXXRecordDecl *R = D->getParent();
+
+	return (R && R->isLambda()) ? R : nullptr;
+}
+
 static const RecordDecl *recordDeclForType(QualType type)
 {
 	type = type.getCanonicalType();
@@ -1192,22 +1209,43 @@ private:
 		if (!D || loc.isInvalid())
 			return;
 
-		const ValueInfo &info = valueInfo(D);
 		SemindexUse u;
 
 		u.kind = SEMINDEX_USE_CALL;
-		u.symbol_kind = SEMINDEX_SYMBOL_FUNCTION;
 		u.mode = SEMINDEX_MODE_R_PTR;
+		u.context = currentFunction;
+		u.context_usr = currentFunctionUSR;
+		u.context_usr_id = currentFunctionUSRId;
+		u.loc = index.location(loc);
+		u.local = false;
+
+		/* A direct call to a lambda resolves to its closure (the lambda symbol),
+		 * not to the operator() method as a plain function call. */
+		const auto *M = dyn_cast_or_null<CXXMethodDecl>(D);
+
+		if (M) {
+			const CXXRecordDecl *closure = lambdaClosureFor(M);
+
+			if (closure) {
+				u.symbol_kind = SEMINDEX_SYMBOL_LAMBDA;
+				u.name = "__lambda";
+				u.owner = "";
+				u.usr = getUSR(closure, ctx);
+				u.usr_id = u.usr.empty() ? 0 : llvm::xxHash64(u.usr);
+
+				index.addUseInScope(std::move(u), loc);
+				return;
+			}
+		}
+
+		const ValueInfo &info = valueInfo(D);
+
+		u.symbol_kind = SEMINDEX_SYMBOL_FUNCTION;
 		u.name = info.name;
 		u.owner = info.owner;
 		u.type = info.type;
 		u.usr = functionUSR(D);
-		u.context = currentFunction;
-		u.context_usr = currentFunctionUSR;
 		u.usr_id = u.usr.empty() ? 0 : llvm::xxHash64(u.usr);
-		u.context_usr_id = currentFunctionUSRId;
-		u.loc = index.location(loc);
-		u.local = false;
 
 		index.addUseInScope(std::move(u), loc);
 	}
@@ -1486,19 +1524,28 @@ private:
 	{
 		SemindexSymbol s;
 
-		s.kind = recordKindForDecl(D);
-		s.name = name;
+		if (isLambdaClosure(D)) {
+			s.kind = SEMINDEX_SYMBOL_LAMBDA;
+			s.name = "__lambda";
+			s.local = !currentFunction.empty();
+		} else {
+			s.kind = recordKindForDecl(D);
+			s.name = name;
+			s.local = false;
+		}
+
 		s.owner = "";
 		s.type = "";
 		s.usr = getUSR(D, ctx);
 		s.context = "";
 		s.loc = index.displayLocation(ctx,
 			D->getBraceRange().getBegin().isValid() ? D->getBraceRange().getBegin() : D->getLocation());
-		s.local = false;
 		s.definition = true;
 
 		index.addSymbolInScope(std::move(s), D->getLocation());
-		addAnonymousRecordFields(D, name);
+
+		if (!isLambdaClosure(D))
+			addAnonymousRecordFields(D, name);
 	}
 
 	void addAnonymousRecordFields(const RecordDecl *D, const std::string &owner)

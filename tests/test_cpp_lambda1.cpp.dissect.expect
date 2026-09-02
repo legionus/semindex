@@ -1,0 +1,23 @@
+
+FILE: tests/test_cpp_lambda1.cpp
+
+   3:20                   def   L __lambda
+   3:6                    def   v file_lambda                      struct :file_lambda
+   3:6                    -w-   v file_lambda                      struct :file_lambda
+   3:27                   def   v v                                int
+   3:39                   -r-   v v                                int
+   5:5                    def   f double_it                        int (int)
+   5:19  double_it        def . v v                                int
+   7:29                   def . L __lambda
+   7:7   double_it        def . v local_lambda                     struct :local_lambda
+   7:7   double_it        -w- . v local_lambda                     struct :local_lambda
+   7:23  double_it        -r- . v v                                int
+   7:30  double_it        def . v x                                int
+   7:42  double_it        -r- . v v                                int
+   7:46  double_it        -r- . v x                                int
+   8:9   double_it        --r   L __lambda
+   8:9   double_it        -r- . v local_lambda                     class (lambda at tests/test_cpp_lambda1.cpp:7:22)
+  11:5                    def   f main                             int (void)
+  13:9   main             --r   L __lambda
+  13:9   main             -r-   v file_lambda                      class (lambda at tests/test_cpp_lambda1.cpp:3:20)
+  13:26  main             --r   f double_it                        int (int)

@@ -160,7 +160,7 @@ bool parseTypeCursor(llvm::StringRef encoded, OwnedTypeCursor &result)
 
 	auto parsed_type_usr_id = parseId(*type_usr_id);
 
-	if (!parsed_type_usr_id || *type_kind < -1 || *type_kind > SEMINDEX_SYMBOL_CLASS)
+	if (!parsed_type_usr_id || *type_kind < -1 || *type_kind > SEMINDEX_SYMBOL_LAMBDA)
 		return false;
 
 	result.declared_type = declared_type->str();
@@ -200,7 +200,7 @@ bool parseFunctionTypeCursor(llvm::StringRef encoded, OwnedFunctionTypeCursor &r
 	if (!parsed_type_usr_id || *position < -1 || *position > std::numeric_limits<int>::max())
 		return false;
 
-	if (*type_kind < -1 || *type_kind > SEMINDEX_SYMBOL_CLASS)
+	if (*type_kind < -1 || *type_kind > SEMINDEX_SYMBOL_LAMBDA)
 		return false;
 
 	result.position = *position;
@@ -252,7 +252,7 @@ bool parseCursor(llvm::StringRef encoded, OwnedCursor &result)
 	if (*line < 1 || *line > std::numeric_limits<unsigned>::max() || *column < 1 ||
 		*column > std::numeric_limits<unsigned>::max() || *record < SEMINDEX_DB_DECLARATION ||
 		*record > SEMINDEX_DB_REFERENCE || *action < 0 || *action > std::numeric_limits<unsigned>::max() ||
-		*kind < SEMINDEX_SYMBOL_VAR || *kind > SEMINDEX_SYMBOL_CLASS || *mode < 0 ||
+		*kind < SEMINDEX_SYMBOL_VAR || *kind > SEMINDEX_SYMBOL_LAMBDA || *mode < 0 ||
 		*mode > std::numeric_limits<unsigned>::max())
 		return false;
 
