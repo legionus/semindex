@@ -18,6 +18,10 @@ Implemented so far:
 * indexing declarations, definitions, and references for variables, fields,
   records, classes, enums, enumerators, typedefs, functions (including C++
   member methods), macros, and included files;
+* explicit user-written casts such as C-style `(T)x`, `static_cast<T>(x)`,
+  `dynamic_cast<T*>(x)`, and `const_cast<T>(x)` recorded as a `READ` reference
+  on the destination type symbol (see
+  [Documentation/api.md](Documentation/api.md));
 * access classification:
 
   * `READ`

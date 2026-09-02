@@ -1,0 +1,33 @@
+
+FILE: tests/test_cpp_casts.cpp
+
+   3:8                    def   c S
+   4:6                    def   m S.v                              int
+   6:8                    def   c D
+   6:12                   -r-   c S
+   9:6                    def   f f                                void (void)
+  11:4   f                def . v d                                D
+  11:4   f                -w- . v d                                D
+  11:2   f                -r-   c D
+  11:4   f                --r   f D.D                              void (void) noexcept
+  12:14  f                -r-   c S
+  12:2   f                --r   f S.S                              void (const S &) noexcept
+  12:17  f                -r- . v d                                D
+  13:5   f                def . v p                                S *
+  13:5   f                -w- . v p                                S *
+  13:2   f                -r-   c S
+  13:10  f                -r-   c S
+  13:15  f                m-- . v d                                D
+  14:5   f                def . v q                                S *
+  14:5   f                -w- . v q                                S *
+  14:2   f                -r-   c S
+  14:22  f                -r-   c S
+  14:28  f                m-- . v d                                D
+  15:6   f                def . v x                                int
+  15:6   f                -w- . v x                                int
+  16:7   f                def . v y                                long
+  16:7   f                -w- . v y                                long
+  16:11  f                -r- . v x                                int
+  17:6   f                def . v w                                int
+  17:6   f                -w- . v w                                int
+  17:15  f                -r- . v x                                int

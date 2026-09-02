@@ -81,6 +81,17 @@ function body. A direct call to the lambda (for example `l(1)`) is recorded as
 a `SEMINDEX_USE_CALL` use on that symbol, the same way an ordinary call is
 recorded on a `SEMINDEX_SYMBOL_FUNCTION`.
 
+Explicit user-written casts to a record or class target are recorded as
+`SEMINDEX_USE_READ` uses on the target type symbol.  This covers the C-style
+`(T)x`, the C++ `static_cast<T>(x)`, `dynamic_cast<T*>(x)`, and
+`const_cast` spellings.  The recorded target is the destination type of the
+cast (the pointee class for a pointer cast), not the source object.  Implicit
+casts introduced by conversion, member lookup, or the compiler are not
+recorded, so unrelated member-access noise is not produced; the rule depends
+only on the explicit cast being user-written in source.  A cast to a primitive
+type (`int`, `long`, ...) is also not recorded, consistent with the treatment
+of other primitive operands.
+
 Symbol records include the written and canonical type spellings when Clang can
 resolve them. A field whose written type names a typedef, record, or enum also
 identifies that type symbol. C++ constructor and destructor methods carry the
