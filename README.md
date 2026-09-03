@@ -233,7 +233,8 @@ User guides:
 * [Command reference](Documentation/command-reference.md);
 * [Index management](Documentation/index-management.md);
 * [Building and installation](Documentation/building.md);
-* [LSP editor integration](Documentation/lsp-editors.md).
+* [LSP editor integration](Documentation/lsp-editors.md);
+* [C++ support](Documentation/cpp-support.md).
 
 Interface and implementation details:
 
