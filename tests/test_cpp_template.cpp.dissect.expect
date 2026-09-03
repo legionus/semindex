@@ -1,7 +1,7 @@
 
 FILE: tests/test_cpp_template.cpp
 
-   3:27                   def   c S
+   3:27                   def   T S
    4:4                    def   m S.value                          T
    5:7                    decl   f S.use                            long (T)
   15:8                    def   c Outer

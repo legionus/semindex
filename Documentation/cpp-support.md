@@ -76,18 +76,21 @@ Search and navigation.
 
 These capabilities are reflected in the primary-template documentation in
 [api.md](api.md): the primary template of a templated class is indexed once as
-a regular `SEMINDEX_SYMBOL_CLASS` (with its members as the usual methods and
-fields); this is the intended, supported representation of templates today.
+a dedicated `SEMINDEX_SYMBOL_TEMPLATE` symbol (name `template`, dissect kind
+`T`) with its members as the usual methods and fields; specializations and
+explicit instantiations are not recorded as separate symbols. This is the
+intended, supported representation of class templates today.
 
 ## What is not supported yet
 
 This is a prototype and the following are not available.
 
-* Templates as dedicated symbols. There is no separate "template" symbol: the
-  primary template is indexed once as a regular `SEMINDEX_SYMBOL_CLASS`, and
-  specializations and explicit instantiations such as `S<int>` are not recorded
-  as separate symbols. Uses of a specialization's members resolve to the
-  primary record's symbols.
+* Function templates, variable templates, and alias templates as dedicated
+  symbols. Only the primary template of a templated class is indexed as a
+  dedicated `SEMINDEX_SYMBOL_TEMPLATE` symbol; function templates are still
+  indexed as `SEMINDEX_SYMBOL_FUNCTION`, and specializations and explicit
+  instantiations such as `S<int>` are not recorded as separate symbols. Uses
+  of a specialization's members resolve to the primary record's symbols.
 * Lambdas and anonymous classes beyond the single `SEMINDEX_SYMBOL_LAMBDA`
   kind. Only the lambda declaration and its direct calls are indexed; nested
   anonymous types have no dedicated representation.
@@ -134,8 +137,9 @@ The commands below match the project's build system and the
    * `test_cpp_method` (classes, owner-qualified fields and methods, overloads,
      constructor calls);
    * `test_cpp_namespace` (namespaced classes and `::`-qualified members);
-   * `test_cpp_template` (primary template indexed as a regular class;
-     specializations are not recorded);
+    * `test_cpp_template` (primary template indexed as a `template` kind;
+      member field, member function, explicit specializations, and
+      instantiations continue to be recorded);
    * `test_cpp_lambda` and `test_cpp_lambda1` (lambda kind `L`
      `SEMINDEX_SYMBOL_LAMBDA`, direct call recorded);
    * `test_cpp_base` (multiple inheritance: base class recorded as `READ`);

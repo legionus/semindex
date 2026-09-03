@@ -268,7 +268,19 @@ static semindex_symbol_kind_t recordKindForDecl(const RecordDecl *D)
 	if (D->isUnion())
 		return SEMINDEX_SYMBOL_UNION;
 
-	if (isa<CXXRecordDecl>(D))
+	const auto *CXX = dyn_cast_or_null<CXXRecordDecl>(D);
+
+	/* A primary class template is a CXXRecordDecl whose
+	 * getDescribedClassTemplate() returns a non-null ClassTemplateDecl.
+	 * This is non-null only for non-specialized primary templates:
+	 * explicit specializations, partial specializations, and instantiations
+	 * carry a specialization/MemberSpecializationInfo instead of a
+	 * ClassTemplateDecl pointer (or are not CXXRecordDecl at all). Lambdas
+	 * are never primary templates (they have no getDescribedClassTemplate). */
+	if (CXX && CXX->getDescribedClassTemplate() != nullptr)
+		return SEMINDEX_SYMBOL_TEMPLATE;
+
+	if (CXX)
 		return SEMINDEX_SYMBOL_CLASS;
 
 	return SEMINDEX_SYMBOL_STRUCT;

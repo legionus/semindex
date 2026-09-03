@@ -1,7 +1,7 @@
 {
   "version": 1,
   "symbols": [
-    {"kind":"class","name":"S","owner":null,"type":null,"usr":"c:@ST>1#T@S","usr_id":"2c3bb4f9848fc88f","context":null,"file":"tests/test_cpp_template.cpp","line":3,"column":27,"local":false,"definition":true},
+    {"kind":"template","name":"S","owner":null,"type":null,"usr":"c:@ST>1#T@S","usr_id":"2c3bb4f9848fc88f","context":null,"file":"tests/test_cpp_template.cpp","line":3,"column":27,"local":false,"definition":true},
     {"kind":"field","name":"value","owner":"S","type":"T","usr":"c:@ST>1#T@S@FI@value","usr_id":"284dd7127a6534e1","context":null,"file":"tests/test_cpp_template.cpp","line":4,"column":4,"local":false,"definition":true},
     {"kind":"function","name":"use","owner":"S","type":"long (T)","usr":"c:@ST>1#T@S@F@use#t0.0#","usr_id":"39b9d3b2c8770ea3","context":null,"file":"tests/test_cpp_template.cpp","line":5,"column":7,"local":false,"definition":false},
     {"kind":"class","name":"Outer","owner":null,"type":null,"usr":"c:@S@Outer","usr_id":"e820061f4f0cfa1d","context":null,"file":"tests/test_cpp_template.cpp","line":15,"column":8,"local":false,"definition":true},

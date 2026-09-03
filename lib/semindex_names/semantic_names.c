@@ -23,6 +23,7 @@ static const struct symbol_kind_name symbol_kind_names[] = {
 	{ SEMINDEX_SYMBOL_FILE, "file" },
 	{ SEMINDEX_SYMBOL_CLASS, "class" },
 	{ SEMINDEX_SYMBOL_LAMBDA, "lambda" },
+	{ SEMINDEX_SYMBOL_TEMPLATE, "template" },
 };
 
 const char *semindex_symbol_kind_name(semindex_symbol_kind_t kind)

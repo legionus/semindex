@@ -87,6 +87,7 @@ c class
 d macro definition/reference
 i include file
 L lambda
+T template
 ```
 
 For fields and C++ methods, the printed name is `owner.name`, for example
