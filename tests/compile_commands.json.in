@@ -101,5 +101,15 @@
       "-c",
       "@CMAKE_CURRENT_SOURCE_DIR@/tests/test_cpp_casts.cpp"
     ]
+  },
+  {
+    "directory": "@CMAKE_CURRENT_SOURCE_DIR@",
+    "file": "@CMAKE_CURRENT_SOURCE_DIR@/tests/test_cpp_new_delete.cpp",
+    "arguments": [
+      "@CMAKE_CXX_COMPILER@",
+      "--no-default-config",
+      "-c",
+      "@CMAKE_CURRENT_SOURCE_DIR@/tests/test_cpp_new_delete.cpp"
+    ]
   }
 ]

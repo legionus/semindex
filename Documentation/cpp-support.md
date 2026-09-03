@@ -58,6 +58,11 @@ Uses and access classification.
   The recorded target is the destination type (the pointee class for a pointer
   cast), not the source object; implicit casts introduced by conversion or
   member lookup are not recorded.
+* Explicit `new T`, `new T[N]`, `new (addr) T`, `delete p`, and `delete[] p`
+   are recorded as a `READ` reference on the constructed/deleted type record
+   `T`, the same way a `static_cast` is recorded on its target. The
+   allocation/deallocation functions (`operator new` / `operator delete`)
+   are not recorded. `new` / `delete` on primitives produce no reference.
 * A base-class specifier in a class definition (for example the `B` in
   `class D : public B {}`) is recorded as a `READ` use on the base class `B`,
   matching multiple inheritance; it is not recorded as a call.
@@ -100,7 +105,6 @@ This is a prototype and the following are not available.
 * RTTI. `dynamic_cast<T*>` is recorded only as an explicit user-written cast to
   the destination type; `typeid` and other run-time type identification are not
   modeled.
-* `new` / `delete` expressions are not recorded as references.
 * Indirect-call and points-to analysis are not available in the ordinary query
   path (only an experimental, in-memory constraint collector behind
   `semindex_set_points_to_analysis()` in the parser API).
@@ -145,6 +149,9 @@ The commands below match the project's build system and the
    * `test_cpp_base` (multiple inheritance: base class recorded as `READ`);
    * `test_cpp_casts` (explicit user-written casts recorded as `READ` on the
      destination type).
+   * `test_cpp_new_delete` (explicit `new T` / `new T[N]` / placement
+     `new` / `delete p` / `delete[] p` recorded as `READ` on the
+     constructed/deleted type record).
 
    To run only the C++ output tests:
 

@@ -981,6 +981,28 @@ public:
 		return true;
 	}
 
+	bool VisitCXXNewExpr(CXXNewExpr *E)
+	{
+		const RecordDecl *R = recordDeclForType(E->getAllocatedType());
+
+		/* A primitive target has no record to reference, so no row is
+		 * recorded, matching the cast rule for primitive targets. */
+		if (R)
+			addTypeUse(R, recordKindForDecl(R), E->getBeginLoc(), "");
+
+		return true;
+	}
+
+	bool VisitCXXDeleteExpr(CXXDeleteExpr *E)
+	{
+		const RecordDecl *R = recordDeclForType(E->getDestroyedType());
+
+		if (R)
+			addTypeUse(R, recordKindForDecl(R), E->getBeginLoc(), "");
+
+		return true;
+	}
+
 private:
 	static unsigned long long functionProperties(const FunctionDecl *D)
 	{

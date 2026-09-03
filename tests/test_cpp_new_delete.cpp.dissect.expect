@@ -1,0 +1,49 @@
+
+FILE: tests/test_cpp_new_delete.cpp
+
+   3:10                   -r-   i <new>
+
+FILE: <scratch space>
+
+   6:1                    -r-   d __GLIBC_USE_ISOC23
+
+FILE: tests/test_cpp_new_delete.cpp
+
+   5:7                    def   c T
+   8:6                    def   m T.v                              int
+  10:2                    decl   f T.T                              void (void)
+  11:2                    decl   f T.T                              void (int)
+  14:6                    def   v bufs                             char[16]
+  16:5                    def   f main                             int (void)
+  18:5   main             def . v p                                T *
+  18:5   main             -w- . v p                                T *
+  18:2   main             -r-   c T
+  18:9   main             -r-   c T
+  18:13  main             -r-   c T
+  18:13  main             --r   f T.T                              void (int)
+  19:5   main             def . v np                               T *
+  19:5   main             -w- . v np                               T *
+  19:2   main             -r-   c T
+  19:10  main             -r-   c T
+  19:14  main             -r-   c T
+  19:14  main             --r   f T.T                              void (void)
+  20:5   main             def . v pp                               T *
+  20:5   main             -w- . v pp                               T *
+  20:2   main             -r-   c T
+  20:10  main             -r-   c T
+  20:21  main             -r-   c T
+  20:21  main             --r   f T.T                              void (int)
+  20:15  main             -r-   v bufs                             char[16]
+  21:5   main             def . v up                               T *
+  21:5   main             -w- . v up                               T *
+  21:2   main             -r-   c T
+  21:10  main             -r-   c T
+  21:14  main             -r-   c T
+  21:14  main             --r   f T.T                              void (void)
+  22:2   main             -r-   c T
+  22:9   main             -r- . v p                                T *
+  23:2   main             -r-   c T
+  23:11  main             -r- . v np                               T *
+  25:7   main             def . v q                                int *
+  25:7   main             -w- . v q                                int *
+  26:9   main             -r- . v q                                int *

@@ -105,6 +105,7 @@ set(SEMINDEX_FORMAT_SOURCES
 	tests/test_cpp_lambda.cpp
 	tests/test_cpp_lambda1.cpp
 	tests/test_cpp_method.cpp
+	tests/test_cpp_new_delete.cpp
 	tests/test_cpp_namespace.cpp
 	tests/test_cpp_template.cpp
 	lib/semindex_support/array_size.h
@@ -611,6 +612,7 @@ if(BUILD_TESTING)
 		tests/test_cpp_template.cpp
 		tests/test_cpp_base.cpp
 		tests/test_cpp_casts.cpp
+		tests/test_cpp_new_delete.cpp
 	)
 		get_filename_component(test_name ${test_source} NAME)
 		add_test(

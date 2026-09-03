@@ -271,8 +271,7 @@ Among the missing features are:
 * templates have no dedicated template symbol (the primary template is
   indexed as a regular class, and specializations are not recorded
   separately; see [Documentation/api.md](Documentation/api.md));
-  `new`/`delete` expressions and virtual-dispatch calls are not recorded
-  as references.
+  virtual-dispatch calls are not recorded as references.
 
 ## Motivation
 

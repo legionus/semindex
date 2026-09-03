@@ -90,7 +90,12 @@ casts introduced by conversion, member lookup, or the compiler are not
 recorded, so unrelated member-access noise is not produced; the rule depends
 only on the explicit cast being user-written in source.  A cast to a primitive
 type (`int`, `long`, ...) is also not recorded, consistent with the treatment
-of other primitive operands.
+of other primitive operands.  The same `READ` reference is recorded on the
+constructed type of an explicit `new T` / `new T[N]` / `new (addr) T` and on
+the destroyed type of an explicit `delete p` / `delete[] p`.  The allocation
+and deallocation function symbols (`operator new` / `operator delete`) are
+not recorded; `new` / `delete` on primitives produce no reference.  This is
+independent of the cast rule.
 
 A C++ base-class specifier appearing in a class definition (for example the
 `B` in `class D : public B {}`) is recorded as a `SEMINDEX_USE_READ` use on
