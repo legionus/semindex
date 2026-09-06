@@ -22,6 +22,16 @@ Implemented so far:
   `dynamic_cast<T*>(x)`, and `const_cast<T>(x)` recorded as a `READ` reference
   on the destination type symbol (see
   [Documentation/api.md](Documentation/api.md));
+* C++ class template primaries indexed as a dedicated
+  `SEMINDEX_SYMBOL_TEMPLATE` symbol, with specializations and explicit
+  instantiations recorded only through the primary's own members;
+* C++ lambda declarations indexed as a dedicated `SEMINDEX_SYMBOL_LAMBDA`
+  symbol, with direct calls recorded as `CALL` uses;
+* a C++ base-class specifier recorded as a `READ` reference on the base
+  record, and explicit `new` / `delete` recorded as a `READ` reference on
+  the constructed or destroyed type (see
+  [Documentation/api.md](Documentation/api.md) and
+  [Documentation/cpp-support.md](Documentation/cpp-support.md));
 * access classification:
 
   * `READ`
@@ -268,10 +278,11 @@ Among the missing features are:
   marked with `.type` or `.ent` and common direct-call instructions are
   recognized, but indirect calls and assembler `.macro` expansion are not;
 * LSP support for unsaved buffers, completion, rename, and workspace symbols;
-* templates have no dedicated template symbol (the primary template is
-  indexed as a regular class, and specializations are not recorded
-  separately; see [Documentation/api.md](Documentation/api.md));
-  virtual-dispatch calls are not recorded as references.
+* specializations and explicit instantiations of class templates are not
+  recorded as separate symbols (the primary template remains a dedicated
+  `SEMINDEX_SYMBOL_TEMPLATE` symbol; see
+  [Documentation/api.md](Documentation/api.md));
+* virtual-dispatch calls are not recorded as references.
 
 ## Motivation
 

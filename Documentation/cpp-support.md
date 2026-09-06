@@ -30,9 +30,10 @@ Declarations, definitions, and references.
   data members are `field` symbols.
 * Members are owner-qualified. For classes the qualified name uses the
   `Class.member` form (for example `Circle.process`), the same convention as
-  ordinary structure fields; for namespaced members the C++ `::` spelling is
-  used (for example `alpha::Point.process`, and a namespaced method as
-  `alpha::Point::process`).
+  ordinary structure fields; for namespaced members the C++ `::` chain is kept
+  only inside the namespace name and the `.` separator between the class and
+  its member is preserved (for example `alpha::Point.process`, and a nested
+  form such as `alpha::beta::Node.value`).
 * Overloads are kept distinct: two methods with the same name in different
   classes produce different USRs and thus different `usr_id` values, so
   `Point.process` and `Circle.process` never resolve to the same record.
@@ -86,37 +87,6 @@ a dedicated `SEMINDEX_SYMBOL_TEMPLATE` symbol (name `template`, dissect kind
 explicit instantiations are not recorded as separate symbols. This is the
 intended, supported representation of class templates today.
 
-## What is not supported yet
-
-This is a prototype and the following are not available.
-
-* Function templates, variable templates, and alias templates as dedicated
-  symbols. Only the primary template of a templated class is indexed as a
-  dedicated `SEMINDEX_SYMBOL_TEMPLATE` symbol; function templates are still
-  indexed as `SEMINDEX_SYMBOL_FUNCTION`, and specializations and explicit
-  instantiations such as `S<int>` are not recorded as separate symbols. Uses
-  of a specialization's members resolve to the primary record's symbols.
-* Lambdas and anonymous classes beyond the single `SEMINDEX_SYMBOL_LAMBDA`
-  kind. Only the lambda declaration and its direct calls are indexed; nested
-  anonymous types have no dedicated representation.
-* Virtual-dispatch call resolution. Calls that are resolved only through a
-  virtual table are not recorded as calls, and function-pointer indirection is
-  not resolved to a target.
-* RTTI. `dynamic_cast<T*>` is recorded only as an explicit user-written cast to
-  the destination type; `typeid` and other run-time type identification are not
-  modeled.
-* Indirect-call and points-to analysis are not available in the ordinary query
-  path (only an experimental, in-memory constraint collector behind
-  `semindex_set_points_to_analysis()` in the parser API).
-* The language server does not support unsaved buffers, completion, rename, or
-  workspace symbols for C++ (or C); it reads saved buffers from disk.
-* A persistent type graph beyond the stored declared-to-canonical type
-  relationships.
-
-The full list of limitations, including the C-specific ones, is in
-[Current limitations in README.md](../README.md#current-limitations) and in the
-per-phase "Out of scope" notes in [TODO.md](../TODO.md).
-
 ## How to verify
 
 The commands below match the project's build system and the
@@ -141,9 +111,11 @@ The commands below match the project's build system and the
    * `test_cpp_method` (classes, owner-qualified fields and methods, overloads,
      constructor calls);
    * `test_cpp_namespace` (namespaced classes and `::`-qualified members);
-    * `test_cpp_template` (primary template indexed as a `template` kind;
-      member field, member function, explicit specializations, and
-      instantiations continue to be recorded);
+    * `test_cpp_template` (primary template indexed as a dedicated
+      `SEMINDEX_SYMBOL_TEMPLATE` symbol (dissect kind `T`), with members as
+      the usual methods and fields; specializations and explicit
+      instantiations are not recorded as separate symbols, and uses of a
+      specialization's members resolve to the primary's own members);
    * `test_cpp_lambda` and `test_cpp_lambda1` (lambda kind `L`
      `SEMINDEX_SYMBOL_LAMBDA`, direct call recorded);
    * `test_cpp_base` (multiple inheritance: base class recorded as `READ`);
@@ -183,3 +155,40 @@ how to verify that the supported C++ features are present and that none of the
 behavior described in "What is supported" has regressed. Because this is a
 documentation-only report, it does not change any of the code, the database
 schema, or the fixtures described above.
+
+## Unsupported C++ constructs (details)
+
+The table below lists the C++-specific constructs that are not indexed (or are
+indexable only in a limited form) by the parser today. For the shared C and C++
+gaps — LSP completion/rename, persistent type graph, points-to analysis, and
+preprocessed-only code — see the [Current
+limitations](../README.md#current-limitations) section of the README. Rows that
+show `—` in the code location column do not have a single obvious visitor to
+point at.
+
+| C++ construct | Clang AST node | Current behavior |
+|---|---|---|
+| Function templates as dedicated symbols | `FunctionTemplateDecl` | Indexed as `SEMINDEX_SYMBOL_FUNCTION`; template nature only visible in the USR (`index_ast.cpp:199-211`) |
+| Variable / alias templates | `VarTemplateDecl`, `AliasTemplateDecl` | No dedicated symbol kind |
+| Explicit specializations `S<int>` / partial specializations | `ClassTemplateSpecializationDecl`, `TSK_*` | Declaration is skipped (`VisitRecordDecl` :809-811, `VisitFieldDecl` :616-618, `VisitFunctionDecl` :883-888); uses resolve to the primary via `primaryValueDecl` (`index_ast.cpp:1158-1210`) |
+| Explicit instantiation `template class S<int>;` | `TemplateSpecializationType` in an instantiation context | Not written to the DB |
+| Virtual-dispatch calls | `CXXMemberCallExpr` whose vtable `getDirectCallee() == nullptr` | Early-return; counted only in the points-to stats when `semindex_set_points_to_analysis()` is enabled (`index_ast.cpp:947-964`) |
+| Indirect calls through a function pointer | `CallExpr` with a function-pointer callee | `if (!FD) return true` — not written outside the experimental points-to path (`index_ast.cpp:947`) |
+| Member-function-pointer invocation | `CXXBindTIExpr` / `MemberCallExpr` on a pointer base | `pointerDecl()` does not recognise it (`index_ast.cpp:1054-1071`) |
+| Placement `new` | `CXXNewExpr` + `OperatorNewExpr` | The `READ` on the record is recorded; the `operator new` call is not (`index_ast.cpp:984-1004`) |
+| `new T[]` / `new (loc) T[]` as distinct semantics | `FunctionDecl` with `OO_New` / `OO_Delete` | Indexed as a plain `function`; the array / placement semantics are not modelled as a separate kind |
+| RTTI: `typeid x` | `CXXTypeidExpr` | Not handled |
+| RTTI: `dynamic_cast` as dispatch | `CXXDynamicCastExpr` / `ImplicitCastExpr` | Recorded only as a `READ` on the destination type; the virtual-dispatch meaning is not visible (`index_ast.cpp:671-702`) |
+| Implicit `static_cast` / `const_cast` / `explicit` on the source type | `CXXFunctionalCastExpr`, `CXXReinterpretCastExpr`, `CXXBindTemporaryExpr` | Only the destination is recorded; source / intermediate temporaries are not (rule: "user-written only") |
+| `try` / `catch` | `CXXTryStmt`, `CXXCatchStmt` | Not handled |
+| `throw` | `CXXThrowExpr` | Not recorded |
+| Exception specifiers / `noexcept` | Function / `ParmVarDecl` attributes | Not recorded in symbol properties (`index_ast.cpp:1007-1026`) |
+| Nested / anonymous classes inside a function | `CXXRecordDecl` with an empty name | Skipped as separate symbols; lambda closure is the exception (`index_ast.cpp:806-808, 1557-1583`) |
+| `using` alias / qualified `using` declaration | `TypedefDecl` / `UsingShadowDecl` | `TypedefDecl` is indexed as a typedef; `UsingShadowDecl` and qualified aliases are not handled (`index_ast.cpp:639-669`) |
+| Friend functions / `friend` declarations | `FriendDecl` (not a `FunctionDecl`) | Not recorded |
+| `goto` / label references | `LabelStmt` / `LabelDecl` | Not recorded (shared C gap) |
+| `constexpr` / `consteval` / CTAD guides | `DeductionGuideDecl`, `FunctionDecl` | Not handled |
+| `static_assert` | `StaticAssertDecl` | Not a dedicated symbol |
+| LSP completion / rename / unsaved buffers for C++ | `—` | Explicitly not supported (shared LSP gap, see [README — Current limitations](../README.md#current-limitations)) |
+| Points-to analysis (regular query path) | any function-pointer / member-pointer use | Available only behind the experimental `semindex_set_points_to_analysis()` (`index_ast.cpp:460-470, 557-609, 947-964`) |
+| Persistent type graph | any `TypeDecl` | Only stored declared-to-canonical relations (see [README — Current limitations](../README.md#current-limitations)) |

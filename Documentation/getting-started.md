@@ -102,6 +102,15 @@ semindex search Circle.process
 semindex search --kind=function 'Circle.*'
 ```
 
+Namespaced C++ members use the `::`-qualified form:
+
+```sh
+semindex search alpha::Point.process
+```
+
+For the full list of supported and unsupported C++ features, see
+[C++ support](cpp-support.md).
+
 Query direct call relationships:
 
 ```sh

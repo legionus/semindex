@@ -66,6 +66,10 @@ C++ member symbols are stored owner-qualified (`Class.method`,
 `Class.field`, or the `ns::Class.member` namespace form) in the same column, so
 they use the same key and the same exact
 and glob lookups as structure fields.
+The same storage and lookup rules apply to symbols of the other C++ kinds,
+for example a lambda symbol (displayed name `__lambda`, kind `lambda`) and
+the primary symbol of a templated class (kind `template`); their members keep
+the owner-qualified `Template.member` form.
 They may also restrict local records by their containing function and local
 status, allowing language-server queries to distinguish same-named local
 variables without adding an index or changing the database layout.
