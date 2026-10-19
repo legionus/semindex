@@ -615,6 +615,14 @@ if(BUILD_TESTING)
 		tests/test_cpp_new_delete.cpp
 	)
 		get_filename_component(test_name ${test_source} NAME)
+		set(json_expect ${test_source}.json.expect)
+		if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${test_source}.llvm${LLVM_VERSION_MAJOR}.json.expect)
+			set(json_expect ${test_source}.llvm${LLVM_VERSION_MAJOR}.json.expect)
+		endif()
+		set(dissect_expect ${test_source}.dissect.expect)
+		if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${test_source}.llvm${LLVM_VERSION_MAJOR}.dissect.expect)
+			set(dissect_expect ${test_source}.llvm${LLVM_VERSION_MAJOR}.dissect.expect)
+		endif()
 		add_test(
 			NAME semindex-json-${test_name}
 			COMMAND
@@ -626,7 +634,7 @@ if(BUILD_TESTING)
 				PYTHON=${Python3_EXECUTABLE}
 				sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-output-tests.sh
 					${test_source}
-					${test_source}.json.expect
+					${json_expect}
 					json
 		)
 		add_test(
@@ -640,7 +648,7 @@ if(BUILD_TESTING)
 				PYTHON=${Python3_EXECUTABLE}
 				sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-output-tests.sh
 					${test_source}
-					${test_source}.dissect.expect
+					${dissect_expect}
 		)
 	endforeach()
 	add_test(
