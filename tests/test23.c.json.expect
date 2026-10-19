@@ -1,19 +1,19 @@
 {
   "version": 1,
   "symbols": [
-    {"kind":"macro","name":"_alias_","owner":null,"type":null,"usr":"macro:_alias_","usr_id":"a885622defe8e306","context":null,"file":"tests/test23.c","line":12,"column":9,"local":false,"definition":true},
-    {"kind":"function","name":"target_function","owner":null,"type":"int (void)","usr":"c:@F@target_function","usr_id":"d03120793dbe13da","context":null,"file":"tests/test23.c","line":2,"column":5,"local":false,"definition":true},
-    {"kind":"function","name":"function_alias","owner":null,"type":"int (void)","usr":"c:@F@function_alias","usr_id":"7d9ba81b06e3e5a0","context":null,"file":"tests/test23.c","line":7,"column":5,"local":false,"definition":true},
-    {"kind":"variable","name":"target_variable","owner":null,"type":"int","usr":"c:@target_variable","usr_id":"c73779fe1dd64caa","context":null,"file":"tests/test23.c","line":9,"column":5,"local":false,"definition":true},
-    {"kind":"variable","name":"variable_alias","owner":null,"type":"int","usr":"c:@variable_alias","usr_id":"2ca348711c1c139e","context":null,"file":"tests/test23.c","line":10,"column":12,"local":false,"definition":true},
-    {"kind":"function","name":"macro_alias","owner":null,"type":"typeof (target_function)","usr":"c:@F@macro_alias","usr_id":"41d7932d3d10ce18","context":null,"file":"tests/test23.c","line":13,"column":33,"local":false,"definition":true}
+    {"kind":"macro","name":"_alias_","owner":null,"type":null,"usr":"macro:_alias_","usr_id":"def57955b168bfe9","context":null,"file":"tests/test23.c","line":12,"column":9,"local":false,"definition":true},
+    {"kind":"function","name":"target_function","owner":null,"type":"int (void)","usr":"c:@F@target_function","usr_id":"223b654a85f91ce2","context":null,"file":"tests/test23.c","line":2,"column":5,"local":false,"definition":true},
+    {"kind":"function","name":"function_alias","owner":null,"type":"int (void)","usr":"c:@F@function_alias","usr_id":"70e17f16c687f6ad","context":null,"file":"tests/test23.c","line":7,"column":5,"local":false,"definition":true},
+    {"kind":"variable","name":"target_variable","owner":null,"type":"int","usr":"c:@target_variable","usr_id":"c3fdde051ed8bb8d","context":null,"file":"tests/test23.c","line":9,"column":5,"local":false,"definition":true},
+    {"kind":"variable","name":"variable_alias","owner":null,"type":"int","usr":"c:@variable_alias","usr_id":"3b9ee393ba84a078","context":null,"file":"tests/test23.c","line":10,"column":12,"local":false,"definition":true},
+    {"kind":"function","name":"macro_alias","owner":null,"type":"typeof (target_function)","usr":"c:@F@macro_alias","usr_id":"5be51bfb2b4d6de8","context":null,"file":"tests/test23.c","line":13,"column":33,"local":false,"definition":true}
   ],
   "uses": [
-    {"kind":"read","symbol_kind":"macro","mode":"-r-","mode_bits":4,"name":"_alias_","owner":null,"type":null,"usr":"macro:_alias_","usr_id":"a885622defe8e306","context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test23.c","line":13,"column":8,"local":false},
-    {"kind":"address","symbol_kind":"function","mode":"m--","mode_bits":3,"name":"target_function","owner":null,"type":"int (void)","usr":"c:@F@target_function","usr_id":"d03120793dbe13da","context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test23.c","line":7,"column":48,"local":false},
-    {"kind":"write","symbol_kind":"variable","mode":"-w-","mode_bits":8,"name":"target_variable","owner":null,"type":"int","usr":"c:@target_variable","usr_id":"c73779fe1dd64caa","context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test23.c","line":9,"column":5,"local":false},
-    {"kind":"address","symbol_kind":"variable","mode":"m--","mode_bits":3,"name":"target_variable","owner":null,"type":"int","usr":"c:@target_variable","usr_id":"c73779fe1dd64caa","context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test23.c","line":10,"column":49,"local":false},
-    {"kind":"address","symbol_kind":"function","mode":"m--","mode_bits":3,"name":"target_function","owner":null,"type":"int (void)","usr":"c:@F@target_function","usr_id":"d03120793dbe13da","context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test23.c","line":13,"column":8,"local":false},
-    {"kind":"read","symbol_kind":"function","mode":"--r","mode_bits":16,"name":"target_function","owner":null,"type":"int (void)","usr":"c:@F@target_function","usr_id":"d03120793dbe13da","context":"macro_alias","context_usr":null,"context_usr_id":null,"file":"tests/test23.c","line":13,"column":16,"local":false}
+    {"kind":"read","symbol_kind":"macro","mode":"-r-","mode_bits":4,"name":"_alias_","owner":null,"type":null,"usr":"macro:_alias_","usr_id":"def57955b168bfe9","context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test23.c","line":13,"column":8,"local":false},
+    {"kind":"address","symbol_kind":"function","mode":"m--","mode_bits":3,"name":"target_function","owner":null,"type":"int (void)","usr":"c:@F@target_function","usr_id":"223b654a85f91ce2","context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test23.c","line":7,"column":48,"local":false},
+    {"kind":"write","symbol_kind":"variable","mode":"-w-","mode_bits":8,"name":"target_variable","owner":null,"type":"int","usr":"c:@target_variable","usr_id":"c3fdde051ed8bb8d","context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test23.c","line":9,"column":5,"local":false},
+    {"kind":"address","symbol_kind":"variable","mode":"m--","mode_bits":3,"name":"target_variable","owner":null,"type":"int","usr":"c:@target_variable","usr_id":"c3fdde051ed8bb8d","context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test23.c","line":10,"column":49,"local":false},
+    {"kind":"address","symbol_kind":"function","mode":"m--","mode_bits":3,"name":"target_function","owner":null,"type":"int (void)","usr":"c:@F@target_function","usr_id":"223b654a85f91ce2","context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test23.c","line":13,"column":8,"local":false},
+    {"kind":"read","symbol_kind":"function","mode":"--r","mode_bits":16,"name":"target_function","owner":null,"type":"int (void)","usr":"c:@F@target_function","usr_id":"223b654a85f91ce2","context":"macro_alias","context_usr":null,"context_usr_id":null,"file":"tests/test23.c","line":13,"column":16,"local":false}
   ]
 }

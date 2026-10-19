@@ -368,9 +368,9 @@ void rebuildRecords(semindex *s)
 		rec.type_kind = sym.type_kind;
 		rec.type_symbol = sym.type_symbol.c_str();
 		rec.type_usr = sym.type_usr.c_str();
-		rec.type_usr_id = sym.type_usr.empty() ? 0 : llvm::xxHash64(sym.type_usr);
+		rec.type_usr_id = sym.type_usr.empty() ? 0 : llvm::xxh3_64bits(sym.type_usr);
 		rec.usr = sym.usr.c_str();
-		rec.usr_id = sym.usr.empty() ? 0 : llvm::xxHash64(sym.usr);
+		rec.usr_id = sym.usr.empty() ? 0 : llvm::xxh3_64bits(sym.usr);
 		rec.context = sym.context.c_str();
 		rec.file = sym.loc.file ? sym.loc.file->c_str() : "";
 		rec.file_index = sym.loc.file ? file_index.at(sym.loc.file) : s->files.size();
@@ -399,8 +399,8 @@ void rebuildRecords(semindex *s)
 		rec.usr = use.usr.c_str();
 		rec.context = use.context.c_str();
 		rec.context_usr = use.context_usr.c_str();
-		rec.usr_id = use.usr.empty() ? 0 : llvm::xxHash64(use.usr);
-		rec.context_usr_id = use.context_usr.empty() ? 0 : llvm::xxHash64(use.context_usr);
+		rec.usr_id = use.usr.empty() ? 0 : llvm::xxh3_64bits(use.usr);
+		rec.context_usr_id = use.context_usr.empty() ? 0 : llvm::xxh3_64bits(use.context_usr);
 		rec.file = use.loc.file ? use.loc.file->c_str() : "";
 		rec.file_index = use.loc.file ? file_index.at(use.loc.file) : s->files.size();
 		rec.line = use.loc.line;
@@ -429,7 +429,7 @@ void rebuildRecords(semindex *s)
 				.type_kind = parameter.type_kind,
 				.type_symbol = parameter.type_symbol.c_str(),
 				.type_usr = parameter.type_usr.c_str(),
-				.type_usr_id = parameter.type_usr.empty() ? 0 : llvm::xxHash64(parameter.type_usr),
+				.type_usr_id = parameter.type_usr.empty() ? 0 : llvm::xxh3_64bits(parameter.type_usr),
 			});
 		}
 
@@ -437,7 +437,7 @@ void rebuildRecords(semindex *s)
 			.name = signature.name.c_str(),
 			.owner = signature.owner.c_str(),
 			.usr = signature.usr.c_str(),
-			.usr_id = signature.usr.empty() ? 0 : llvm::xxHash64(signature.usr),
+			.usr_id = signature.usr.empty() ? 0 : llvm::xxh3_64bits(signature.usr),
 			.return_type = signature.return_type.c_str(),
 			.canonical_return_type = signature.canonical_return_type.c_str(),
 			.parameters = parameters.data(),

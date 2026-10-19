@@ -1,17 +1,17 @@
 {
   "version": 1,
   "symbols": [
-    {"kind":"class","name":"B","owner":null,"type":null,"usr":"c:@S@B","usr_id":"2afbaef9e8dccd1b","context":null,"file":"tests/test_cpp_base.cpp","line":3,"column":8,"local":false,"definition":true},
-    {"kind":"field","name":"v","owner":"B","type":"int","usr":"c:@S@B@FI@v","usr_id":"5499b60c8ffdcd0e","context":null,"file":"tests/test_cpp_base.cpp","line":4,"column":6,"local":false,"definition":true},
-    {"kind":"class","name":"D1","owner":null,"type":null,"usr":"c:@S@D1","usr_id":"11cfcd775e8cfe96","context":null,"file":"tests/test_cpp_base.cpp","line":6,"column":8,"local":false,"definition":true},
-    {"kind":"class","name":"D2","owner":null,"type":null,"usr":"c:@S@D2","usr_id":"9f5b7e321b4fb8ff","context":null,"file":"tests/test_cpp_base.cpp","line":8,"column":8,"local":false,"definition":true},
-    {"kind":"class","name":"D3","owner":null,"type":null,"usr":"c:@S@D3","usr_id":"4064668461bfa10b","context":null,"file":"tests/test_cpp_base.cpp","line":10,"column":8,"local":false,"definition":true},
-    {"kind":"class","name":"X","owner":null,"type":null,"usr":"c:@S@X","usr_id":"3a6ccff72cf0c64c","context":null,"file":"tests/test_cpp_base.cpp","line":12,"column":8,"local":false,"definition":true},
-    {"kind":"field","name":"w","owner":"X","type":"int","usr":"c:@S@X@FI@w","usr_id":"9029cbfa71fca253","context":null,"file":"tests/test_cpp_base.cpp","line":13,"column":6,"local":false,"definition":true}
+    {"kind":"class","name":"B","owner":null,"type":null,"usr":"c:@S@B","usr_id":"11c88f0d7c886009","context":null,"file":"tests/test_cpp_base.cpp","line":3,"column":8,"local":false,"definition":true},
+    {"kind":"field","name":"v","owner":"B","type":"int","usr":"c:@S@B@FI@v","usr_id":"b3ccba25febca38f","context":null,"file":"tests/test_cpp_base.cpp","line":4,"column":6,"local":false,"definition":true},
+    {"kind":"class","name":"D1","owner":null,"type":null,"usr":"c:@S@D1","usr_id":"b7652512d80e0d09","context":null,"file":"tests/test_cpp_base.cpp","line":6,"column":8,"local":false,"definition":true},
+    {"kind":"class","name":"D2","owner":null,"type":null,"usr":"c:@S@D2","usr_id":"47537315a27bcc38","context":null,"file":"tests/test_cpp_base.cpp","line":8,"column":8,"local":false,"definition":true},
+    {"kind":"class","name":"D3","owner":null,"type":null,"usr":"c:@S@D3","usr_id":"10850189c5527faa","context":null,"file":"tests/test_cpp_base.cpp","line":10,"column":8,"local":false,"definition":true},
+    {"kind":"class","name":"X","owner":null,"type":null,"usr":"c:@S@X","usr_id":"881aeb76411c7bd8","context":null,"file":"tests/test_cpp_base.cpp","line":12,"column":8,"local":false,"definition":true},
+    {"kind":"field","name":"w","owner":"X","type":"int","usr":"c:@S@X@FI@w","usr_id":"6991c6e142a146f0","context":null,"file":"tests/test_cpp_base.cpp","line":13,"column":6,"local":false,"definition":true}
   ],
   "uses": [
-    {"kind":"read","symbol_kind":"class","mode":"-r-","mode_bits":4,"name":"B","owner":null,"type":null,"usr":"c:@S@B","usr_id":"2afbaef9e8dccd1b","context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test_cpp_base.cpp","line":6,"column":20,"local":false},
-    {"kind":"read","symbol_kind":"class","mode":"-r-","mode_bits":4,"name":"B","owner":null,"type":null,"usr":"c:@S@B","usr_id":"2afbaef9e8dccd1b","context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test_cpp_base.cpp","line":8,"column":23,"local":false},
-    {"kind":"read","symbol_kind":"class","mode":"-r-","mode_bits":4,"name":"B","owner":null,"type":null,"usr":"c:@S@B","usr_id":"2afbaef9e8dccd1b","context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test_cpp_base.cpp","line":10,"column":21,"local":false}
+    {"kind":"read","symbol_kind":"class","mode":"-r-","mode_bits":4,"name":"B","owner":null,"type":null,"usr":"c:@S@B","usr_id":"11c88f0d7c886009","context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test_cpp_base.cpp","line":6,"column":20,"local":false},
+    {"kind":"read","symbol_kind":"class","mode":"-r-","mode_bits":4,"name":"B","owner":null,"type":null,"usr":"c:@S@B","usr_id":"11c88f0d7c886009","context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test_cpp_base.cpp","line":8,"column":23,"local":false},
+    {"kind":"read","symbol_kind":"class","mode":"-r-","mode_bits":4,"name":"B","owner":null,"type":null,"usr":"c:@S@B","usr_id":"11c88f0d7c886009","context":null,"context_usr":null,"context_usr_id":null,"file":"tests/test_cpp_base.cpp","line":10,"column":21,"local":false}
   ]
 }

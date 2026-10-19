@@ -484,7 +484,7 @@ public:
 
 		currentFunction = getName(D);
 		currentFunctionUSR = D->doesThisDeclarationHaveABody() ? functionUSR(D) : "";
-		currentFunctionUSRId = currentFunctionUSR.empty() ? 0 : llvm::xxHash64(currentFunctionUSR);
+		currentFunctionUSRId = currentFunctionUSR.empty() ? 0 : llvm::xxh3_64bits(currentFunctionUSR);
 		bool ret = RecursiveASTVisitor<SemindexVisitor>::TraverseFunctionDecl(D);
 
 		currentFunction = oldFunction;
@@ -1269,7 +1269,7 @@ private:
 				u.name = "__lambda";
 				u.owner = "";
 				u.usr = getUSR(closure, ctx);
-				u.usr_id = u.usr.empty() ? 0 : llvm::xxHash64(u.usr);
+				u.usr_id = u.usr.empty() ? 0 : llvm::xxh3_64bits(u.usr);
 
 				index.addUseInScope(std::move(u), loc);
 				return;
@@ -1283,7 +1283,7 @@ private:
 		u.owner = info.owner;
 		u.type = info.type;
 		u.usr = functionUSR(D);
-		u.usr_id = u.usr.empty() ? 0 : llvm::xxHash64(u.usr);
+		u.usr_id = u.usr.empty() ? 0 : llvm::xxh3_64bits(u.usr);
 
 		index.addUseInScope(std::move(u), loc);
 	}

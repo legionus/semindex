@@ -1,15 +1,15 @@
 {
   "version": 1,
   "symbols": [
-    {"kind":"function","name":"main","owner":null,"type":"int (void)","usr":"c:@F@main#","usr_id":"8ee1ab9c21451584","context":null,"file":"tests/test_cpp_lambda.cpp","line":3,"column":5,"local":false,"definition":true},
-    {"kind":"lambda","name":"__lambda","owner":null,"type":null,"usr":"c:test_cpp_lambda.cpp@69@F@main#@Sa","usr_id":"2019d45ade0d9ac8","context":null,"file":"tests/test_cpp_lambda.cpp","line":5,"column":18,"local":true,"definition":true},
-    {"kind":"variable","name":"l","owner":null,"type":"struct :l","usr":"c:test_cpp_lambda.cpp@60@F@main#@l","usr_id":"a9d2efb77d1ee322","context":"main","file":"tests/test_cpp_lambda.cpp","line":5,"column":7,"local":true,"definition":true},
-    {"kind":"variable","name":"x","owner":null,"type":"int","usr":"c:test_cpp_lambda.cpp@72@F@main#@Sa@F@operator()#I#1@x","usr_id":"cd16cf9e00adecd4","context":"main","file":"tests/test_cpp_lambda.cpp","line":5,"column":18,"local":true,"definition":true}
+    {"kind":"function","name":"main","owner":null,"type":"int (void)","usr":"c:@F@main#","usr_id":"841c4e0268f63356","context":null,"file":"tests/test_cpp_lambda.cpp","line":3,"column":5,"local":false,"definition":true},
+    {"kind":"lambda","name":"__lambda","owner":null,"type":null,"usr":"c:test_cpp_lambda.cpp@69@F@main#@Sa","usr_id":"7ca26439a16f7c77","context":null,"file":"tests/test_cpp_lambda.cpp","line":5,"column":18,"local":true,"definition":true},
+    {"kind":"variable","name":"l","owner":null,"type":"struct :l","usr":"c:test_cpp_lambda.cpp@60@F@main#@l","usr_id":"99aa3e2b7eb676ad","context":"main","file":"tests/test_cpp_lambda.cpp","line":5,"column":7,"local":true,"definition":true},
+    {"kind":"variable","name":"x","owner":null,"type":"int","usr":"c:test_cpp_lambda.cpp@72@F@main#@Sa@F@operator()#I#1@x","usr_id":"2aefed65e48a6b8c","context":"main","file":"tests/test_cpp_lambda.cpp","line":5,"column":18,"local":true,"definition":true}
   ],
   "uses": [
-    {"kind":"write","symbol_kind":"variable","mode":"-w-","mode_bits":8,"name":"l","owner":null,"type":"struct :l","usr":"c:test_cpp_lambda.cpp@60@F@main#@l","usr_id":"a9d2efb77d1ee322","context":"main","context_usr":null,"context_usr_id":null,"file":"tests/test_cpp_lambda.cpp","line":5,"column":7,"local":true},
-    {"kind":"read","symbol_kind":"variable","mode":"-r-","mode_bits":4,"name":"x","owner":null,"type":"int","usr":"c:test_cpp_lambda.cpp@72@F@main#@Sa@F@operator()#I#1@x","usr_id":"cd16cf9e00adecd4","context":"main","context_usr":null,"context_usr_id":null,"file":"tests/test_cpp_lambda.cpp","line":5,"column":30,"local":true},
-    {"kind":"call","symbol_kind":"lambda","mode":"--r","mode_bits":16,"name":"__lambda","owner":null,"type":null,"usr":"c:test_cpp_lambda.cpp@69@F@main#@Sa","usr_id":"2019d45ade0d9ac8","context":"main","context_usr":"c:@F@main#","context_usr_id":"8ee1ab9c21451584","file":"tests/test_cpp_lambda.cpp","line":6,"column":9,"local":false},
-    {"kind":"read","symbol_kind":"variable","mode":"-r-","mode_bits":4,"name":"l","owner":null,"type":"class (lambda at tests/test_cpp_lambda.cpp:5:11)","usr":"c:test_cpp_lambda.cpp@60@F@main#@l","usr_id":"a9d2efb77d1ee322","context":"main","context_usr":null,"context_usr_id":null,"file":"tests/test_cpp_lambda.cpp","line":6,"column":9,"local":true}
+    {"kind":"write","symbol_kind":"variable","mode":"-w-","mode_bits":8,"name":"l","owner":null,"type":"struct :l","usr":"c:test_cpp_lambda.cpp@60@F@main#@l","usr_id":"99aa3e2b7eb676ad","context":"main","context_usr":null,"context_usr_id":null,"file":"tests/test_cpp_lambda.cpp","line":5,"column":7,"local":true},
+    {"kind":"read","symbol_kind":"variable","mode":"-r-","mode_bits":4,"name":"x","owner":null,"type":"int","usr":"c:test_cpp_lambda.cpp@72@F@main#@Sa@F@operator()#I#1@x","usr_id":"2aefed65e48a6b8c","context":"main","context_usr":null,"context_usr_id":null,"file":"tests/test_cpp_lambda.cpp","line":5,"column":30,"local":true},
+    {"kind":"call","symbol_kind":"lambda","mode":"--r","mode_bits":16,"name":"__lambda","owner":null,"type":null,"usr":"c:test_cpp_lambda.cpp@69@F@main#@Sa","usr_id":"7ca26439a16f7c77","context":"main","context_usr":"c:@F@main#","context_usr_id":"841c4e0268f63356","file":"tests/test_cpp_lambda.cpp","line":6,"column":9,"local":false},
+    {"kind":"read","symbol_kind":"variable","mode":"-r-","mode_bits":4,"name":"l","owner":null,"type":"class (lambda at tests/test_cpp_lambda.cpp:5:11)","usr":"c:test_cpp_lambda.cpp@60@F@main#@l","usr_id":"99aa3e2b7eb676ad","context":"main","context_usr":null,"context_usr_id":null,"file":"tests/test_cpp_lambda.cpp","line":6,"column":9,"local":true}
   ]
 }
