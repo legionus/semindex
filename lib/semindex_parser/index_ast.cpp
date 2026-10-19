@@ -8,7 +8,11 @@
 #include <clang/AST/TypeLoc.h>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Frontend/FrontendActions.h>
+#if __has_include(<clang/UnifiedSymbolResolution/USRGeneration.h>)
+#include <clang/UnifiedSymbolResolution/USRGeneration.h>
+#else
 #include <clang/Index/USRGeneration.h>
+#endif
 #include <clang/Lex/Lexer.h>
 #include <clang/Lex/Preprocessor.h>
 #include <clang/Tooling/Tooling.h>
